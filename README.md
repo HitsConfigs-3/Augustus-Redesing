@@ -1,44 +1,51 @@
 # Augustus Redesing
 
-Rediseño visual del cliente **Augustus** para **Minecraft 1.8.9**.
+Rediseño visual del cliente **Augustus** para **Minecraft 1.8.9**, hecho por **Dream Visuals**.
 
 Esta build mantiene **Java 8, Minecraft 1.8.9 y LWJGL 2** exactamente como el cliente original, pero
 reemplaza toda la capa de presentación por una interfaz de cristal sólido: paneles oscuros, superficies
 con desenfoque real, tipografía MSDF e iconos vectoriales.
 
+<!-- Jerarquía de créditos: 1) Dream Visuals (autor del rediseño), 2) HitsConfigs (patrocinio), 3) el cliente de Skid Solutions -->
 <p align="center">
-  <img src="assets/ss.png" alt="Augustus Redesing" width="640" />
-</p>
-
-<p align="center">
-  <img src="assets/branding/hitsconfigs.jpg" alt="HitsConfigs" width="170" />
+  <img src="assets/branding/dream-visuals.jpg" alt="Dream Visuals" width="200" />
   &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-  <img src="assets/branding/dream-visuals.jpg" alt="Dream Visuals" width="170" />
+  <img src="assets/branding/hitsconfigs.jpg" alt="HitsConfigs" width="160" />
 </p>
 
 <p align="center">
-  <b>Patrocinado por HitsConfigs</b>
-  &nbsp;&nbsp;·&nbsp;&nbsp;
   <b>Rediseñado por Dream Visuals</b>
+  &nbsp;&nbsp;·&nbsp;&nbsp;
+  <b>Patrocinado por HitsConfigs</b>
 </p>
 
 ---
 
 ## Créditos
 
-### Patrocinio y autoría del rediseño
+### 1. Rediseño — Dream Visuals
 
-- **Patrocinado por HitsConfigs** — el patrocinador de esta build.
-- **Rediseñado por Dream Visuals** — autor del rediseño visual (interfaz de cristal sólido, desenfoque
-  real, tipografía MSDF, iconos Tabler y animaciones).
+**Dream Visuals** es el autor principal de todo lo que ves aquí: la interfaz de cristal sólido, el
+desenfoque gaussiano multipaso real, la tipografía MSDF, los iconos Tabler y las animaciones.
 
-El cliente **Augustus** no es mío: viene de **https://github.com/Skid-Technology/OpenAugustus**, que es la
-base directa de este rediseño. Todo el mérito del cliente original (módulos, sistema de configuración,
-gestión de eventos, hacks) es de su autor y colaboradores.
+### 2. Patrocinio — HitsConfigs
 
-- **Origen directo de esta build:** [Skid-Technology/OpenAugustus](https://github.com/Skid-Technology/OpenAugustus)
+Esta build se publica **con el patrocinio de HitsConfigs**.
+
+### 3. Cliente — Skid Solutions / OpenAugustus
+
+<p align="center">
+  <img src="assets/ss.png" alt="Skid Solutions" width="420" />
+</p>
+
+El cliente **Augustus** no es de este rediseño: viene de
+**[Skid-Technology/OpenAugustus](https://github.com/Skid-Technology/OpenAugustus)** (Skid Solutions), que
+es la base directa sobre la que está hecho todo esto. Todo el mérito del cliente original (módulos,
+sistema de configuración, gestión de eventos, hacks) es de su autor y colaboradores.
+
+- **Origen directo de esta build:** [Skid-Technology/OpenAugustus](https://github.com/Skid-Technology/OpenAugustus) (Skid Solutions)
 - **Origen original del cliente Augustus:** [yxzeroo/openaugustus](https://github.com/yxzeroo/openaugustus) (así lo acredita el README de OpenAugustus)
-- Comunidad del autor original: https://discord.gg/skidsolutions
+- Comunidad del cliente: https://discord.gg/skidsolutions
 
 Este repositorio es un **derivado** de OpenAugustus. El rediseño es **exclusivamente visual**: no se ha
 alterado la lógica de ningún módulo, ni los ajustes, ni el formato de configuración.
