@@ -62,7 +62,8 @@ El lanzador funciona en dos modos y elige solo:
 ### Opción 2 — Desde el código fuente (lo que se usa en desarrollo)
 
 ```powershell
-cd OpenAugustus
+git clone https://github.com/HitsConfigs-3/Augustus-Redesing.git
+cd Augustus-Redesing
 .\gradlew.bat runClient
 ```
 
@@ -104,7 +105,7 @@ Ejecuta directamente `src/main/java/Start.java` (o `StartMinecraftDirectory.java
 ## Cómo compilar
 
 ```powershell
-cd OpenAugustus
+# desde la raíz del repositorio clonado
 .\gradlew.bat clean build      # build/libs/openaugustus-b4.23.3.jar
 .\gradlew.bat fatJar           # build/libs/openaugustus-b4.23.3-all.jar  (todo incluido, es el del release)
 .\gradlew.bat compatibilityJar # variante para JRE 8 con políticas JCE restringidas
@@ -134,7 +135,7 @@ formato de los ficheros de configuración y las claves persistidas (`X`, `Y`, `W
 ## Estructura
 
 ```
-OpenAugustus/
+Augustus-Redesing/
 ├── launcher/          # lanzador de Windows (Iniciar-Augustus-Redesing.bat + launcher.ps1)
 ├── src/main/java/     # código del cliente (net/augustus/** es el cliente; net/minecraft/** la base 1.8.9)
 ├── tools/             # scripts de verificación usados durante el desarrollo
