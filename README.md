@@ -10,9 +10,27 @@ con desenfoque real, tipografía MSDF e iconos vectoriales.
   <img src="assets/ss.png" alt="Augustus Redesing" width="640" />
 </p>
 
+<p align="center">
+  <img src="assets/branding/hitsconfigs.jpg" alt="HitsConfigs" width="170" />
+  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+  <img src="assets/branding/dream-visuals.jpg" alt="Dream Visuals" width="170" />
+</p>
+
+<p align="center">
+  <b>Patrocinado por HitsConfigs</b>
+  &nbsp;&nbsp;·&nbsp;&nbsp;
+  <b>Rediseñado por Dream Visuals</b>
+</p>
+
 ---
 
 ## Créditos
+
+### Patrocinio y autoría del rediseño
+
+- **Patrocinado por HitsConfigs** — el patrocinador de esta build.
+- **Rediseñado por Dream Visuals** — autor del rediseño visual (interfaz de cristal sólido, desenfoque
+  real, tipografía MSDF, iconos Tabler y animaciones).
 
 El cliente **Augustus** no es mío: viene de **https://github.com/Skid-Technology/OpenAugustus**, que es la
 base directa de este rediseño. Todo el mérito del cliente original (módulos, sistema de configuración,
