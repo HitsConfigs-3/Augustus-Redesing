@@ -2,17 +2,19 @@ package net.augustus.settings;
 
 import java.io.IOException;
 import java.util.Objects;
-import net.augustus.modules.Module;
+import net.augustus.Augustus;
 import net.augustus.clickgui.components.SliderComponent;
 import net.augustus.clickgui.components.TextFieldComponent;
-import net.augustus.utils.input.KeyboardInputUtil;
 import net.augustus.font.CustomFontUtil;
-import net.augustus.ClientManagers;
-import net.augustus.settings.property.DoubleProperty;
 import net.augustus.font.FontManager;
-import net.augustus.utils.math.MathStatisticsUtil;
+import net.augustus.modules.Module;
 import net.augustus.render.RenderUtil;
-import net.augustus.Augustus;
+import net.augustus.settings.property.DoubleProperty;
+import net.augustus.ui.modern.components.ModernSettingsPanel;
+import net.augustus.ui.modern.components.ModernSlider;
+import net.augustus.ui.modern.render.UiTheme;
+import net.augustus.utils.input.KeyboardInputUtil;
+import net.augustus.utils.math.MathStatisticsUtil;
 import net.minecraft.util.MathHelper;
 
 public class DoubleValue extends Setting {
@@ -23,16 +25,18 @@ public class DoubleValue extends Setting {
    private long lastArrowRepeatTimeMs;
    private boolean scrollAdjusted;
    private final SliderComponent slider;
+   private final ModernSlider modernSlider = new ModernSlider();
    private double minValue;
    private int labelWidth;
    private final DoubleProperty v;
    private double lastSyncedValue;
    private boolean arrowAdjusting;
    private double maxValue;
+   private int renderedHeight = ModernSettingsPanel.MIN_CARD_HEIGHT;
 
    @Override
    public int getHeight() {
-      return 27;
+      return this.renderedHeight;
    }
 
    public DoubleValue visibleWhen(SettingVisibilityCondition condition) {
@@ -42,43 +46,47 @@ public class DoubleValue extends Setting {
 
    @Override
    public void render(int n, int n2, int n3, int n4, int n5, int n6, CustomFontUtil customFontUtil, boolean flag) {
-      customFontUtil = FontManager.consolas30TextField;
+      customFontUtil = FontManager.interMedium;
       super.render(n, n2, n3, n4, n5, n6, customFontUtil, flag);
-      String str = this.getDisplayName() + ": ";
+      String label = this.getFormattedDisplayName();
       this.wasArrowAdjusting = this.arrowAdjusting;
       if (this.consumeLabelDirty(this.labelWidth == -1)) {
-         this.labelWidth = (int)customFontUtil.getStringWidth(str);
+         this.labelWidth = (int)customFontUtil.getStringWidth(label);
       }
 
+      float cardW = ModernSettingsPanel.resolveCardWidth(n3, n5);
+      float sliderW = Math.min(316.0F, Math.max(200.0F, cardW * 0.36F));
+      ModernSettingsPanel.CardMetrics m = ModernSettingsPanel.drawSettingCard(
+         n3,
+         n4,
+         n5,
+         label,
+         this.getDescription(),
+         this.shouldShowInlineDescription(),
+         sliderW,
+         false,
+         this.isFocused(),
+         flag,
+         n,
+         n2
+      );
+      this.renderedHeight = m.cardH;
+      this.applyCardMetrics(m);
+
       if (flag) {
-         int colorInt = ClientManagers.moduleManager.clickGui.textColor.getColorInt((byte)0);
-         int colorInt2 = ClientManagers.moduleManager.clickGui.hoverTextColor.getColorInt((byte)0);
-         customFontUtil.drawString(str, (double)n3, (double)n4, colorInt);
-         n3 += this.labelWidth;
-         int hoveredColor = RenderUtil.getHoveredColor(
-            colorInt,
-            0.2,
-            n,
-            n2,
-            (int)((float)n3 + (float)(200 - this.textField.getTextWidth()) / 2.0F) - 4,
-            n4,
-            this.textField.getTextWidth() + 8,
-            (int)(customFontUtil.getFontHeight() + 1.0F)
-         );
-         if (RenderUtil.isHovered((float)this.slider.getX(), (float)this.slider.getY(), (float)this.slider.getSliderWidth(), (float)this.slider.getSliderHeight(), n, n2)) {
+         float sliderX = m.controlAreaRightX - sliderW;
+
+         if (RenderUtil.isHovered(sliderX - 6.0F, m.cardY, sliderW + 12.0F, (float)m.cardH, n, n2)) {
             if (this.arrowAdjusting
                && (KeyboardInputUtil.isKeyDown(203) || KeyboardInputUtil.isKeyDown(205))
                && System.currentTimeMillis() - this.arrowPressStartTimeMs >= 400L
                && System.currentTimeMillis() - this.lastArrowRepeatTimeMs >= 50L) {
-               double d4 = 1.0 / Math.pow(10.0, (double)Math.min(this.decimalPlaces, 3)) * (double)(KeyboardInputUtil.isKeyDown(203) ? -1 : 1);
-               if (this.getValue() + d4 <= this.maxValue) {
-                  if (this.getValue() + d4 >= this.minValue) {
-                     this.setValue(this.getValue() + d4);
-                     this.notifyValueChanged();
-                     this.notifyUserChanged();
-                  }
+               double step = 1.0 / Math.pow(10.0, (double)Math.min(this.decimalPlaces, 3)) * (double)(KeyboardInputUtil.isKeyDown(203) ? -1 : 1);
+               if (this.getValue() + step <= this.maxValue && this.getValue() + step >= this.minValue) {
+                  this.setValue(this.getValue() + step);
+                  this.notifyValueChanged();
+                  this.notifyUserChanged();
                }
-
                this.lastArrowRepeatTimeMs = System.currentTimeMillis();
             }
 
@@ -87,9 +95,9 @@ public class DoubleValue extends Setting {
                int lastDelta = Augustus.getInstance().getMouseWheelTracker().lastDelta;
                if (lastDelta != 0) {
                   lastDelta = lastDelta > 0 ? 1 : -1;
-                  double d6 = (double)Math.abs(lastDelta) / Math.pow(10.0, (double)Math.min(this.decimalPlaces, 3)) * (double)lastDelta;
-                  if (this.getValue() + d6 <= this.maxValue && this.getValue() + d6 >= this.minValue) {
-                     this.setValue(this.getValue() + d6);
+                  double step = (double)Math.abs(lastDelta) / Math.pow(10.0, (double)Math.min(this.decimalPlaces, 3)) * (double)lastDelta;
+                  if (this.getValue() + step <= this.maxValue && this.getValue() + step >= this.minValue) {
+                     this.setValue(this.getValue() + step);
                      this.notifyValueChanged();
                      this.notifyUserChanged();
                      this.scrollAdjusted = true;
@@ -102,65 +110,67 @@ public class DoubleValue extends Setting {
             this.arrowAdjusting = false;
          }
 
-         int colorInt3 = ClientManagers.moduleManager.clickGui.headerColor.getColorInt((byte)0);
-         double d11 = this.slider.drawSlider(n3, n4 - 2, (short)200, (byte)20, n, n2, this.getValue(), this.minValue, this.maxValue, this.decimalPlaces, customFontUtil, colorInt3, RenderUtil.getHoveredColor(colorInt2, 0.1294, n, n2, n3, n4 - 2, 200, 20));
-         if (d11 != this.getValue()) {
+         String displayVal = this.textField.isFocused() ? null : ModernSlider.formatNumber(this.getValue(), this.decimalPlaces);
+         double nextVal = this.modernSlider.render(
+            sliderX,
+            m.cardY,
+            sliderW,
+            (float)m.cardH,
+            n,
+            n2,
+            this.getValue(),
+            this.minValue,
+            this.maxValue,
+            this.decimalPlaces,
+            this.slider.isDragging(),
+            this.slider.getClickX(),
+            this.slider.getClickY(),
+            this.textField,
+            displayVal
+         );
+
+         this.slider.x = (int)this.modernSlider.getTrackX();
+         this.slider.y = (int)this.modernSlider.getTrackY();
+         this.slider.sliderWidth = (int)this.modernSlider.getTrackWidth();
+         this.slider.sliderHeight = (int)this.modernSlider.getTrackHeight();
+
+         if (nextVal != this.getValue()) {
             this.notifyValueChanged();
             this.notifyUserChanged();
          }
+         this.setValue(nextVal);
 
-         this.setValue(d11);
-         int n10 = (int)((float)n3 + (float)(200 - this.textField.getTextWidth()) / 2.0F);
-         this.textField.drawTextField(n10, n4, n, n2, customFontUtil, hoveredColor);
          if (this.textField.isFocused()) {
             if (!Objects.equals(this.textField.getText(), "")) {
                if (!this.textField.getText().equals("-") && !this.textField.getText().endsWith("-") && !this.textField.getText().endsWith("E")) {
-                  Double d12 = this.tryParseDouble(this.textField.getText());
-                  if (d12 != null) {
-                     double d13 = d12;
-                     double d15 = this.roundToDecimals(d13, this.decimalPlaces);
-                     if (d15 != this.getValue()) {
+                  Double parsed = this.tryParseDouble(this.textField.getText());
+                  if (parsed != null) {
+                     double clamped = MathHelper.clamp_double(parsed, this.minValue, this.maxValue);
+                     double rounded = this.roundToDecimals(clamped, this.decimalPlaces);
+                     if (rounded != this.getValue()) {
                         this.notifyValueChanged();
                         this.notifyUserChanged();
                      }
-
-                     this.setValue(d15);
+                     this.setValue(rounded);
                   }
                } else {
                   this.setValue(1.7976931348623157E308);
                }
             }
          } else {
-            double value2 = this.getValue();
-            Double d17;
-            if (this.textField.getText() != null && !this.textField.getText().isEmpty()) {
-               d17 = this.tryParseDouble(this.textField.getText());
-            } else {
-               d17 = null;
-            }
-
-            Double d18 = d17;
-            if (this.lastSyncedValue != value2 || d18 != null && d18 != value2) {
-               int n12 = (int)value2;
-               if ((double)n12 != value2) {
-                  this.textField.setText(String.valueOf(value2));
-               } else {
-                  this.textField.setText(String.valueOf(n12));
-               }
+            double val = this.getValue();
+            Double parsedField = this.textField.getText() != null && !this.textField.getText().isEmpty()
+               ? this.tryParseDouble(this.textField.getText())
+               : null;
+            if (this.lastSyncedValue != val || parsedField != null && parsedField != val) {
+               this.textField.setText(ModernSlider.formatNumber(val, this.decimalPlaces));
             } else if (this.textField.getText() != null && this.textField.getText().isEmpty()) {
-               int lastSyncedValue2 = (int)this.lastSyncedValue;
-               if ((double)lastSyncedValue2 != this.lastSyncedValue) {
-                  this.textField.setText(String.valueOf(this.lastSyncedValue));
-               } else {
-                  this.textField.setText(String.valueOf(lastSyncedValue2));
-               }
+               this.textField.setText(ModernSlider.formatNumber(this.lastSyncedValue, this.decimalPlaces));
             }
-
             this.lastSyncedValue = this.getValue();
          }
 
          this.setFocused(this.textField.isFocused() || this.slider.isDragging());
-         this.contentWidth = n3 + 220;
       }
    }
 
@@ -183,8 +193,8 @@ public class DoubleValue extends Setting {
    }
 
    private double roundToDecimals(double d, int n) {
-      if (n == 0) {
-         return (double)((int)d);
+      if (n <= 0) {
+         return (double)Math.round(d);
       } else {
          double d2 = Math.pow(10.0, (double)n);
          return (double)Math.round(d * d2) / d2;
@@ -311,8 +321,23 @@ public class DoubleValue extends Setting {
    @Override
    public boolean mouseClicked(int mouseX, int mouseY, int mouseButton) throws IOException {
       super.mouseClicked(mouseX, mouseY, mouseButton);
-      this.textField.mouseClicked(mouseX, mouseY, mouseButton);
       this.slider.mouseClicked(mouseX, mouseY, mouseButton);
+      if (mouseButton == 0 && this.modernSlider.isValueChipHovered(mouseX, mouseY)) {
+         if (!this.textField.isFocused()) {
+            this.textField.setFocused(true);
+         } else {
+            this.textField.mouseClicked(mouseX, mouseY, mouseButton);
+            this.textField.setFocused(true);
+         }
+         this.setFocused(true);
+         return true;
+      }
+      this.textField.mouseClicked(mouseX, mouseY, mouseButton);
+      if (mouseButton == 0 && this.modernSlider.isTrackHovered(mouseX, mouseY)) {
+         this.slider.setDragging(true);
+         this.textField.setFocused(false);
+         return true;
+      }
       return false;
    }
 

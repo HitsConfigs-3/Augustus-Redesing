@@ -1,9 +1,10 @@
 package net.augustus.ui.config;
 
-import net.augustus.ClientManagers;
+import net.augustus.clickgui.ClickGuiScreen;
 import net.augustus.clickgui.MainClickGuiWindow;
 import net.augustus.font.CustomFontUtil;
 import net.augustus.render.RenderUtil;
+import net.augustus.ui.modern.render.UiTheme;
 import net.augustus.utils.TimeHelper;
 import java.io.IOException;
 
@@ -28,6 +29,22 @@ public abstract class AbstractConfigListItem {
    private String updatedDate;
    private String configName;
    private int height;
+
+   /**
+    * Applies the ClickGUI open/close envelope to one ARGB at the point of draw.
+    *
+    * <p>WHY this row type needs its own fade: the config row's card behind it is drawn by
+    * {@code ConfigSystemPanel}, but the row's own name label is painted here, so without this it would hang
+    * at full brightness over a fading card for the whole ~290 ms close. Only alpha is scaled - the cached
+    * name width and the hit-test rectangle are untouched.
+    *
+    * <p>Wrapped exactly once, at the draw; the value is never stored in a field, so it cannot leak a stale
+    * envelope into a later frame or another screen.
+    */
+   private static int faded(int argb) {
+      // Settled overlay (everything except the ~288 ms open/close transition): skip the arithmetic.
+      return ClickGuiScreen.getScreenFade() >= 0.999F ? argb : ClickGuiScreen.fadeArgb(argb);
+   }
 
    public AbstractConfigListItem(String configName, String author, String updatedDate, String updatedTime, boolean editable) {
       this.configName = configName;
@@ -137,11 +154,9 @@ public abstract class AbstractConfigListItem {
          this.cachedNameWidth = (int)fontRenderer.getStringWidth(this.configName);
       }
 
-      int baseColor = selected
-         ? ClientManagers.moduleManager.clickGui.hoverTextColor.getColorInt((byte)0)
-         : ClientManagers.moduleManager.clickGui.textColor.getColorInt((byte)0);
-      int color = RenderUtil.getHoveredColor(baseColor, 0.2, mouseX, mouseY, x - 5, y, this.cachedNameWidth + 10, height + 2);
-      fontRenderer.drawString(this.configName, (double)x, (double)y, color);
+      boolean isHovered = RenderUtil.isHovered((float)(x - 5), (float)y, (float)(this.cachedNameWidth + 10), (float)(height + 2), mouseX, mouseY);
+      int color = selected || isHovered ? UiTheme.TEXT_PRIMARY : UiTheme.secondaryTextColor();
+      fontRenderer.drawString(this.configName, (double)x, (double)y, faded(color));
       this.rendered = true;
    }
 }

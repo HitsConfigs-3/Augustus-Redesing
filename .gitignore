@@ -2,6 +2,7 @@
 /.gradle/
 /.jvmdg/
 /build/
+/bin/
 /out/
 /target/
 

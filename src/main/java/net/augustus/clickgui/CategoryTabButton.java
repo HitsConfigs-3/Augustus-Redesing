@@ -3,6 +3,7 @@ package net.augustus.clickgui;
 import net.augustus.ClientManagers;
 import net.augustus.font.CustomFontUtil;
 import net.augustus.render.RenderUtil;
+import net.augustus.utils.render.BlurComponent;
 import java.util.List;
 import net.augustus.modules.Categorys;
 
@@ -68,6 +69,7 @@ public class CategoryTabButton {
       this.right = (int)(((float)this.x) + this.font.getStringWidth(this.categorys.name()) + (float)this.paddingX);
       this.top = this.y - this.paddingY + 3;
       this.bottom = (int)((float)this.y + this.font.getFontHeight() + (float)this.paddingY);
+      BlurComponent.drawClickGuiOptionBlur((float)this.left, (float)this.top, (float)this.width, (float)this.height, 4.0F);
       int colorInt = ClientManagers.moduleManager.clickGui.textColor.getColorInt((byte)0);
       this.font.drawString(this.categorys.toString(), (double)this.x, (double)this.y, colorInt);
       int height2 = this.height;

@@ -21,8 +21,8 @@ import net.minecraft.client.renderer.GlStateManager;
 public class HealthDisplay extends Module implements RenderListener {
    private static final int HEART_SYMBOL_WIDTH = mc.fontRendererObj.getStringWidth("❤");
    private final DoubleValue scale;
-   private final DoubleValue posX;
-   private final DoubleValue posY;
+   public final DoubleValue posX;
+   public final DoubleValue posY;
    private final DoubleValue decimalPlaces;
    private final DoubleValue spacing;
    private final BooleanValue fontShadow;

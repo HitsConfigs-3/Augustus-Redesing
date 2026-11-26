@@ -1,0 +1,55 @@
+Augustus Redesing - lanzador
+============================
+
+Que es esto
+-----------
+Un lanzador de Windows para el cliente Augustus Redesing (Minecraft 1.8.9).
+El cliente Augustus viene de https://github.com/Skid-Technology/OpenAugustus
+(creditos completos en el README del repositorio).
+
+Como se usa
+-----------
+1. Descomprime el ZIP del release COMPLETO (el que incluye el cliente
+   openaugustus-*-all.jar y la carpeta natives) en una carpeta propia, por
+   ejemplo C:\AugustusRedesing
+2. Doble clic en:  Iniciar-Augustus-Redesing.bat
+3. Espera: el lanzador te dice que Java ha encontrado y que modo va a usar.
+
+Si solo tienes el lanzador (sin el jar), tambien funciona si esta dentro del
+proyecto clonado: en ese caso ejecuta `gradlew runClient`, que prepara los
+nativos y descarga los assets de Minecraft 1.8 automaticamente.
+
+Requisito: Java 8
+-----------------
+Minecraft 1.8.9 y LWJGL 2 necesitan Java 8 (1.8.0_xxx). El lanzador lo busca en
+JAVA_HOME, en las rutas tipicas de instalacion y en el PATH; si no lo encuentra
+te dice donde descargarlo (https://adoptium.net/temurin/releases/?version=8).
+No arranca con Java moderno a proposito: fallaria de forma confusa.
+
+En el juego
+-----------
+  RSHIFT           abre la ClickGUI
+  RSHIFT / ESC / X  la cierran (con animacion)
+  ClickGui -> General -> GUI Scale   cambia la escala de la interfaz
+
+Ficheros
+--------
+  Iniciar-Augustus-Redesing.bat   doble clic aqui
+  launcher.ps1                    la logica (busca Java 8, nativos, jar, gradlew)
+  LEEME.txt                       este fichero
+  ..\natives\                     nativos de LWJGL/OpenAL/jinput (modo jar)
+  ..\openaugustus-*-all.jar       cliente compilado (modo jar)
+
+Si algo falla
+-------------
+- "No se ha encontrado un Java 8": instala Java 8 y vuelve a intentarlo.
+- "No se han encontrado los nativos": asegurate de que la carpeta natives\ esta
+  junto al jar (el ZIP completo ya la trae).
+- El cliente se cierra al arrancar: revisa run\logs\latest.log o el log que se
+  genere junto al jar.
+
+Creditos
+--------
+Cliente Augustus: https://github.com/Skid-Technology/OpenAugustus
+Origen original:  https://github.com/yxzeroo/openaugustus
+Minecraft es una marca de Mojang Studios. Proyecto no afiliado.

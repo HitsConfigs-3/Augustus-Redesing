@@ -57,7 +57,11 @@ public class BlurShadowSettings extends SettingComposite {
    }
 
    public boolean isBlurActive() {
-      return this.blur.getValue() && ClientManagers.moduleManager.blur.isToggled();
+      return this.blur != null && this.blur.getValue() && ClientManagers.moduleManager.blur.isToggled();
+   }
+
+   public boolean isBlurSettingEnabled() {
+      return this.blur != null && this.blur.getValue();
    }
 
    public boolean isShadowActive() {

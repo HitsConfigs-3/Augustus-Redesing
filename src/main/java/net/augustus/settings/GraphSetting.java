@@ -8,6 +8,7 @@ import net.augustus.settings.graph.GraphCurveRenderer;
 import net.augustus.settings.graph.GraphPoint;
 import net.augustus.settings.graph.GraphRenderResult;
 import net.augustus.settings.property.GraphPointListProperty;
+import net.augustus.ui.modern.components.ModernSettingsPanel;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -43,11 +44,28 @@ public class GraphSetting extends Setting {
    @Override
    public void render(int n, int n2, int n3, int n4, int n5, int n6, CustomFontUtil customFontUtil, boolean flag) {
       super.render(n, n2, n3, n4, n5, n6, customFontUtil, flag);
+      int graphBodyH = 226;
+      ModernSettingsPanel.CardMetrics m = ModernSettingsPanel.drawStackedCard(
+         n3,
+         n4,
+         n5,
+         this.getFormattedDisplayName(),
+         this.getDescription(),
+         this.shouldShowInlineDescription(),
+         "Interactive Graph",
+         graphBodyH,
+         false,
+         this.isFocused(),
+         flag,
+         n,
+         n2
+      );
+      this.renderedHeight = m.cardH;
+      this.applyCardMetrics(m);
       if (flag) {
-         GraphRenderResult graphRenderResult = this.editorComponent.drawGraph(n3, n4, n, n2, customFontUtil, this);
-         this.renderedHeight = graphRenderResult.getHeight();
+         GraphRenderResult graphRenderResult = this.editorComponent.drawGraphInCard((int)(m.cardX + ModernSettingsPanel.CARD_PAD_X), (int)m.controlCenterY, n, n2, this);
          this.setFocused(graphRenderResult.isDragging());
-         this.contentWidth = graphRenderResult.getRightX();
+         this.contentWidth = Math.max(this.contentWidth, graphRenderResult.getRightX() - n3 + 12);
       }
    }
 

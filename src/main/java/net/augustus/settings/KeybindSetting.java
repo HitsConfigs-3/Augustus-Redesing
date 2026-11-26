@@ -1,11 +1,15 @@
 package net.augustus.settings;
 
-import net.augustus.ClientManagers;
+import java.io.IOException;
 import net.augustus.font.CustomFontUtil;
+import net.augustus.font.FontManager;
+import net.augustus.modules.Module;
 import net.augustus.render.RenderUtil;
 import net.augustus.settings.property.IntegerProperty;
-import java.io.IOException;
-import net.augustus.modules.Module;
+import net.augustus.ui.modern.components.ModernButton;
+import net.augustus.ui.modern.components.ModernSettingsPanel;
+import net.augustus.ui.modern.render.LucideIcon;
+import net.augustus.ui.modern.render.UiTheme;
 import org.lwjgl.input.Keyboard;
 
 public class KeybindSetting extends Setting {
@@ -15,6 +19,8 @@ public class KeybindSetting extends Setting {
    private int boxWidth;
    private boolean listeningForKey;
    private int boxHeight;
+   private int renderedHeight = ModernSettingsPanel.MIN_CARD_HEIGHT;
+   private final ModernButton keyButton = new ModernButton();
 
    public KeybindSetting visibleWhen(SettingVisibilityCondition condition) {
       this.visibilityCondition = condition;
@@ -43,7 +49,7 @@ public class KeybindSetting extends Setting {
 
    @Override
    public int getHeight() {
-      return 27;
+      return this.renderedHeight;
    }
 
    @Override
@@ -90,7 +96,7 @@ public class KeybindSetting extends Setting {
 
    @Override
    public void renderTooltip() {
-      this.drawDescriptionTooltip((int)this.renderFont.getStringWidth(this.getName() + ": "));
+      this.drawDescriptionTooltip((int)FontManager.interSemiBold.getStringWidth(this.getDisplayName()) + 6);
    }
 
    private boolean isPointInBounds(int n, int n2, int n3, int n4, int n5, int n6) {
@@ -109,20 +115,46 @@ public class KeybindSetting extends Setting {
 
    @Override
    public void render(int n, int n2, int n3, int n4, int n5, int n6, CustomFontUtil customFontUtil, boolean flag) {
+      customFontUtil = FontManager.interMedium;
       super.render(n, n2, n3, n4, n5, n6, customFontUtil, flag);
+      String label = this.getFormattedDisplayName();
+      String keyName = this.listeningForKey
+         ? "Press key..."
+         : (this.getKeyCode() >= 10000 ? "Mouse" + (this.getKeyCode() - 10000) : Keyboard.getKeyName(Math.max(this.getKeyCode(), 0)));
+      float btnW = Math.max(100.0F, FontManager.interSemiBold.getStringWidth(keyName) + 36.0F);
+      ModernSettingsPanel.CardMetrics m = ModernSettingsPanel.drawSettingCard(
+         n3,
+         n4,
+         n5,
+         label,
+         this.getDescription(),
+         this.shouldShowInlineDescription(),
+         btnW,
+         false,
+         this.listeningForKey,
+         flag,
+         n,
+         n2
+      );
+      this.renderedHeight = m.cardH;
+      this.applyCardMetrics(m);
+      this.boxWidth = Math.round(btnW);
+      this.boxHeight = 24;
+      this.boxX = Math.round(m.controlAreaRightX - btnW);
+      this.boxY = Math.round(m.controlCenterY - 12.0F);
+
       if (flag) {
-         String str = this.getDisplayName()
-            + ": "
-            + (
-               this.listeningForKey
-                  ? "..."
-                  : (this.getKeyCode() >= 10000 ? "Mouse" + (this.getKeyCode() - 10000) : Keyboard.getKeyName(Math.max(this.getKeyCode(), 0)))
-            );
-         this.boxX = n3 - 1;
-         this.boxY = n4;
-         this.boxHeight = (int)customFontUtil.getFontHeight() + 1;
-         this.boxWidth = (int)customFontUtil.getStringWidth(str) + 4;
-         customFontUtil.drawString(str, (double)n3, (double)n4, RenderUtil.getHoveredColor(ClientManagers.moduleManager.clickGui.textColor.getColorInt((byte)0), 0.2, n, n2, this.boxX, this.boxY, this.boxWidth, this.boxHeight));
+         this.keyButton.render(
+            (float)this.boxX,
+            (float)this.boxY,
+            (float)this.boxWidth,
+            (float)this.boxHeight,
+            keyName,
+            LucideIcon.KEYBOARD,
+            this.listeningForKey ? ModernButton.Variant.PRIMARY : ModernButton.Variant.GLASS,
+            n,
+            n2
+         );
       }
    }
 

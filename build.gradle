@@ -163,6 +163,11 @@ dependencies {
     implementation 'org.jctools:jctools-core:4.0.5'
 
     // Client libraries
+    // SVG Salamander: parses the vendored Tabler SVGs at runtime and rasterises them to
+    // BufferedImage, which is then uploaded as a Minecraft DynamicTexture. Its published POM
+    // declares NO dependencies, so it cannot drag a conflicting XML parser onto Minecraft's
+    // classpath. Licence: LGPL-2.1 (see the library's own NOTICE).
+    implementation 'com.kitfox.svg:svg-salamander:1.0'
     implementation 'com.microsoft.onnxruntime:onnxruntime:1.20.0'
     implementation 'org.yaml:snakeyaml:2.5'
     implementation 'org.json:json:20160810'
@@ -359,6 +364,22 @@ tasks.register('prepareIde') {
 tasks.named('jar') {
     manifest {
         attributes 'Main-Class': 'Start'
+    }
+}
+
+// Writes the resolved compile classpath to a file so contributors can run fast standalone javac
+// checks (OpenAugustus/tools/check.ps1) against the already-built classes instead of invoking
+// Gradle. Several people can then compile-check at once without contending for the build directory.
+tasks.register('dumpCompileClasspath') {
+    group = 'verification'
+    description = 'Writes the main compile classpath to build/compile-classpath.txt for standalone javac checks.'
+    def outFile = layout.buildDirectory.file('compile-classpath.txt')
+    outputs.file(outFile)
+    doLast {
+        def target = outFile.get().asFile
+        target.parentFile.mkdirs()
+        target.text = sourceSets.main.compileClasspath.asPath
+        logger.lifecycle("Wrote compile classpath (${sourceSets.main.compileClasspath.files.size()} entries) to ${target}")
     }
 }
 

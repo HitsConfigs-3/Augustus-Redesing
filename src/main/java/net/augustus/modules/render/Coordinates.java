@@ -19,8 +19,8 @@ import net.minecraft.client.renderer.GlStateManager;
 import net.minecraft.util.MathHelper;
 
 public class Coordinates extends Module implements RenderListener {
-   private final DoubleValue posX;
-   private final DoubleValue posY;
+   public final DoubleValue posX;
+   public final DoubleValue posY;
    private final DoubleValue scale;
    private final ColorSetting labelColor;
    private final ColorSetting valueColor;

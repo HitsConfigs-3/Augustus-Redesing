@@ -61,6 +61,17 @@ public class ToggleUtil {
          if (n != 0) {
             if (module.getKeyCode() == n) {
                boolean flag3 = !flag && module.isToggled() && module.isToggledByKey() && ((double)(currentTimeMs - module.getLastToggleTimeMs()) > holdThresholdMs || module.isKeyHoldMode());
+               // "Hold the key to toggle off" must never apply to the ClickGui module: its keybind opens a
+               // screen, and the overlay refuses new input while it is presented (NO_TOGGLE_SCREENS), so the
+               // press that would re-toggle it is suppressed while its own release is not. Holding the key
+               // for longer than DynamicKeyTime and letting go therefore used to switch the module off behind
+               // an already-open overlay - which the overlay now answers by animating itself closed, i.e. a
+               // ClickGUI that "opens and closes on its own". The keybind opens the overlay; ESC, the title-bar
+               // X and the docks close it.
+               if (flag3 && module == ClientManagers.moduleManager.clickGui) {
+                  flag3 = false;
+               }
+
                if ((flag && !flag2) || flag3) {
                   Queue queue = PENDING_TOGGLES;
                   queue.add((Runnable)() -> module.toggle());

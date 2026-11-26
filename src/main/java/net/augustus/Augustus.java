@@ -42,7 +42,7 @@ public class Augustus {
    private final String name = "Augustus";
    private final String version = "b4.23.3";
    private final String authors = "E-sound, DasNeueUpdate, EnZaXD";
-   private int clientColor = new Color(41, 146, 222).getRGB();
+   private int clientColor = new Color(124, 92, 255).getRGB();
    private final ModuleRegistry moduleRegistry;
    private ModuleManager moduleManager;
    private SettingManager settingManager;
@@ -112,6 +112,7 @@ public class Augustus {
       this.moduleManager = new ModuleManager();
       this.configManager = new ConfigManager();
       this.moduleManager.initModules();
+      this.configManager.initVisualsConfig(this.moduleManager);
       this.settingDescriptionManager = new SettingDescriptionManager();
       this.settingNameManager = new SettingNameManager();
       this.moduleManager.autoDisable.initModuleSettings(this.moduleManager);
@@ -126,6 +127,7 @@ public class Augustus {
       this.settingNameManager.initialize();
       this.clientTabManager.initTabs();
       this.configManager.loadAll();
+      this.migrateRenderLoadFromConfigOnce();
       MinotarAvatarCache.preloadAccountAvatars();
 
       try {
@@ -147,17 +149,61 @@ public class Augustus {
       });
    }
 
-   public void stop() {
-      if (Minecraft.getMinecraft() != null && Minecraft.getMinecraft().getSession() != null) {
-         Minecraft.getMinecraft().getSession().updatePlayTime(false);
+   private void migrateRenderLoadFromConfigOnce() {
+      try {
+         java.io.File marker = new java.io.File(
+            net.augustus.config.JsonConfigFile.BASE_CONFIG_DIR + java.io.File.separator + "settings",
+            ".render_loadfromconfig_migrated"
+         );
+         if (marker.exists()) {
+            return;
+         }
+         for (Object obj : this.moduleManager.getModules()) {
+            if (obj instanceof net.augustus.modules.Module) {
+               net.augustus.modules.Module mod = (net.augustus.modules.Module)obj;
+               if (mod.getCategorys() == net.augustus.modules.Categorys.RENDER) {
+                  mod.setLoadFromConfig(true);
+               }
+            }
+         }
+         this.configManager.snapshotAll();
+         this.configManager.moduleSettingsConfig.save(true);
+         if (marker.getParentFile() != null && !marker.getParentFile().exists()) {
+            marker.getParentFile().mkdirs();
+         }
+         java.nio.file.Files.write(marker.toPath(), "migrated=true\n".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+      } catch (Throwable t) {
+         System.err.println("[OpenAugustus] Failed during one-time Render LoadFromConfig migration:");
+         t.printStackTrace();
       }
+   }
 
-      this.configManager.saveAll();
+   public synchronized void stop() {
+      if (this.shuttingDown) {
+         return;
+      }
+      this.shuttingDown = true;
 
       try {
-         Thread.sleep(200L);
-      } catch (InterruptedException e) {
-         throw new RuntimeException(e);
+         if (this.moduleManager != null && this.moduleManager.clickGui != null && this.moduleManager.clickGui.isToggled()) {
+            this.moduleManager.clickGui.setToggled(false, false);
+         }
+      } catch (Throwable ignored) {
+      }
+
+      try {
+         if (Minecraft.getMinecraft() != null && Minecraft.getMinecraft().getSession() != null) {
+            Minecraft.getMinecraft().getSession().updatePlayTime(false);
+         }
+      } catch (Throwable ignored) {
+      }
+
+      try {
+         if (this.configManager != null) {
+            this.configManager.saveAllForShutdown();
+         }
+      } catch (Throwable t) {
+         t.printStackTrace();
       }
    }
 

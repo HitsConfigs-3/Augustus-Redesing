@@ -28,8 +28,8 @@ import net.minecraft.potion.PotionEffect;
 import org.lwjgl.opengl.GL11;
 
 public class PotionHUD extends Module implements RenderListener {
-   private final DoubleValue xCoord;
-   private final DoubleValue yCoord;
+   public final DoubleValue xCoord;
+   public final DoubleValue yCoord;
    private final DoubleValue scale;
    private final DoubleValue margin;
    private final ColorSetting backgroundColor;

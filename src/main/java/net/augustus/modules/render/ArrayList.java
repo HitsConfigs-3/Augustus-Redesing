@@ -38,8 +38,8 @@ import org.lwjgl.opengl.GL11;
 public class ArrayList extends Module implements GuiScaleListener, RenderListener {
    private final java.util.ArrayList visibleModules;
    private boolean needsAnimationReset;
-   private final DoubleValue xPos;
-   private final DoubleValue yPos;
+   public final DoubleValue xPos;
+   public final DoubleValue yPos;
    public final StringValue side;
    public final StringValue sorting;
    public final StringValue suffix;

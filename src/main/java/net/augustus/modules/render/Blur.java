@@ -33,9 +33,13 @@ public class Blur extends Module implements RenderEntityListener {
    public Blur() {
        super("Blur", "Unschärfe", new Color(170, 181, 182, 255), Categorys.RENDER);
       this.modesNew = (StringValue)new StringValue(this, "ModesNew", "Kawase", new String[]{"Kawase", "Gaussian", "Box"}).withDisplayName("Modes");
+      this.modesNew.setDescription("Shader blur pass algorithm used across world and screen glass effects.");
       this.sigma = new DoubleValue(this, "Sigma", 7.0, 4.0, 30.0, 1);
+      this.sigma.setDescription("Kernel radius controlling gaussian/kawase world blur softness.");
       this.inScreens = new BooleanValue(this, "InScreens", true);
+      this.inScreens.setDescription("Keeps screen and ClickGUI glass blur active while menus are open.");
       this.blurEntities = new BooleanValue(this, "BlurEntities", false);
+      this.blurEntities.setDescription("Applies real-time blur silhouette shading to matching entities.");
       TargetSelectionSettings targetSelectionSettings2 = new TargetSelectionSettings(this, TargetFilterPresets.createRenderFilterWithSelf()).withTargetsDisplayName("Entities");
       BooleanValue blurEntities2 = this.blurEntities;
       this.entities = targetSelectionSettings2.withVisibility(() -> blurEntities2.getValue());

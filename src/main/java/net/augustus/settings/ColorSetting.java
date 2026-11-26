@@ -2,15 +2,19 @@ package net.augustus.settings;
 
 import net.augustus.Augustus;
 import net.augustus.ClientManagers;
+import net.augustus.clickgui.MainClickGuiWindow;
 import net.augustus.clickgui.components.ColorAlphaSliderComponent;
 import net.augustus.clickgui.components.ColorBrightnessSliderComponent;
 import net.augustus.clickgui.components.ColorHueSliderComponent;
 import net.augustus.clickgui.components.ColorSaturationSliderComponent;
 import net.augustus.font.CustomFontUtil;
-import net.augustus.render.RenderUtil;
+import net.augustus.font.FontManager;
 import net.augustus.settings.property.BooleanProperty;
 import net.augustus.settings.property.DoubleProperty;
 import net.augustus.settings.property.IntegerProperty;
+import net.augustus.ui.modern.components.ModernColorPicker;
+import net.augustus.ui.modern.components.ModernSettingsPanel;
+import net.augustus.ui.modern.popup.PopupHost;
 import net.augustus.utils.render.ColorUtil;
 import java.awt.Color;
 import java.io.IOException;
@@ -62,10 +66,15 @@ public class ColorSetting extends Setting {
    private final DoubleValue aDist;
    private final BooleanValue fade;
    private final IntegerProperty fc;
+   private final ModernColorPicker modernColorPicker = new ModernColorPicker();
+   private int labelWidth = -1;
+   private float lastPillX;
+   private float lastPillBottomY;
+   private int renderedHeight = ModernSettingsPanel.MIN_CARD_HEIGHT;
 
    @Override
    public void renderTooltip() {
-      this.drawDescriptionTooltip((int)this.renderFont.getStringWidth(this.getDisplayName() + ": "));
+      this.drawDescriptionTooltip(Math.max(40, this.labelWidth + 6));
    }
 
    public void setFadeAlpha(int fadeAlpha) {
@@ -158,13 +167,13 @@ public class ColorSetting extends Setting {
    }
 
    private void onFadeAlphaPropertyChanged(int n) {
-      Color color = new Color((Integer)this.fc.getValue());
-      this.setFadeColor(new Color(color.getRed(), color.getGreen(), color.getBlue(), n));
+      Color color = this.fadeColor != null ? this.fadeColor : new Color((Integer)this.fc.getValue());
+      this.setFadeColor(new Color(color.getRed(), color.getGreen(), color.getBlue(), MathHelper.clamp_int(n, 0, 255)));
    }
 
    private void onPrimaryRgbPropertyChanged(Integer num) {
       Color color = new Color(num);
-      this.setPrimaryColor(new Color(color.getRed(), color.getGreen(), color.getBlue(), this.getPrimaryAlpha()));
+      this.setPrimaryColor(new Color(color.getRed(), color.getGreen(), color.getBlue(), MathHelper.clamp_int(this.getPrimaryAlpha(), 0, 255)));
    }
 
    public void setRainbowDistance(double rainbowDistance) {
@@ -249,58 +258,11 @@ public class ColorSetting extends Setting {
    @Override
    public boolean mouseClicked(int mouseX, int mouseY, int mouseButton) throws IOException {
       super.mouseClicked(mouseX, mouseY, mouseButton);
-      this.primaryHueSlider.mouseClicked(mouseX, mouseY, mouseButton);
-      this.primarySaturationSlider.mouseClicked(mouseX, mouseY, mouseButton);
-      this.primaryBrightnessSlider.mouseClicked(mouseX, mouseY, mouseButton);
-      this.primaryAlphaSlider.mouseClicked(mouseX, mouseY, mouseButton);
-      if (this.isRainbowEnabled()) {
-         this.rSpeed.mouseClicked(mouseX, mouseY, mouseButton);
-         this.rDist.mouseClicked(mouseX, mouseY, mouseButton);
-      }
-
-      if (!this.isFadeEnabled() && !this.isRainbowEnabled()) {
-         if (!this.isClientColorEnabled()) {
-            this.astolfo.mouseClicked(mouseX, mouseY, mouseButton);
-         }
-      }
-
-      if (!this.isAstolfoEnabled() && !this.isRainbowEnabled()) {
-         if (!this.isClientColorEnabled()) {
-            this.fade.mouseClicked(mouseX, mouseY, mouseButton);
-         }
-      }
-
-      if (!this.isFadeEnabled() && !this.isAstolfoEnabled()) {
-         if (!this.isClientColorEnabled()) {
-            this.rainbow.mouseClicked(mouseX, mouseY, mouseButton);
-         }
-      }
-
-      if (!this.isFadeEnabled() && !this.isAstolfoEnabled() && !this.isRainbowEnabled() && !(this.getParentModule() instanceof CustomClientColor)) {
-         this.clientColor.mouseClicked(mouseX, mouseY, mouseButton);
-      }
-
-      if (this.isFadeEnabled() && !this.isRainbowEnabled()) {
-         this.fSpeed.mouseClicked(mouseX, mouseY, mouseButton);
-         this.fDist.mouseClicked(mouseX, mouseY, mouseButton);
-         this.fadeHueSlider.mouseClicked(mouseX, mouseY, mouseButton);
-         this.fadeSaturationSlider.mouseClicked(mouseX, mouseY, mouseButton);
-         this.fadeBrightnessSlider.mouseClicked(mouseX, mouseY, mouseButton);
-         this.fadeAlphaSlider.mouseClicked(mouseX, mouseY, mouseButton);
-      }
-
-      if (this.isAstolfoEnabled() && !this.isRainbowEnabled() && !this.isFadeEnabled()) {
-         this.aSpeed.mouseClicked(mouseX, mouseY, mouseButton);
-         this.aDist.mouseClicked(mouseX, mouseY, mouseButton);
-      }
-
-      if (this.isClientColorEnabled() && !(this.getParentModule() instanceof CustomClientColor)) {
-         this.clientColorAlpha.mouseClicked(mouseX, mouseY, mouseButton);
-      }
-
-      this.notifyValueChanged();
-      this.notifyUserChanged();
-      return false;
+      PopupHost host = MainClickGuiWindow.activePopupHost();
+      MainClickGuiWindow mw = MainClickGuiWindow.activeMainWindow();
+      float ox = mw != null ? (float)mw.getSettingsOffsetX() : 0.0F;
+      float oy = mw != null ? (float)mw.getSettingsOffsetY() : 0.0F;
+      return this.modernColorPicker.handleClick(mouseX, mouseY, mouseButton, host, this, this.lastPillX + ox, this.lastPillBottomY + oy);
    }
 
    public void updateComputedColor(int n) {
@@ -329,9 +291,8 @@ public class ColorSetting extends Setting {
 
    public ColorSetting withDefaultPrimaryColor(Color color) {
       this.setPrimaryColor(new Color(color.getRed(), color.getGreen(), color.getBlue(), color.getAlpha()));
-      IntegerProperty integerProperty = this.c;
-      Integer rgb = color.getRGB();
-      integerProperty.setDefaultValue(rgb);
+      this.c.setDefaultValue(this.toOpaqueRgb(color));
+      this.a.setDefaultValue(color.getAlpha());
       return this;
    }
 
@@ -358,228 +319,56 @@ public class ColorSetting extends Setting {
 
    @Override
    public void render(int n, int n2, int n3, int n4, int n5, int n6, CustomFontUtil customFontUtil, boolean flag) {
+      customFontUtil = FontManager.interSemiBold;
       super.render(n, n2, n3, n4, n5, n6, customFontUtil, flag);
+      String label = this.getFormattedDisplayName();
+      if (this.consumeLabelDirty(this.labelWidth == -1)) {
+         this.labelWidth = (int)customFontUtil.getStringWidth(label);
+      }
+
+      float cardW = ModernSettingsPanel.resolveCardWidth(n3, n5);
+      float pillW = Math.min(220.0F, Math.max(138.0F, this.modernColorPicker.measurePillWidth(this)));
+      PopupHost host = MainClickGuiWindow.activePopupHost();
+      boolean isOpen = host != null && host.isOpenFor(this.modernColorPicker);
+      ModernSettingsPanel.CardMetrics m = ModernSettingsPanel.drawSettingCard(
+         n3,
+         n4,
+         n5,
+         label,
+         this.getDescription(),
+         this.shouldShowInlineDescription(),
+         pillW,
+         false,
+         isOpen,
+         flag,
+         n,
+         n2
+      );
+      this.renderedHeight = m.cardH;
+      this.applyCardMetrics(m);
+
+      float pillX = m.controlAreaRightX - pillW;
+      float pillY = m.controlCenterY - 12.0F;
+      this.lastPillX = pillX;
+      this.lastPillBottomY = pillY + 24.0F;
+
       if (flag) {
          this.renderYOffset = 0;
-         short s = 200;
-         byte b = 20;
-         String str = this.getDisplayName() + ": ";
-         int colorInt = ClientManagers.moduleManager.clickGui.textColor.getColorInt((byte)0);
-         double d = (double)n3;
-         customFontUtil.drawString(str, d, (double)n4, colorInt);
-         int colorInt2 = ClientManagers.moduleManager.clickGui.headerColor.getColorInt((byte)0);
-         this.renderYOffset += 25;
-         float[] primaryHsb2 = this.primaryHsb;
-         ColorHueSliderComponent primaryHueSlider2 = this.primaryHueSlider;
-         int n7 = n4 - 2 + this.renderYOffset;
-         double d4 = (double)this.primaryHsb[0];
-         float[] primaryHsb3 = this.primaryHsb;
-         int primaryAlpha = this.getPrimaryAlpha();
-         float[] floats = primaryHsb3;
-         double d5 = 1.0;
-         primaryHsb2[0] = (float)primaryHueSlider2.drawHueSlider(n3, n7, s, b, n, n2, d4, 0.0, d5, (byte)7, customFontUtil, colorInt2, floats, primaryAlpha);
-         this.renderYOffset += 25;
-         primaryHsb2 = this.primaryHsb;
-         ColorSaturationSliderComponent component = this.primarySaturationSlider;
-         n7 = n4 - 2 + this.renderYOffset;
-         double d8 = (double)this.primaryHsb[1];
-         primaryHsb3 = this.primaryHsb;
-         int primaryAlpha2 = this.getPrimaryAlpha();
-         float[] floats2 = primaryHsb3;
-         double d9 = 1.0;
-         primaryHsb2[1] = (float)component.drawSaturationSlider(n3, n7, s, b, n, n2, d8, 0.0, d9, (byte)7, customFontUtil, colorInt2, floats2, primaryAlpha2);
-         this.renderYOffset += 25;
-         primaryHsb2 = this.primaryHsb;
-         ColorBrightnessSliderComponent component2 = this.primaryBrightnessSlider;
-         n7 = n4 - 2 + this.renderYOffset;
-         d4 = (double)this.primaryHsb[2];
-         primaryHsb3 = this.primaryHsb;
-         int primaryAlpha3 = this.getPrimaryAlpha();
-         float[] floats3 = primaryHsb3;
-         double d12 = 1.0;
-         primaryHsb2[2] = (float)component2.drawBrightnessSlider(n3, n7, s, b, n, n2, d4, 0.0, d12, (byte)7, customFontUtil, colorInt2, floats3, primaryAlpha3);
-         this.renderYOffset += 25;
-         ColorAlphaSliderComponent primaryAlphaSlider2 = this.primaryAlphaSlider;
-         int n11 = n4 - 2 + this.renderYOffset;
-         double primaryAlpha4 = (double)this.getPrimaryAlpha();
-         float[] primaryHsb4 = this.primaryHsb;
-         double d15 = 255.0;
-         int n13 = (int)primaryAlphaSlider2.drawAlphaSlider(n3, n11, s, b, n, n2, primaryAlpha4, 0.0, d15, (byte)7, customFontUtil, colorInt2, primaryHsb4);
-         int n14;
-         this.setPrimaryAlpha(n13);
-         this.renderYOffset += 27;
-         Color color = new Color(Color.HSBtoRGB(this.primaryHsb[0], this.primaryHsb[1], this.primaryHsb[2]));
-         this.primaryColor = new Color(color.getRed(), color.getGreen(), color.getBlue(), this.getPrimaryAlpha());
-         int n16 = s + 40;
-         int n17 = 25;
-         n14 = n3 + n16;
-         n7 = n4 + n17;
-         int n18 = n7;
-         int n19 = n14;
-         this.rainbow.render(n, n2, n19, n18, n5, n6, customFontUtil, true);
-         this.setRainbowEnabled(this.rainbow.getValue());
-         n17 += 25;
-         if (this.isRainbowEnabled()) {
-            n14 = n3 + n16;
-            n7 = n4 + n17;
-            int n20 = n7;
-            int n21 = n14;
-            this.rSpeed.render(n, n2, n21, n20, n5, n6, customFontUtil, true);
-            this.setRainbowSpeed(this.rSpeed.getValue());
-            n17 += 25;
-            n14 = n3 + n16;
-            n7 = n4 + n17;
-            int n22 = n7;
-            int n23 = n14;
-            this.rDist.render(n, n2, n23, n22, n5, n6, customFontUtil, true);
-            this.setRainbowDistance(this.rDist.getValue());
-            n17 += 25;
-         }
+         MainClickGuiWindow mw = MainClickGuiWindow.activeMainWindow();
+         float ox = mw != null ? (float)mw.getSettingsOffsetX() : 0.0F;
+         float oy = mw != null ? (float)mw.getSettingsOffsetY() : 0.0F;
 
-         n14 = n3 + n16;
-         n7 = n4 + n17;
-         int n24 = n6 + 50;
-         int n25 = n24;
-         int n26 = n7;
-         int n27 = n14;
-         this.fade.render(n, n2, n27, n26, n5, n25, customFontUtil, true);
-         this.setFadeEnabled(this.fade.getValue());
-         n17 += 25;
-         if (this.isFadeEnabled() && !this.isRainbowEnabled()) {
-            if (!this.isClientColorEnabled()) {
-               n14 = n3 + n16;
-               n7 = n4 + n17;
-               int n28 = n7;
-               int n29 = n14;
-               this.fSpeed.render(n, n2, n29, n28, n5, n6, customFontUtil, true);
-               this.setFadeSpeed(this.fSpeed.getValue());
-               n17 += 25;
-               n14 = n3 + n16;
-               n7 = n4 + n17;
-               int n30 = n7;
-               int n31 = n14;
-               this.fDist.render(n, n2, n31, n30, n5, n6, customFontUtil, true);
-               this.setFadeDistance(this.fDist.getValue());
-               int n32 = 0;
-               n16 += s + 100;
-               d = (double)(n3 + n16);
-               double d18 = (double)(n4 + n32);
-               double d19 = d;
-               customFontUtil.drawString("FadeColor:", d19, d18, colorInt);
-               n32 += 25;
-               primaryHsb2 = this.fadeHsb;
-               ColorHueSliderComponent fadeHueSlider2 = this.fadeHueSlider;
-               n14 = n3 + n16;
-               n7 = n4 - 2 + n32;
-               d4 = (double)this.fadeHsb[0];
-               primaryHsb3 = this.fadeHsb;
-               int fadeAlpha = this.getFadeAlpha();
-               float[] floats4 = primaryHsb3;
-               double d20 = 1.0;
-               primaryHsb2[0] = (float)fadeHueSlider2.drawHueSlider(n14, n7, s, b, n, n2, d4, 0.0, d20, (byte)7, customFontUtil, colorInt2, floats4, fadeAlpha);
-               n32 += 25;
-               primaryHsb2 = this.fadeHsb;
-               ColorSaturationSliderComponent fadeSaturationSlider2 = this.fadeSaturationSlider;
-               n14 = n3 + n16;
-               n7 = n4 - 2 + n32;
-               d8 = (double)this.fadeHsb[1];
-               primaryHsb3 = this.fadeHsb;
-               int fadeAlpha2 = this.getFadeAlpha();
-               float[] floats5 = primaryHsb3;
-               double d23 = 1.0;
-               primaryHsb2[1] = (float)fadeSaturationSlider2.drawSaturationSlider(n14, n7, s, b, n, n2, d8, 0.0, d23, (byte)7, customFontUtil, colorInt2, floats5, fadeAlpha2);
-               n32 += 25;
-               primaryHsb2 = this.fadeHsb;
-               ColorBrightnessSliderComponent fadeBrightnessSlider2 = this.fadeBrightnessSlider;
-               n14 = n3 + n16;
-               n7 = n4 - 2 + n32;
-               d4 = (double)this.fadeHsb[2];
-               primaryHsb3 = this.fadeHsb;
-               int fadeAlpha3 = this.getFadeAlpha();
-               float[] floats6 = primaryHsb3;
-               double d26 = 1.0;
-               primaryHsb2[2] = (float)fadeBrightnessSlider2.drawBrightnessSlider(n14, n7, s, b, n, n2, d4, 0.0, d26, (byte)7, customFontUtil, colorInt2, floats6, fadeAlpha3);
-               n32 += 25;
-               ColorAlphaSliderComponent fadeAlphaSlider2 = this.fadeAlphaSlider;
-               int n39 = n3 + n16;
-               n14 = n4 - 2 + n32;
-               primaryAlpha4 = (double)this.getFadeAlpha();
-               float[] fadeHsb2 = this.fadeHsb;
-               double d29 = 255.0;
-               this.setFadeAlpha((int)fadeAlphaSlider2.drawAlphaSlider(n39, n14, s, b, n, n2, primaryAlpha4, 0.0, d29, (byte)7, customFontUtil, colorInt2, fadeHsb2));
-               n17 = 0;
-               n16 += s + 50;
-               Color color2 = new Color(Color.HSBtoRGB(this.fadeHsb[0], this.fadeHsb[1], this.fadeHsb[2]));
-               this.fadeColor = new Color(color2.getRed(), color2.getGreen(), color2.getBlue(), this.getFadeAlpha());
-            }
-         }
-
-         if (this.isRainbowEnabled()) {
-            n16 += s + 100;
-            n17 = 25;
-         }
-
-         n14 = n3 + n16;
-         n7 = n4 + n17;
-         n24 = n6 + 50;
-         int n43 = n24;
-         int n44 = n7;
-         int n45 = n14;
-         this.astolfo.render(n, n2, n45, n44, n5, n43, customFontUtil, true);
-         this.setAstolfoEnabled(this.astolfo.getValue());
-         if (this.isAstolfoEnabled() && !this.isRainbowEnabled() && !this.isFadeEnabled()) {
-            if (!this.isClientColorEnabled()) {
-               n16 += 50 + subPanelOffsetX;
-               int n46 = 25;
-               n14 = n3 + n16;
-               n7 = n4 + n46;
-               int n47 = n7;
-               int n48 = n14;
-               this.aSpeed.render(n, n2, n48, n47, n5, n6, customFontUtil, true);
-               this.setAstolfoSpeed(this.aSpeed.getValue());
-               n46 += 25;
-               n14 = n3 + n16;
-               n7 = n4 + n46;
-               int n49 = n7;
-               int n50 = n14;
-               this.aDist.render(n, n2, n50, n49, n5, n6, customFontUtil, true);
-               this.setAstolfoDistance(this.aDist.getValue());
-               n17 = n46 + 25;
-               n16 -= 50 + subPanelOffsetX;
-            }
-         }
-
-         if (!(this.getParentModule() instanceof CustomClientColor)) {
-            n17 += 25;
-            n14 = n3 + n16;
-            n7 = n4 + n17;
-            n24 = n6 + 50;
-            int n51 = n24;
-            int n52 = n7;
-            int n53 = n14;
-            this.clientColor.render(n, n2, n53, n52, n5, n51, customFontUtil, true);
-            this.setClientColorEnabled(this.clientColor.getValue());
-            if (this.isClientColorEnabled()) {
-               n17 = 25;
-               n16 += 50 + subPanelOffsetX;
-            }
-
-            if (this.isClientColorEnabled()) {
-               n14 = n3 + n16;
-               n7 = n4 + n17;
-               n24 = n6 + 50;
-               int n54 = n24;
-               int n55 = n7;
-               int n56 = n14;
-               this.clientColorAlpha.render(n, n2, n56, n55, n5, n54, customFontUtil, true);
-               this.setClientColorAlpha(MathHelper.clamp_int((int)this.clientColorAlpha.getValue(), 1, 255));
-            }
-         } else {
-            this.setClientColorEnabled(false);
-         }
-
-         this.contentWidth = n16 + s + 20;
-         RenderUtil.resetGlColorState();
+         this.modernColorPicker.renderPill(
+            pillX,
+            pillY,
+            pillW,
+            this,
+            n,
+            n2,
+            host,
+            pillX + ox,
+            this.lastPillBottomY + oy
+         );
       }
    }
 
@@ -587,8 +376,8 @@ public class ColorSetting extends Setting {
        super(module, doubleValue, str);
       IntegerProperty integerProperty = new IntegerProperty(this, "A", 0);
       Consumer consumer = obj -> {
-         Color color2 = new Color((Integer)this.c.getValue());
-         this.setPrimaryColor(new Color(color2.getRed(), color2.getGreen(), color2.getBlue(), (Integer)obj));
+         Color color2 = this.primaryColor != null ? this.primaryColor : new Color((Integer)this.c.getValue());
+         this.setPrimaryColor(new Color(color2.getRed(), color2.getGreen(), color2.getBlue(), MathHelper.clamp_int((Integer)obj, 0, 255)));
       };
       this.a = (IntegerProperty)integerProperty.withOnValueChanged(consumer);
       this.fa = (IntegerProperty)new IntegerProperty(this, "FA", 0).withOnValueChanged(obj2 -> this.onFadeAlphaPropertyChanged((int)obj2));
@@ -688,9 +477,8 @@ public class ColorSetting extends Setting {
 
    public ColorSetting withDefaultFadeColor(Color color) {
       this.setFadeColor(new Color(color.getRed(), color.getGreen(), color.getBlue(), color.getAlpha()));
-      IntegerProperty fc2 = this.fc;
-      Integer rgb = color.getRGB();
-      fc2.setDefaultValue(rgb);
+      this.fc.setDefaultValue(this.toOpaqueRgb(color));
+      this.fa.setDefaultValue(color.getAlpha());
       return this;
    }
 
@@ -846,7 +634,7 @@ public class ColorSetting extends Setting {
 
    private void onFadeRgbPropertyChanged(Integer num) {
       Color color = new Color(num);
-      this.setFadeColor(new Color(color.getRed(), color.getGreen(), color.getBlue(), this.getFadeAlpha()));
+      this.setFadeColor(new Color(color.getRed(), color.getGreen(), color.getBlue(), MathHelper.clamp_int(this.getFadeAlpha(), 0, 255)));
    }
 
    public ColorSetting withDefaultRainbowSpeed(int defaultRainbowSpeed) {
@@ -868,6 +656,9 @@ public class ColorSetting extends Setting {
    public void setPrimaryColor(Color color) {
       this.primaryColor = color;
       this.setPrimaryAlpha(this.primaryColor.getAlpha());
+      if (this.c != null) {
+         this.c.setValue(this.toOpaqueRgb(this.primaryColor));
+      }
       Color.RGBtoHSB(this.primaryColor.getRed(), this.primaryColor.getGreen(), this.primaryColor.getBlue(), this.primaryHsb);
    }
 
@@ -881,7 +672,7 @@ public class ColorSetting extends Setting {
 
    @Override
    public int getHeight() {
-      return 127;
+      return this.renderedHeight;
    }
 
    public Color getPrimaryColor() {
@@ -965,6 +756,9 @@ public class ColorSetting extends Setting {
    public void setFadeColor(Color color) {
       this.fadeColor = color;
       this.setFadeAlpha(this.fadeColor.getAlpha());
+      if (this.fc != null) {
+         this.fc.setValue(this.toOpaqueRgb(this.fadeColor));
+      }
       Color.RGBtoHSB(this.fadeColor.getRed(), this.fadeColor.getGreen(), this.fadeColor.getBlue(), this.fadeHsb);
    }
 

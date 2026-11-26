@@ -1,6 +1,8 @@
 package net.augustus.font;
 
 import net.augustus.Augustus;
+import net.augustus.ui.modern.font.InterFontUtil;
+import net.augustus.ui.modern.render.UiTheme;
 import net.augustus.utils.file.ClientFileUtil;
 import java.awt.Font;
 import java.awt.FontFormatException;
@@ -44,6 +46,14 @@ public class FontManager {
    public static DynamicFontUtil jelloArrayList;
    public static HashMap customDynamicFonts;
    public static CustomFontUtil consolas32;
+   public static InterFontUtil interSection;
+   public static InterFontUtil interRegular;
+   public static InterFontUtil interSmall;
+   public static InterFontUtil interMedium;
+   public static InterFontUtil interSemiBold;
+   public static InterFontUtil interSemiBoldLarge;
+   public static InterFontUtil interBold;
+   public static InterFontUtil interBoldTitle;
    public static final String CLIENT_DATA_DIR;
    public static DynamicFontUtil comfortaaArrayList;
 
@@ -66,17 +76,28 @@ public class FontManager {
       tahomaBoldArrayList = new DynamicFontUtil("tahomaboldarraylist", "tahoma-bold.ttf", 32, 1);
       rubikBoldHud = new DynamicFontUtil("rubikboldhud", "rubik-bold.ttf", 32, 1);
       esp60 = new CustomFontUtil("Esp", loadFontResource("esp.ttf", 60));
-      consolas30 = new CustomFontUtil("Consolas30", loadFontResource("consolas.ttf", 30), 1);
-      consolas40 = new CustomFontUtil("Consolas40", loadFontResource("consolas.ttf", 40), 1);
-      consolas30Booleans = new CustomFontUtil("Consolas301", loadFontResource("consolas.ttf", 30), 1);
-      consolas30Default = new CustomFontUtil("Consolas301", loadFontResource("consolas.ttf", 30), 1);
-      consolas30MultiMode = new CustomFontUtil("Consolas301", loadFontResource("consolas.ttf", 30), 1);
-      consolas30MultiOption = new CustomFontUtil("Consolas301", loadFontResource("consolas.ttf", 30), 1);
-      consolas30BooleanValue = new CustomFontUtil("Consolas301", loadFontResource("consolas.ttf", 30), 1);
-      consolas30TextField = new CustomFontUtil("Consolas301", loadFontResource("consolas.ttf", 30), 1);
-      consolas32 = new CustomFontUtil("Consolas32", loadFontResource("consolas.ttf", 32), 1);
-      esp32 = new CustomFontUtil("Esp", loadFontResource("esp.ttf", 32), 1);
-      rubikBold32 = new CustomFontUtil("RubikBold32", loadFontResource("rubik-bold.ttf", 32), 1);
+      // Clear typographic hierarchy tuned for crisp high-contrast dark frosted glass (clean AA, no heavy stroke inflation).
+      interSection = new InterFontUtil("InterBoldSection12", "inter_bold", "inter-bold.ttf", 12.0F, 0.0F, 0);
+      interRegular = new InterFontUtil("InterRegular14", "inter_medium", "inter-medium.ttf", 14.5F, -0.025F, 0);
+      interSmall = new InterFontUtil("InterMedium13", "inter_medium", "inter-medium.ttf", 13.5F, 0.0F, 0);
+      interMedium = new InterFontUtil("InterMedium16", "inter_medium", "inter-medium.ttf", 16.0F, 0.0F, 0);
+      interSemiBold = new InterFontUtil("InterSemiBold18", "inter_semibold", "inter-semibold.ttf", 18.5F, 0.0F, UiTheme.TEXT_SHADOW_SUBTLE);
+      interSemiBoldLarge = new InterFontUtil("InterSemiBold19", "inter_semibold", "inter-semibold.ttf", 19.5F, 0.0F, UiTheme.TEXT_SHADOW_SUBTLE);
+      interBold = new InterFontUtil("InterBold20", "inter_bold", "inter-bold.ttf", 20.5F, 0.0F, UiTheme.TEXT_SHADOW_SUBTLE);
+      interBoldTitle = new InterFontUtil("InterBold22", "inter_bold", "inter-bold.ttf", 22.0F, 0.0F, UiTheme.TEXT_SHADOW_SUBTLE);
+
+      // Route ClickGUI & Settings typography cleanly to crisp Inter SDF variants (Regular 400, Medium 500, SemiBold 600, Bold 700).
+      consolas30 = interMedium;
+      consolas40 = interBold;
+      consolas30Booleans = interMedium;
+      consolas30Default = interMedium;
+      consolas30MultiMode = interMedium;
+      consolas30MultiOption = interMedium;
+      consolas30BooleanValue = interMedium;
+      consolas30TextField = interMedium;
+      consolas32 = interSemiBoldLarge;
+      esp32 = interBold;
+      rubikBold32 = interBoldTitle;
       reloadCustomFonts();
    }
 

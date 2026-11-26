@@ -28,6 +28,16 @@ public class ModuleSettingsConfigSection extends AbstractFeatureConfigFile {
       super(new AbstractFeature[]{abstractFeature});
    }
 
+   @Override
+   public UnaryFunction getSaveFilter() {
+      return obj -> !VisualsConfigFile.isProtectedVisualProperty((ConfigProperty)obj);
+   }
+
+   @Override
+   public UnaryFunction getLoadFilter() {
+      return obj -> !VisualsConfigFile.isProtectedVisualProperty((ConfigProperty)obj);
+   }
+
    private static Boolean isAllowedInReadOnlyConfig(ConfigProperty configProperty) {
       if (configProperty instanceof Module) {
          return true;
@@ -86,6 +96,16 @@ public class ModuleSettingsConfigSection extends AbstractFeatureConfigFile {
    @Override
    public String getName() {
       return "Modules_Settings";
+   }
+
+   @Override
+   public boolean alwaysReserializeOnSave() {
+      return true;
+   }
+
+   @Override
+   public boolean markLoadedEvenIfEmpty() {
+      return true;
    }
 
    private static JsonObject deepMergeJson(JsonObject json, JsonObject json2) {

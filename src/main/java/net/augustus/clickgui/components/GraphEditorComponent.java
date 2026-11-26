@@ -4,12 +4,15 @@ import net.augustus.ClientManagers;
 import net.augustus.clickgui.graph.GraphEditorCanvasContext;
 import net.augustus.clickgui.graph.LinearGraphRenderer;
 import net.augustus.font.CustomFontUtil;
+import net.augustus.font.FontManager;
 import net.augustus.render.RenderUtil;
 import net.augustus.settings.GraphSetting;
 import net.augustus.settings.graph.GraphCurveRenderer;
 import net.augustus.settings.graph.GraphPoint;
 import net.augustus.settings.graph.GraphRenderResult;
 import net.augustus.settings.graph.GraphViewport;
+import net.augustus.ui.modern.render.GlassRenderer;
+import net.augustus.ui.modern.render.UiTheme;
 import java.awt.Color;
 import java.util.List;
 import java.util.Locale;
@@ -166,7 +169,7 @@ public class GraphEditorComponent extends GuiComponent {
 
    private void drawControlPoints(GraphSetting graphSetting, int n) {
       List points = graphSetting.getPoints();
-      int colorInt = ClientManagers.moduleManager.clickGui.hoverTextColor.getColorInt((byte)0);
+      int accent = UiTheme.accentColor();
 
       for (int i = 0; i < points.size(); i++) {
          GraphPoint graphPoint = (GraphPoint)points.get(i);
@@ -174,12 +177,13 @@ public class GraphEditorComponent extends GuiComponent {
          int n3 = this.valueYToScreenY(graphSetting, graphPoint.getY());
          int mouseY2 = this.mouseY;
          boolean isNearPoint = this.isNearPoint(n2, n3, this.mouseX, mouseY2);
-         int n4 = (this.draggedPointIndex == i) ? colorInt : (isNearPoint ? RenderUtil.adjustColorBrightness(n, 0.10000000149011612) : n);
+         boolean dragged = this.draggedPointIndex == i;
+         int fill = dragged ? accent : (isNearPoint ? UiTheme.lerpArgb(0xFFFFFFFF, accent, 0.5F) : 0xFFFFFFFF);
          if (graphPoint.getY() == 0.0 && graphPoint.isHighlightZeroY()) {
-            n4 = Color.RED.getRGB();
+            fill = UiTheme.DANGER_ACCENT;
          }
-
-         RenderUtil.drawRect(n2 - 4, n3 - 4, n2 + 4, n3 + 4, n4);
+         float r = dragged ? 5.5F : (isNearPoint ? 5.0F : 4.2F);
+         GlassRenderer.drawCircle((float)n2, (float)n3, r, fill, 0xFF10131A, 1.5F);
       }
    }
 
@@ -246,14 +250,14 @@ public class GraphEditorComponent extends GuiComponent {
 
          for (double i = firstTickValue(minX, d); i <= maxX + d * 0.5; i += d) {
             int n3 = this.valueXToScreenX(graphSetting, snapNearZero(i, d));
-            RenderUtil.drawRect(n3, this.canvasY + 1, n3 + 1, this.canvasY + 200 - 1, n2);
-            RenderUtil.drawRect(n3, this.canvasY + 200 - 1 - 3, n3 + 1, this.canvasY + 200 - 1, n);
+            GlassRenderer.drawSeparator((float)n3, (float)(this.canvasY + 2), (float)n3, (float)(this.canvasY + 200 - 2), 1.0F, n2);
+            GlassRenderer.drawSeparator((float)n3, (float)(this.canvasY + 200 - 4), (float)n3, (float)(this.canvasY + 200 - 1), 1.4F, n);
          }
 
          for (double j = firstTickValue(minY, d2); j <= maxY + d2 * 0.5; j += d2) {
             int n4 = this.valueYToScreenY(graphSetting, snapNearZero(j, d2));
-            RenderUtil.drawRect(this.canvasX + 1, n4, this.canvasX + 800 - 1, n4 + 1, n2);
-            RenderUtil.drawRect(this.canvasX + 1, n4, this.canvasX + 1 + 3, n4 + 1, n);
+            GlassRenderer.drawSeparator((float)(this.canvasX + 2), (float)n4, (float)(this.canvasX + 800 - 2), (float)n4, 1.0F, n2);
+            GlassRenderer.drawSeparator((float)(this.canvasX + 1), (float)n4, (float)(this.canvasX + 4), (float)n4, 1.4F, n);
          }
       }
    }
@@ -339,29 +343,48 @@ public class GraphEditorComponent extends GuiComponent {
       return this.componentWidth;
    }
 
+   public GraphRenderResult drawGraphInCard(int canvasXPos, int canvasYPos, int mouseXIn, int mouseYIn, GraphSetting graphSetting) {
+      CustomFontUtil axisFont = FontManager.interSmall;
+      super.updateLayout(canvasXPos, canvasYPos, mouseXIn, mouseYIn, FontManager.interSemiBold);
+      int textPrimary = UiTheme.primaryTextColor();
+      int textMuted = UiTheme.secondaryTextColor();
+      this.canvasX = canvasXPos;
+      this.canvasY = canvasYPos;
+      GL11.glEnable(2848);
+      GlassRenderer.drawRecessedWell((float)this.canvasX, (float)this.canvasY, 800.0F, 200.0F, UiTheme.CONTROL_RADIUS, this.draggedPointIndex != -1 ? 1.0F : 0.0F, 0.0F, (float)mouseXIn, (float)mouseYIn, UiTheme.accentColor(), 1.0F);
+      this.drawGridAndTicks(graphSetting, UiTheme.GLASS_BORDER_STRONG, 0x2ED8D0FF);
+      this.drawCurve(graphSetting);
+      this.drawControlPoints(graphSetting, textPrimary);
+      int yAxisExtra = this.drawYAxisLabels(graphSetting, axisFont, textMuted);
+      this.drawXAxisLabels(graphSetting, axisFont, textMuted);
+      this.totalHeight = 226;
+      this.totalRightX = this.canvasX + 800 + 10 + yAxisExtra;
+      this.componentWidth = 800;
+      GL11.glDisable(2848);
+      return new GraphRenderResult(this.totalHeight, this.totalRightX, this.draggedPointIndex != -1);
+   }
+
    public GraphRenderResult drawGraph(int n, int n2, int n3, int n4, CustomFontUtil customFontUtil, GraphSetting graphSetting) {
-      super.updateLayout(n, n2, n3, n4, customFontUtil);
-      String str = graphSetting.getDisplayName() + ":";
-      int colorInt = ClientManagers.moduleManager.clickGui.textColor.getColorInt((byte)0);
-      customFontUtil.drawString(str, (double)n, (double)n2, colorInt);
-      int n5 = (int)((float)n2 + customFontUtil.getFontHeight() + 6.0F);
+      CustomFontUtil titleFont = FontManager.interSemiBold;
+      CustomFontUtil axisFont = FontManager.interSmall;
+      super.updateLayout(n, n2, n3, n4, titleFont);
+      String str = graphSetting.getDisplayName();
+      int textPrimary = UiTheme.primaryTextColor();
+      int textMuted = UiTheme.secondaryTextColor();
+      titleFont.drawString(str, (double)n, (double)n2, textPrimary);
+      int n5 = (int)((float)n2 + titleFont.getFontHeight() + 8.0F);
       this.canvasX = n;
       this.canvasY = n5;
       GL11.glEnable(2848);
-      int colorInt2 = ClientManagers.moduleManager.clickGui.headerColor.getColorInt((byte)0);
-      RenderUtil.drawRect(this.canvasX, this.canvasY, this.canvasX + 800, this.canvasY + 200, colorInt2);
-      RenderUtil.drawRect(this.canvasX, this.canvasY, this.canvasX + 800, this.canvasY + 1, colorInt2);
-      RenderUtil.drawRect(this.canvasX, this.canvasY + 200 - 1, this.canvasX + 800, this.canvasY + 200, colorInt2);
-      RenderUtil.drawRect(this.canvasX, this.canvasY, this.canvasX + 1, this.canvasY + 200, colorInt2);
-      RenderUtil.drawRect(this.canvasX + 800 - 1, this.canvasY, this.canvasX + 800, this.canvasY + 200, colorInt2);
-      this.drawGridAndTicks(graphSetting, colorInt, colorInt2);
+      GlassRenderer.drawRecessedWell((float)this.canvasX, (float)this.canvasY, 800.0F, 200.0F, UiTheme.CARD_RADIUS, this.draggedPointIndex != -1 ? 1.0F : 0.0F, 0.0F, (float)n3, (float)n4, UiTheme.accentColor(), 1.0F);
+      this.drawGridAndTicks(graphSetting, UiTheme.GLASS_BORDER_STRONG, 0x2ED8D0FF);
       this.drawCurve(graphSetting);
-      this.drawControlPoints(graphSetting, colorInt);
-      int n6 = this.drawYAxisLabels(graphSetting, customFontUtil, colorInt);
-      this.drawXAxisLabels(graphSetting, customFontUtil, colorInt);
-      this.totalHeight = this.canvasY + 200 + 18 + 5 - n2;
+      this.drawControlPoints(graphSetting, textPrimary);
+      int n6 = this.drawYAxisLabels(graphSetting, axisFont, textMuted);
+      this.drawXAxisLabels(graphSetting, axisFont, textMuted);
+      this.totalHeight = this.canvasY + 200 + 20 + 6 - n2;
       this.totalRightX = this.canvasX + 800 + 10 + n6;
-      this.componentWidth = (int)Math.max(customFontUtil.getStringWidth(str), 800.0F);
+      this.componentWidth = (int)Math.max(titleFont.getStringWidth(str), 800.0F);
       GL11.glDisable(2848);
       return new GraphRenderResult(this.totalHeight, this.totalRightX, this.draggedPointIndex != -1);
    }

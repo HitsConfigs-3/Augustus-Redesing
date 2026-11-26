@@ -1,18 +1,23 @@
 package net.augustus.settings;
 
-import net.augustus.Augustus;
-import net.augustus.ClientManagers;
-import net.augustus.font.CustomFontUtil;
-import net.augustus.font.FontManager;
-import net.augustus.render.RenderUtil;
-import net.augustus.settings.property.IndexedSettingFactory;
-import net.augustus.settings.property.SettingGroupListProperty;
 import java.awt.Color;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import net.augustus.ClientManagers;
+import net.augustus.clickgui.ClickGuiScreen;
+import net.augustus.font.CustomFontUtil;
+import net.augustus.font.FontManager;
 import net.augustus.modules.Module;
 import net.augustus.modules.misc.Dummy;
+import net.augustus.render.RenderUtil;
+import net.augustus.settings.property.IndexedSettingFactory;
+import net.augustus.settings.property.SettingGroupListProperty;
+import net.augustus.ui.modern.components.ModernButton;
+import net.augustus.ui.modern.components.ModernSettingsPanel;
+import net.augustus.ui.modern.render.GlassRenderer;
+import net.augustus.ui.modern.render.LucideIcon;
+import net.augustus.ui.modern.render.UiTheme;
 
 public class DynamicSettingList extends Setting {
    public int hoveredRemoveIndex;
@@ -30,6 +35,23 @@ public class DynamicSettingList extends Setting {
    public int renderedHeight;
    public int nextEntryId;
    public static final CustomFontUtil BUTTON_FONT = FontManager.consolas40;
+
+   /**
+    * Applies the ClickGUI open/close envelope to one ARGB at the point of draw.
+    *
+    * <p>WHY this list needs its own fade: the child rows and the Add/Remove buttons fade themselves, but the
+    * list header label and its horizontal divider are painted here, so they would otherwise stay bright over
+    * the fading rows. Only alpha is scaled; the measured header height, the row offsets and the scroll maths
+    * are untouched.
+    *
+    * <p>Each colour is wrapped exactly once, at the draw.
+    */
+   private static int faded(int argb) {
+      // Settled overlay (everything except the ~288 ms open/close transition): skip the arithmetic.
+      return ClickGuiScreen.getScreenFade() >= 0.999F ? argb : ClickGuiScreen.fadeArgb(argb);
+   }
+   private final ModernButton addButton = new ModernButton();
+   private final List<ModernButton> removeButtons = new ArrayList<>();
 
    public int getEntryCount() {
       return ((List)this.entriesProperty.getValue()).size();
@@ -105,7 +127,7 @@ public class DynamicSettingList extends Setting {
 
    public DynamicSettingList(Module module, String str, IndexedSettingFactory indexedSettingFactory, int n, int n2) {
        super(module, null, str);
-      this.renderedHeight = 0;
+      this.renderedHeight = 32;
       this.labelWidth = -1;
       this.hoveredRemoveIndex = -1;
       this.addButtonHovered = false;
@@ -204,80 +226,73 @@ public class DynamicSettingList extends Setting {
 
    @Override
    public void render(int n, int n2, int n3, int n4, int n5, int n6, CustomFontUtil customFontUtil, boolean flag) {
+      customFontUtil = FontManager.interBold;
       super.render(n, n2, n3, n4, n5, n6, customFontUtil, flag);
-      String str = this.getDisplayName() + ":";
+      String str = this.getFormattedDisplayName();
       boolean flag2 = this.labelWidth == -1;
-      int n7;
       if (this.consumeLabelDirty(flag2)) {
          this.labelWidth = (int)customFontUtil.getStringWidth(str);
       }
 
+      float cardW = ModernSettingsPanel.resolveCardWidth(n3, n5);
+      int headerH = 30;
       if (flag) {
-         int colorInt = ClientManagers.moduleManager.clickGui.textColor.getColorInt((byte)0);
-         double d = (double)n3;
-         customFontUtil.drawString(str, d, (double)n4, colorInt);
+         customFontUtil.drawVerticallyCenteredString(str, (double)(n3 + 2), (double)n4, (double)headerH, faded(UiTheme.TEXT_PRIMARY));
+         float addBtnW = 68.0F;
+         float addX = (float)n3 + cardW - addBtnW;
+         float addY = (float)n4 + (float)(headerH - 22) * 0.5F;
+         float lineStart = (float)n3 + this.labelWidth + 14.0F;
+         float lineEnd = (this.canAddEntry() ? addX : (float)n3 + cardW) - 10.0F;
+         if (lineEnd > lineStart + 12.0F) {
+            GlassRenderer.drawSeparator(lineStart, (float)n4 + (float)headerH * 0.5F, lineEnd, (float)n4 + (float)headerH * 0.5F, UiTheme.SEPARATOR_THICKNESS, faded(UiTheme.GLASS_DIVIDER));
+         }
+
          this.addButtonHovered = false;
          if (this.canAddEntry()) {
-            int n8 = n3 + this.labelWidth + 10;
-            String str2 = "+";
-            float stringWidth = BUTTON_FONT.getStringWidth(str2);
-            byte b2 = 8;
-            boolean isHovered = RenderUtil.isHovered(
-               (float)(n8 - b2),
-               (float)(n4 - 3 - b2),
-               (float)((int)stringWidth + b2 * 2),
-               (float)((int)(BUTTON_FONT.getFontHeight() + (float)(b2 * 2))),
-               n,
-               n2
-            );
-            this.addButtonHovered = isHovered;
-            Color color = isHovered ? ADD_HOVER_COLOR : ADD_COLOR;
-            CustomFontUtil customFontUtil2 = BUTTON_FONT;
-            d = (double)n8;
-            customFontUtil2.drawString(str2, d, (double)(n4 - 3), color.getRGB());
+            this.addButton.render(addX, addY, addBtnW, 22.0F, "Add", LucideIcon.PLUS, ModernButton.Variant.ACTIVE_GREEN, n, n2);
+            this.addButtonHovered = this.addButton.isHovered(n, n2);
          }
+      }
 
-         this.renderedHeight = (int)(customFontUtil.getFontHeight() + 5.0F);
-         this.hoveredRemoveIndex = -1;
-         List value = (List)this.entriesProperty.getValue();
+      this.renderedHeight = headerH + 6;
+      this.hoveredRemoveIndex = -1;
+      this.contentWidth = (int)Math.ceil((double)cardW);
+      List value = (List)this.entriesProperty.getValue();
+      while (this.removeButtons.size() < value.size()) {
+         this.removeButtons.add(new ModernButton());
+      }
 
-         for (int i = 0; i < value.size(); i++) {
-            Setting setting = (Setting)value.get(i);
-            if (setting.isVisible()) {
-               int n9 = n4 + this.renderedHeight;
-               n7 = n3 + 20;
-               setting.render(n, n2, n7, n9, n5 - 40, n6, customFontUtil, flag);
-               String str3 = "-";
-               float stringWidth2 = BUTTON_FONT.getStringWidth(str3);
-               byte b3 = 8;
+      int visibleIdx = 0;
+      for (int i = 0; i < value.size(); i++) {
+         Setting setting = (Setting)value.get(i);
+         if (setting.isVisible()) {
+            if (visibleIdx > 0) {
+               this.renderedHeight += ModernSettingsPanel.CARD_GAP;
+            }
+            int childY = n4 + this.renderedHeight;
+            int childX = n3 + 28;
+            boolean childVisible = flag && childY + setting.getHeight() > -20 && childY < n6 + 20;
+            setting.render(n, n2, childX, childY, n5, n6, customFontUtil, childVisible);
+            if (childVisible) {
+               ModernButton remBtn = this.removeButtons.get(i);
+               float remY = (float)childY + (float)(Math.min(42, setting.getHeight()) - 22) * 0.5F;
                if (this.canRemoveEntry()) {
-                  boolean isHovered2 = RenderUtil.isHovered(
-                     (float)(n3 - b3),
-                     (float)(n9 - 3 - b3),
-                     (float)((int)stringWidth2 + b3 * 2),
-                     (float)((int)(BUTTON_FONT.getFontHeight() + (float)(b3 * 2))),
-                     n,
-                     n2
-                  );
-                  if (isHovered2) {
+                  remBtn.render((float)n3, remY, 22.0F, 22.0F, null, LucideIcon.MINUS, ModernButton.Variant.DANGER, n, n2);
+                  if (remBtn.isHovered(n, n2)) {
                      this.hoveredRemoveIndex = i;
                   }
-
-                  Color color2 = isHovered2 ? REMOVE_HOVER_COLOR : REMOVE_COLOR;
-                  CustomFontUtil customFontUtil3 = BUTTON_FONT;
-                  d = (double)n3;
-                  customFontUtil3.drawString(str3, d, (double)(n9 - 3), color2.getRGB());
                } else {
-                  d = (double)n3;
-                  double d11 = (double)(n9 - 3);
-                  double d12 = d;
-                  BUTTON_FONT.drawString(str3, d12, d11, colorInt);
+                  remBtn.render((float)n3, remY, 22.0F, 22.0F, null, LucideIcon.MINUS, ModernButton.Variant.GLASS, -9999, -9999);
                }
-
-               this.renderedHeight = this.renderedHeight + setting.getHeight();
             }
-         }
 
+            this.renderedHeight += setting.getHeight();
+            this.contentWidth = Math.max(this.contentWidth, setting.getContentWidth() + 28);
+            visibleIdx++;
+         }
+      }
+
+      if (flag) {
          for (Setting setting2 : (Iterable<Setting>)(value)) {
             if (setting2.isVisible()) {
                setting2.renderTooltip();

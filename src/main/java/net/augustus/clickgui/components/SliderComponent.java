@@ -2,6 +2,7 @@ package net.augustus.clickgui.components;
 
 import net.augustus.font.CustomFontUtil;
 import net.augustus.render.RenderUtil;
+import net.augustus.utils.render.BlurComponent;
 import java.io.IOException;
 import net.minecraft.util.MathHelper;
 
@@ -40,6 +41,7 @@ public class SliderComponent extends GuiComponent {
       super.updateLayout(n, n2, n5, n6, customFontUtil);
       this.sliderWidth = n3;
       this.sliderHeight = n4;
+      BlurComponent.drawClickGuiOptionBlur((float)n, (float)n2, (float)n3, (float)n4, 3.0F);
       RenderUtil.drawRectOutline((double)n, (double)n2, (double)(n + n3), (double)(n2 + n4), 2.0F, n8);
       if (d == 1.7976931348623157E308) {
          d = 0.0;

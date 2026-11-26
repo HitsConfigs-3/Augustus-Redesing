@@ -65,36 +65,7 @@ public class KawaseBlurPass implements BlurPass, MC {
    }
 
    public Framebuffer applyBlurToFramebuffer(Framebuffer framebuffer, int n) {
-      if (n > 20) {
-         n = 20;
-      }
-
-      Framebuffer framebuffer2 = null;
-      float f = 1.0F;
-      int n2 = 0;
-
-      for (TuplePair tuplePair : (TuplePair[])this.passPresets.get(n - 1)) {
-         Framebuffer framebuffer3 = null;
-         Framebuffer framebuffer4 = null;
-         if (n2 == 0) {
-            framebuffer3 = framebuffer;
-            framebuffer4 = this.pingFramebuffer;
-         } else if (n2 % 2 != 0) {
-            framebuffer3 = this.pingFramebuffer;
-            framebuffer4 = this.pongFramebuffer;
-         } else if (n2 % 2 == 0) {
-            framebuffer3 = this.pongFramebuffer;
-            framebuffer4 = this.pingFramebuffer;
-         }
-
-         f *= (Float)tuplePair.getSecond();
-         float second = (Float)tuplePair.getSecond();
-         float first = (Float)tuplePair.getFirst();
-         framebuffer2 = this.renderSamplePass(first, f, second, framebuffer4, framebuffer3);
-         n2++;
-      }
-
-      return framebuffer2;
+      return KawaseBlurEngine.blurToFramebuffer(framebuffer, n);
    }
 
    public Framebuffer renderSamplePass(float f, float f2, float f3, Framebuffer framebuffer, Framebuffer framebuffer2) {

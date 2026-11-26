@@ -2,6 +2,7 @@ package net.augustus.settings;
 
 import net.augustus.font.CustomFontUtil;
 import net.augustus.settings.property.DoubleProperty;
+import net.augustus.ui.modern.components.ModernSettingsPanel;
 import net.augustus.utils.math.MathStatisticsUtil;
 import java.io.IOException;
 import java.util.function.Consumer;
@@ -30,17 +31,27 @@ public class RangeSetting extends Setting {
          this.labelWidth = (int)customFontUtil.getStringWidth(this.min.getDisplayName() + ": ");
       }
 
+      if (this.hasDescription()) {
+         DoubleValue descTarget = this.maxFirst ? this.max : this.min;
+         if (!descTarget.hasDescription()) {
+            descTarget.setDescription(this.getDescription());
+         }
+      }
+
+      int gap = ModernSettingsPanel.CARD_GAP;
       if (this.maxFirst) {
          this.max.render(n, n2, n3, n4, n5, n6, customFontUtil, flag);
          this.setMaxValue(this.max.getValue());
-         this.min.render(n, n2, n3, n4 + this.max.getHeight(), n5, n6, customFontUtil, flag);
+         this.min.render(n, n2, n3, n4 + this.max.getHeight() + gap, n5, n6, customFontUtil, flag);
          this.setMinValue(this.min.getValue());
       } else {
          this.min.render(n, n2, n3, n4, n5, n6, customFontUtil, flag);
          this.setMinValue(this.min.getValue());
-         this.max.render(n, n2, n3, n4 + this.min.getHeight(), n5, n6, customFontUtil, flag);
+         this.max.render(n, n2, n3, n4 + this.min.getHeight() + gap, n5, n6, customFontUtil, flag);
          this.setMaxValue(this.max.getValue());
       }
+
+      this.contentWidth = Math.max(this.min.getContentWidth(), this.max.getContentWidth());
 
       if (this.getMinValue() > this.getMaxValue()) {
          if (this.min.getSlider().isDragging() || this.wasMinFieldFocused && !this.min.getTextField().isFocused() || this.min.isWasArrowAdjusting() || this.min.isScrollAdjusted()) {
@@ -56,6 +67,7 @@ public class RangeSetting extends Setting {
 
       this.wasMinFieldFocused = this.min.getTextField().isFocused();
       this.wasMaxFieldFocused = this.max.getTextField().isFocused();
+      this.setFocused(this.min.isFocused() || this.max.isFocused());
    }
 
    public RangeSetting withValueUpdatedCallback(Runnable runnable) {
@@ -145,7 +157,7 @@ public class RangeSetting extends Setting {
 
    @Override
    public int getHeight() {
-      return this.min.getHeight() + this.max.getHeight();
+      return this.min.getHeight() + ModernSettingsPanel.CARD_GAP + this.max.getHeight();
    }
 
    public RangeSetting named(String str) {
@@ -295,9 +307,10 @@ public class RangeSetting extends Setting {
    @Override
    public boolean mouseClicked(int mouseX, int mouseY, int mouseButton) throws IOException {
       super.mouseClicked(mouseX, mouseY, mouseButton);
-      this.min.mouseClicked(mouseX, mouseY, mouseButton);
-      this.max.mouseClicked(mouseX, mouseY, mouseButton);
-      return false;
+      boolean minHandled = this.min.mouseClicked(mouseX, mouseY, mouseButton);
+      boolean maxHandled = this.max.mouseClicked(mouseX, mouseY, mouseButton);
+      this.setFocused(this.min.isFocused() || this.max.isFocused());
+      return minHandled || maxHandled;
    }
 
    public RangeSetting visibleWhen(SettingVisibilityCondition condition) {

@@ -13,6 +13,7 @@ import net.augustus.modules.AbstractFeature;
 import net.augustus.modules.Categorys;
 import net.augustus.modules.Module;
 import net.augustus.modules.misc.Dummy;
+import net.augustus.ui.modern.components.ModernSettingsPanel;
 
 public abstract class Setting extends AbstractFeature {
    private boolean dispatchingUserChange;
@@ -43,12 +44,32 @@ public abstract class Setting extends AbstractFeature {
    private final SettingGroup parentGroup;
    private boolean labelDirty;
    public int tooltipAnchorY;
+   protected boolean descriptionTruncated;
+   protected int tooltipAreaWidth = 220;
 
    public void mouseClickMove(int mouseX, int mouseY, int clickedMouseButton, long timeSinceLastClick) {
    }
 
    public String getDisplayName() {
       return this.translatedName.isEmpty() ? this.displayName : this.translatedName;
+   }
+
+   public String getFormattedDisplayName() {
+      return ModernSettingsPanel.formatUiLabel(this.getDisplayName());
+   }
+
+   public boolean shouldShowInlineDescription() {
+      return this.hasDescription()
+         && (Augustus.getInstance() == null
+            || Augustus.getInstance().getModuleManager() == null
+            || Augustus.getInstance().getModuleManager().clickGui == null
+            || Augustus.getInstance().getModuleManager().clickGui.settingDescriptions.getValue());
+   }
+
+   protected void applyCardMetrics(ModernSettingsPanel.CardMetrics m) {
+      this.descriptionTruncated = m.descriptionTruncated;
+      this.tooltipAreaWidth = Math.max(80, m.tooltipWidth);
+      this.contentWidth = (int)Math.ceil((double)m.cardW);
    }
 
    public Setting withChangeListener(SettingChangeListener listener) {
@@ -169,7 +190,7 @@ public abstract class Setting extends AbstractFeature {
    }
 
    public int getHeight() {
-      return 25;
+      return ModernSettingsPanel.MIN_CARD_HEIGHT;
    }
 
    public boolean isVisualOnly() {
@@ -217,8 +238,10 @@ public abstract class Setting extends AbstractFeature {
    }
 
    public void drawDescriptionTooltip(int n) {
-      if (this.hasDescription() && Augustus.getInstance().getModuleManager().clickGui.settingDescriptions.getValue()) {
-         boolean isHovered = RenderUtil.isHovered((float)(this.renderX - 2), (float)this.renderY, (float)n, this.renderFont.getFontHeight(), this.lastMouseX, this.lastMouseY);
+      if (this.descriptionTruncated && this.hasDescription() && Augustus.getInstance().getModuleManager().clickGui.settingDescriptions.getValue()) {
+         int hitW = Math.max(n, this.tooltipAreaWidth);
+         int hitH = Math.max(32, Math.min(72, this.getHeight()));
+         boolean isHovered = RenderUtil.isHovered((float)(this.renderX + 8), (float)this.renderY, (float)hitW, (float)hitH, this.lastMouseX, this.lastMouseY);
          if (isHovered) {
             if (!this.tooltipHovered) {
                this.hoverStartTimeMs = System.currentTimeMillis();
@@ -240,6 +263,8 @@ public abstract class Setting extends AbstractFeature {
          }
 
          this.tooltipHovered = isHovered;
+      } else {
+         this.tooltipHovered = false;
       }
    }
 

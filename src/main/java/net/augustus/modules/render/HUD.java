@@ -35,8 +35,8 @@ public class HUD extends Module implements RenderListener {
    public final StringValue mode;
    public final StringValue side;
    public final StringValue casing;
-   private final DoubleValue xPos;
-   private final DoubleValue yPos;
+   public final DoubleValue xPos;
+   public final DoubleValue yPos;
    private final DoubleValue scale;
    public final DoubleValue size;
    private final DoubleValue newFontSize;

@@ -82,6 +82,15 @@ public class ShaderProgram {
       GlStateManager.bindTexture(framebuffer.framebufferTexture);
    }
 
+   /**
+    * Binds a texture directly to sampler unit 0 without mutating {@code savedTextureBindings}.
+    * Callers using this inside multi-pass loops must save and restore unit 0 manually.
+    */
+   public void bindTextureUnit0Fast(String str, int textureId) {
+      this.setUniform1i(str, 0);
+      GlStateManager.bindTexture(textureId);
+   }
+
    public void setUniform1fv(String str, FloatBuffer floatBuffer) {
       GL20.glUniform1(this.getUniformLocation(str), floatBuffer);
    }

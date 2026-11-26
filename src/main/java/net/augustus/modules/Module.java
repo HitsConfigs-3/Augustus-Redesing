@@ -25,7 +25,14 @@ import net.augustus.settings.options.NotificationCategoryOption;
 import net.augustus.config.ModuleSettingsConfigSection;
 import net.augustus.utils.animation.EasingType;
 import net.augustus.utils.animation.AnimationUtil;
+import net.augustus.render.RenderUtil;
+import net.augustus.utils.render.BlurComponent;
 import net.augustus.settings.BooleanValue;
+import net.augustus.ui.modern.components.ModernSettingsPanel;
+import net.augustus.ui.modern.components.ModernToggleSwitch;
+import net.augustus.ui.modern.render.GlassRenderer;
+import net.augustus.ui.modern.render.LucideIcon;
+import net.augustus.ui.modern.render.UiTheme;
 import net.augustus.utils.interfaces.MC;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.PacketThreadUtil;
@@ -74,6 +81,10 @@ public abstract class Module extends AbstractFeature implements MC, Comparable {
    private final BooleanValue showInArrayList;
    private final BooleanValue toggleSound;
    private final BooleanValue keyHoldMode;
+   private final ModernToggleSwitch[] behaviorSwitches = new ModernToggleSwitch[]{
+      new ModernToggleSwitch(), new ModernToggleSwitch(), new ModernToggleSwitch(), new ModernToggleSwitch()
+   };
+   private final float[][] behaviorCellBounds = new float[4][4];
 
    public Module(String str) {
        super(null, str);
@@ -84,7 +95,7 @@ public abstract class Module extends AbstractFeature implements MC, Comparable {
       Consumer<Boolean> consumer2 = bool2 -> this.setLoadFromConfig(bool2);
       this.loadFromConfigProperty = (BooleanProperty)booleanProperty2.withOnValueChanged(consumer2);
       BooleanProperty booleanProperty3 = new BooleanProperty(this, "M_A", true);
-      Consumer<Boolean> consumer3 = bool3 -> this.onTogglePropertyChanged(bool3);
+      Consumer<Boolean> consumer3 = bool3 -> this.setShowInArrayList(bool3);
       this.showInArrayListProperty = (BooleanProperty)booleanProperty3.withOnValueChanged(consumer3);
       BooleanProperty booleanProperty4 = new BooleanProperty(this, "M_S", true);
       Consumer<Boolean> consumer4 = bool4 -> this.setToggleSoundEnabled(bool4);
@@ -136,7 +147,7 @@ public abstract class Module extends AbstractFeature implements MC, Comparable {
       Consumer<Boolean> consumer2 = bool2 -> this.setLoadFromConfig(bool2);
       this.loadFromConfigProperty = (BooleanProperty)booleanProperty2.withOnValueChanged(consumer2);
       BooleanProperty booleanProperty3 = new BooleanProperty(this, "M_A", true);
-      Consumer<Boolean> consumer3 = bool3 -> this.onTogglePropertyChanged(bool3);
+      Consumer<Boolean> consumer3 = bool3 -> this.setShowInArrayList(bool3);
       this.showInArrayListProperty = (BooleanProperty)booleanProperty3.withOnValueChanged(consumer3);
       BooleanProperty booleanProperty4 = new BooleanProperty(this, "M_S", true);
       Consumer<Boolean> consumer4 = bool4 -> this.setToggleSoundEnabled(bool4);
@@ -175,7 +186,7 @@ public abstract class Module extends AbstractFeature implements MC, Comparable {
       this.color = color2;
       this.categorys = categorys2;
       this.sessionExpireTimeMs = this.lastToggleTimeMs + 171000000L;
-      this.setLoadFromConfig(this.categorys != Categorys.RENDER);
+      this.setLoadFromConfig(true);
       Augustus.getInstance().getModuleRegistry().getModules().add(this);
       this.alwaysEnabled = false;
       this.registerInCategory();
@@ -190,7 +201,7 @@ public abstract class Module extends AbstractFeature implements MC, Comparable {
       Consumer<Boolean> consumer2 = bool2 -> this.setLoadFromConfig(bool2);
       this.loadFromConfigProperty = (BooleanProperty)booleanProperty2.withOnValueChanged(consumer2);
       booleanProperty2 = new BooleanProperty(this, "M_A", true);
-      Consumer<Boolean> consumer3 = bool3 -> this.onTogglePropertyChanged(bool3);
+      Consumer<Boolean> consumer3 = bool3 -> this.setShowInArrayList(bool3);
       this.showInArrayListProperty = (BooleanProperty)booleanProperty2.withOnValueChanged(consumer3);
       BooleanProperty booleanProperty3 = new BooleanProperty(this, "M_S", true);
       Consumer<Boolean> consumer4 = bool4 -> this.setToggleSoundEnabled(bool4);
@@ -228,7 +239,7 @@ public abstract class Module extends AbstractFeature implements MC, Comparable {
       this.displayName = str;
       this.color = color2;
       this.categorys = categorys2;
-      this.setLoadFromConfig(this.categorys != Categorys.RENDER);
+      this.setLoadFromConfig(true);
       this.setShowInArrayList(false);
       Augustus.getInstance().getModuleRegistry().getModules().add(this);
       this.alwaysEnabled = true;
@@ -554,6 +565,7 @@ public abstract class Module extends AbstractFeature implements MC, Comparable {
       this.guiFont = customFontUtil;
       this.guiX = x;
       this.guiY = y;
+      BlurComponent.drawClickGuiOptionBlur((float)(x - 4), (float)y, 164.0F, (float)(this.guiHeight + 2), 3.0F);
       int textColor = Augustus.getInstance().getModuleManager().clickGui.textColor.getColorInt((byte)0);
       int hoverTextColor = Augustus.getInstance().getModuleManager().clickGui.hoverTextColor.getColorInt((byte)0);
       int color = this.isToggled()
@@ -620,72 +632,272 @@ public abstract class Module extends AbstractFeature implements MC, Comparable {
       return this.settings;
    }
 
-   public int renderSettingsHeader(int n, int n2, int n3, int n4, CustomFontUtil customFontUtil, boolean flag) {
-      String str;
-      StringBuilder sb;
-      {
-         sb = new StringBuilder().append("Key: ");
-         if (this.bindingKey) {
-            str = "...";
-         } else {
-            str = KeyboardInputUtil.getKeyDisplayName(this.getKeyCode());
+   public int renderKeybindPill(int rightEdgeX, int y, int mouseX, int mouseY) {
+      CustomFontUtil font = FontManager.interMedium;
+      String keyStr = this.bindingKey ? "Press key..." : KeyboardInputUtil.getKeyDisplayName(this.getKeyCode());
+      String label = this.bindingKey ? keyStr : ("Bind: " + keyStr);
+      int pillH = 24;
+      int pillW = Math.max(92, (int)font.getStringWidth(label) + 34);
+      this.keyBindX = rightEdgeX - pillW;
+      this.keyBindY = y;
+      this.keyBindHeight = pillH;
+      this.keyBindWidth = pillW;
+
+      boolean keyHovered = RenderUtil.isHovered((float)this.keyBindX, (float)this.keyBindY, (float)pillW, (float)pillH, mouseX, mouseY);
+      float hovT = net.augustus.ui.modern.render.UiAnimation.smoothState("mod_bind_hov", keyHovered ? 1.0F : 0.0F, 16.0F);
+      float prsT = net.augustus.ui.modern.render.UiAnimation.smoothState("mod_bind_prs", keyHovered && net.augustus.ui.modern.render.UiAnimation.isPrimaryMouseDown() ? 1.0F : 0.0F, 30.0F);
+      int accent = UiTheme.accentColor();
+      if (this.bindingKey) {
+         GlassRenderer.drawSoftShadow((float)this.keyBindX, (float)this.keyBindY, (float)pillW, (float)pillH, UiTheme.CONTROL_RADIUS, 7.0F, 1.0F, UiTheme.withAlpha(0xF59E0B, 82));
+         GlassRenderer.drawRoundedBox((float)this.keyBindX, (float)this.keyBindY, (float)pillW, (float)pillH, UiTheme.CONTROL_RADIUS, UiTheme.withAlpha(0xF59E0B, 60), 0xFFFBBF24, UiTheme.THICK_BORDER_THICKNESS);
+      } else {
+         GlassRenderer.drawRecessedWell((float)this.keyBindX, (float)this.keyBindY, (float)pillW, (float)pillH, UiTheme.CONTROL_RADIUS, hovT, prsT * 0.4F, (float)mouseX, (float)mouseY, accent, UiTheme.BORDER_THICKNESS);
+      }
+      int fg = this.bindingKey ? 0xFFFDE68A : (keyHovered ? UiTheme.TEXT_PRIMARY : UiTheme.secondaryTextColor());
+      LucideIcon.KEYBOARD.drawCentered((float)(this.keyBindX + 13), (float)this.keyBindY + (float)pillH * 0.5F + prsT * 0.35F, 12.5F, fg);
+      font.drawVerticallyCenteredString(label, (double)(this.keyBindX + 24), (double)this.keyBindY + prsT * 0.35F, (double)pillH, fg);
+      return pillW;
+   }
+
+   public int renderBehaviorCard(int x, int y, int boundsWidth, int mouseX, int mouseY, boolean drawVisuals) {
+      float cardW = ModernSettingsPanel.resolveCardWidth(x, boundsWidth);
+      boolean twoByTwo = cardW < 640.0F;
+      int cardH = twoByTwo ? 80 : ModernSettingsPanel.MIN_CARD_HEIGHT;
+
+      boolean[] states = new boolean[]{
+         this.loadFromConfig.getValue(),
+         this.showInArrayList.getValue(),
+         this.toggleSound.getValue(),
+         this.keyHoldMode.getValue()
+      };
+      String[] labels = new String[]{"Load Config", "Show ArrayList", "Toggle Sound", "Key Hold"};
+      boolean configEditable = Augustus.getInstance().isConfigEditingEnabled();
+      int accent = UiTheme.accentColor();
+
+      if (drawVisuals) {
+         boolean cardHover = RenderUtil.isHovered((float)x, (float)y, cardW, (float)cardH, mouseX, mouseY);
+         ModernSettingsPanel.drawGlassCardSurface("beh_" + this.getName(), (float)x, (float)y, cardW, (float)cardH, ModernSettingsPanel.CARD_RADIUS, cardHover, false, true, mouseX, mouseY);
+      }
+
+      CustomFontUtil font = FontManager.interMedium;
+      if (!twoByTwo) {
+         // Left: "Load Config" styled cleanly as a secondary toggle button with subtle border (no orphan switch!)
+         float loadPadX = 12.0F;
+         float btnX = (float)x + 8.0F;
+         float btnH = 24.0F;
+         float btnY = (float)y + ((float)cardH - btnH) * 0.5F;
+         float btnW = Math.max(106.0F, font.getStringWidth(labels[0]) + loadPadX * 2.0F + 14.0F);
+         this.behaviorCellBounds[0][0] = btnX;
+         this.behaviorCellBounds[0][1] = btnY;
+         this.behaviorCellBounds[0][2] = btnW;
+         this.behaviorCellBounds[0][3] = btnH;
+
+         if (drawVisuals) {
+            boolean locked = !configEditable;
+            boolean btnHovered = !locked && RenderUtil.isHovered(btnX, btnY, btnW, btnH, mouseX, mouseY);
+            boolean btnPressed = btnHovered && net.augustus.ui.modern.render.UiAnimation.isPrimaryMouseDown();
+            float hovT = net.augustus.ui.modern.render.UiAnimation.smoothState("beh_load_hov", btnHovered ? 1.0F : 0.0F, 16.0F);
+            float actT = net.augustus.ui.modern.render.UiAnimation.smoothState("beh_load_act", states[0] ? 1.0F : 0.0F, 18.0F);
+            float prsT = net.augustus.ui.modern.render.UiAnimation.smoothState("beh_load_prs", btnPressed ? 1.0F : 0.0F, 30.0F);
+
+            int idleFill = UiTheme.glassControlFillArgb(hovT, 0.0F, accent);
+            int activeFill = UiTheme.withAlpha(UiTheme.lerpArgb(accent, 0xFF1E1938, 0.58F), Math.round(185.0F + 25.0F * hovT));
+            int topF = locked ? UiTheme.glassDisabledFillArgb() : UiTheme.lerpArgb(idleFill, activeFill, actT);
+            int botF = locked ? topF : UiTheme.lerpArgb(topF, 0xFF0A0C12, 0.20F);
+            int idleBorder = 0x1AFFFFFF;
+            int activeBorder = UiTheme.withAlpha(UiTheme.accentSoftGlow(), Math.round(135.0F + 70.0F * hovT));
+            int btnBorder = locked
+               ? UiTheme.scaleAlpha(UiTheme.GLASS_BORDER, 0.55F)
+               : UiTheme.lerpArgb(UiTheme.lerpArgb(idleBorder, UiTheme.withAlpha(UiTheme.accentSoftGlow(), 175), hovT * 0.7F), activeBorder, actT);
+
+            GlassRenderer.drawInteractiveSurface(
+               btnX,
+               btnY,
+               btnW,
+               btnH,
+               UiTheme.CONTROL_RADIUS,
+               topF,
+               botF,
+               btnBorder,
+               UiTheme.BORDER_THICKNESS,
+               UiTheme.glassTopHighlightAlpha(Math.max(hovT, actT * 0.5F)),
+               hovT,
+               prsT,
+               !locked,
+               (float)mouseX,
+               (float)mouseY,
+               accent
+            );
+
+            float dotCx = btnX + 11.0F;
+            float dotCy = btnY + btnH * 0.5F + prsT * 0.35F;
+            if (locked) {
+               LucideIcon.LOCK.drawCentered(dotCx, dotCy, 10.0F, UiTheme.disabledTextColor());
+            } else {
+               int dotCol = UiTheme.lerpArgb(UiTheme.mutedTextColor(), UiTheme.lerpArgb(accent, 0xFFFFFFFF, 0.30F), actT);
+               GlassRenderer.drawCircle(dotCx, dotCy, 2.7F, dotCol);
+            }
+            int txtCol = locked
+               ? UiTheme.disabledTextColor()
+               : (states[0] || btnHovered ? UiTheme.primaryTextColor() : UiTheme.secondaryTextColor());
+            font.drawVerticallyCenteredString(labels[0], (double)(btnX + 19.0F), (double)(btnY + prsT * 0.35F), (double)btnH, txtCol);
+         }
+
+         // Right: 3 evenly distributed toggle options separated cleanly (no orphan switch on far right)
+         float togglesLeft = btnX + btnW + 12.0F;
+         float togglesRight = (float)x + cardW - 4.0F;
+         float colW = Math.max(90.0F, (togglesRight - togglesLeft) / 3.0F);
+         if (drawVisuals) {
+            GlassRenderer.drawSeparator(togglesLeft - 6.0F, (float)y + 9.0F, togglesLeft - 6.0F, (float)y + (float)cardH - 9.0F, 1.0F, UiTheme.GLASS_DIVIDER);
+            for (int c = 1; c < 3; c++) {
+               float sx = togglesLeft + colW * (float)c;
+               GlassRenderer.drawSeparator(sx, (float)y + 9.0F, sx, (float)y + (float)cardH - 9.0F, 1.0F, UiTheme.GLASS_DIVIDER);
+            }
+         }
+
+         for (int i = 1; i <= 3; i++) {
+            float cx = togglesLeft + colW * (float)(i - 1);
+            float cy = (float)y;
+            this.behaviorCellBounds[i][0] = cx;
+            this.behaviorCellBounds[i][1] = cy;
+            this.behaviorCellBounds[i][2] = colW;
+            this.behaviorCellBounds[i][3] = (float)cardH;
+
+            if (drawVisuals) {
+               boolean cellHovered = RenderUtil.isHovered(cx, cy, colW, (float)cardH, mouseX, mouseY);
+               float cHovT = net.augustus.ui.modern.render.UiAnimation.smoothState("beh_cell_" + i, cellHovered ? 1.0F : 0.0F, 16.0F);
+               if (cHovT > 0.03F) {
+                  GlassRenderer.drawRoundedRect(cx + 4.0F, cy + 4.0F, colW - 8.0F, (float)cardH - 8.0F, UiTheme.CONTROL_RADIUS, UiTheme.withAlpha(accent, Math.round(24.0F * cHovT)));
+               }
+               float switchW = 34.0F;
+               float switchH = 18.0F;
+               float switchX = cx + colW - 14.0F - switchW;
+               float switchY = cy + ((float)cardH - switchH) * 0.5F;
+               float textMaxW = Math.max(40.0F, switchX - (cx + 14.0F) - 8.0F);
+               String safeLabel = ModernSettingsPanel.trimToWidth(font, labels[i], textMaxW);
+               int fg = cellHovered || states[i] ? UiTheme.primaryTextColor() : UiTheme.secondaryTextColor();
+               font.drawVerticallyCenteredString(safeLabel, (double)(cx + 14.0F), (double)cy, (double)cardH, fg);
+               this.behaviorSwitches[i].setEnabled(true);
+               this.behaviorSwitches[i].render(switchX, switchY, switchW, switchH, states[i], mouseX, mouseY);
+            }
+         }
+      } else {
+         int cols = 2;
+         float cellW = cardW / 2.0F;
+         float cellH = (float)cardH / 2.0F;
+         if (drawVisuals) {
+            GlassRenderer.drawSeparator((float)x + cellW, (float)y + 8.0F, (float)x + cellW, (float)y + (float)cardH - 8.0F, 1.0F, UiTheme.GLASS_DIVIDER);
+            GlassRenderer.drawSeparator((float)x + 12.0F, (float)y + cellH, (float)x + cardW - 12.0F, (float)y + cellH, 1.0F, UiTheme.GLASS_DIVIDER);
+         }
+
+         for (int i = 0; i < 4; i++) {
+            int col = i % cols;
+            int row = i / cols;
+            float cx = (float)x + (float)col * cellW;
+            float cy = (float)y + (float)row * cellH;
+            if (i == 0) {
+               float btnH = 24.0F;
+               float btnW = Math.min(cellW - 20.0F, Math.max(106.0F, font.getStringWidth(labels[0]) + 36.0F));
+               float bx = cx + 10.0F;
+               float by = cy + (cellH - btnH) * 0.5F;
+               this.behaviorCellBounds[0][0] = bx;
+               this.behaviorCellBounds[0][1] = by;
+               this.behaviorCellBounds[0][2] = btnW;
+               this.behaviorCellBounds[0][3] = btnH;
+               if (drawVisuals) {
+                  boolean locked = !configEditable;
+                  int fill = locked ? UiTheme.glassDisabledFillArgb() : (states[0] ? UiTheme.withAlpha(accent, 90) : UiTheme.glassControlFillArgb(0.0F, 0.0F, accent));
+                  int border = locked ? UiTheme.GLASS_BORDER : (states[0] ? UiTheme.withAlpha(UiTheme.accentSoftGlow(), 165) : 0x1AFFFFFF);
+                  GlassRenderer.drawRoundedBox(bx, by, btnW, btnH, UiTheme.CONTROL_RADIUS, fill, border, 1.0F);
+                  font.drawCenteredStringInBox(labels[0], (double)bx, (double)by, (double)btnW, (double)btnH, locked ? UiTheme.disabledTextColor() : UiTheme.TEXT_PRIMARY);
+               }
+            } else {
+               this.behaviorCellBounds[i][0] = cx;
+               this.behaviorCellBounds[i][1] = cy;
+               this.behaviorCellBounds[i][2] = cellW;
+               this.behaviorCellBounds[i][3] = cellH;
+               if (drawVisuals) {
+                  boolean cellHovered = RenderUtil.isHovered(cx, cy, cellW, cellH, mouseX, mouseY);
+                  float switchW = 34.0F;
+                  float switchH = 18.0F;
+                  float switchX = cx + cellW - 14.0F - switchW;
+                  float switchY = cy + (cellH - switchH) * 0.5F;
+                  float textMaxW = Math.max(40.0F, switchX - (cx + 14.0F) - 6.0F);
+                  String safeLabel = ModernSettingsPanel.trimToWidth(font, labels[i], textMaxW);
+                  int fg = cellHovered || states[i] ? UiTheme.primaryTextColor() : UiTheme.secondaryTextColor();
+                  font.drawVerticallyCenteredString(safeLabel, (double)(cx + 14.0F), (double)cy, (double)cellH, fg);
+                  this.behaviorSwitches[i].setEnabled(true);
+                  this.behaviorSwitches[i].render(switchX, switchY, switchW, switchH, states[i], mouseX, mouseY);
+               }
+            }
          }
       }
 
-      String str2 = sb.append(str).toString();
-      this.keyBindX = n - 1;
-      this.keyBindY = n2;
-      this.keyBindHeight = (int)customFontUtil.getFontHeight() + 1;
-      this.keyBindWidth = (int)customFontUtil.getStringWidth(str2) + 4;
-      int colorInt = Augustus.getInstance().getModuleManager().clickGui.textColor.getColorInt((byte)0);
-      double d = (double)n;
-      double d2 = (double)n2;
-      int keyBindHeight2 = this.keyBindHeight;
-      int keyBindWidth2 = this.keyBindWidth;
-      int keyBindY2 = this.keyBindY;
-      int keyBindX2 = this.keyBindX;
-      customFontUtil.drawString(str2, d, d2, this.getHoveredColor(colorInt, 0.2, n3, n4, keyBindX2, keyBindY2, keyBindWidth2, keyBindHeight2, flag));
-      int n5 = n + 200;
-      this.loadFromConfig.render(n3, n4, n5, n2, (byte)0, (byte)0, customFontUtil, true);
-      int n7 = n + 400;
-      this.showInArrayList.render(n3, n4, n7, n2, (byte)0, (byte)0, customFontUtil, true);
-      int n9 = n + 600;
-      this.toggleSound.render(n3, n4, n9, n2, (byte)0, (byte)0, customFontUtil, true);
-      int n11 = n + 780;
-      this.keyHoldMode.render(n3, n4, n11, n2, (byte)0, (byte)0, customFontUtil, true);
-      BooleanProperty mc2 = this.loadFromConfigProperty;
-      Boolean value = this.loadFromConfig.getValue();
-      mc2.setValue(value);
-      BooleanProperty ma = this.showInArrayListProperty;
-      Boolean value2 = this.showInArrayList.getValue();
-      ma.setValue(value2);
-      BooleanProperty ms = this.toggleSoundProperty;
-      Boolean value3 = this.toggleSound.getValue();
-      ms.setValue(value3);
-      BooleanProperty mKm2 = this.keyHoldModeProperty;
-      Boolean value4 = this.keyHoldMode.getValue();
-      mKm2.setValue(value4);
-      return 930;
+      this.loadFromConfigProperty.setValue(this.loadFromConfig.getValue());
+      this.showInArrayListProperty.setValue(this.showInArrayList.getValue());
+      this.toggleSoundProperty.setValue(this.toggleSound.getValue());
+      this.keyHoldModeProperty.setValue(this.keyHoldMode.getValue());
+      return cardH;
    }
 
-   public void handleSettingsMouseClick(int n, int n2, int n3) throws IOException {
+   public int renderSettingsHeader(int n, int n2, int n3, int n4, CustomFontUtil customFontUtil, boolean flag) {
+      int cardH = this.renderBehaviorCard(n, n2, 760, n3, n4, flag);
+      return Math.max(760, cardH);
+   }
+
+   public boolean handleBehaviorCardClick(int mouseX, int mouseY, int mouseButton) {
+      if (mouseButton != 0) {
+         return false;
+      }
+      for (int i = 0; i < 4; i++) {
+         float cx = this.behaviorCellBounds[i][0];
+         float cy = this.behaviorCellBounds[i][1];
+         float cw = this.behaviorCellBounds[i][2];
+         float ch = this.behaviorCellBounds[i][3];
+         if (cw > 0.0F && ch > 0.0F && RenderUtil.isHovered(cx, cy, cw, ch, mouseX, mouseY)) {
+            switch (i) {
+               case 0:
+                  if (Augustus.getInstance().isConfigEditingEnabled()) {
+                     this.setLoadFromConfig(!this.loadFromConfig.getValue());
+                     return true;
+                  }
+                  return false;
+               case 1:
+                  this.setShowInArrayList(!this.showInArrayList.getValue());
+                  return true;
+               case 2:
+                  this.setToggleSoundEnabled(!this.toggleSound.getValue());
+                  return true;
+               case 3:
+                  this.setKeyHoldMode(!this.keyHoldMode.getValue());
+                  return true;
+            }
+         }
+      }
+      return false;
+   }
+
+   public boolean handleKeybindClick(int n, int n2, int n3) {
       if (this.isPointInBounds(this.keyBindX, this.keyBindY, this.keyBindWidth, this.keyBindHeight, n, n2) && !this.bindingKey) {
          this.bindingKey = true;
+         return true;
       } else if (this.bindingKey) {
          if ((this.isPointInBounds(this.keyBindX, this.keyBindY, this.keyBindWidth + 20, this.keyBindHeight, n, n2) && (n3 == 0 || n3 == 1)) || n3 > 1) {
             this.setKeyCode(n3 + 10000);
          }
 
          this.bindingKey = false;
+         return true;
+      }
+      return false;
+   }
+
+   public void handleSettingsMouseClick(int n, int n2, int n3) throws IOException {
+      if (this.handleKeybindClick(n, n2, n3)) {
+         return;
       }
 
-      if (Augustus.getInstance().isConfigEditingEnabled()) {
-         this.loadFromConfig.mouseClicked(n, n2, n3);
-      }
-
-      this.showInArrayList.mouseClicked(n, n2, n3);
-      this.toggleSound.mouseClicked(n, n2, n3);
-      this.keyHoldMode.mouseClicked(n, n2, n3);
+      this.handleBehaviorCardClick(n, n2, n3);
    }
 
    public void handleSettingsKeyTyped(char typedChar, int keyCode) throws IOException {

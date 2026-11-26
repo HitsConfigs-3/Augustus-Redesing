@@ -150,6 +150,9 @@ public class ClipboardConfigCodec {
    }
 
    private static Boolean shouldImportCategoryProperty(ConfigProperty prop) {
+      if (VisualsConfigFile.isProtectedVisualProperty(prop)) {
+         return false;
+      }
       return !(prop.getFeatureBase() instanceof Module)
          || (prop.getName().equals("M_T") && prop.getFeatureBase() instanceof Module)
          || prop instanceof AbstractFeature;

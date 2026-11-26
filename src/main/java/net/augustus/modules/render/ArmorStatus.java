@@ -25,8 +25,8 @@ import net.minecraft.item.ItemStack;
 import org.lwjgl.opengl.GL11;
 
 public class ArmorStatus extends Module implements RenderListener {
-   private final DoubleValue posX;
-   private final DoubleValue posY;
+   public final DoubleValue posX;
+   public final DoubleValue posY;
    private final DoubleValue scale;
    private final StringValue durabilityMode;
    private final ColorSetting durabilityColor;
