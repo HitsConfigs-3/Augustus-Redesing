@@ -64,20 +64,25 @@ function Find-Java8 {
 }
 
 function Find-Jar {
-   <# El fat jar se llama openaugustus-<version>-all.jar. Se busca donde un usuario lo dejaria al
-      descomprimir el release, y tambien en el arbol del proyecto. #>
+   <# El fat jar se llama augustus-redesing-<version>-all.jar (antes openaugustus-<version>-all.jar; se
+      sigue aceptando el nombre viejo para quien tenga una descarga anterior). Se busca donde un usuario lo
+      dejaria al descomprimir el release, y tambien en el arbol del proyecto. #>
    $dirs = @($script:BaseDir, (Join-Path $script:BaseDir 'libs'), (Join-Path $script:BaseDir 'build\libs'),
              (Join-Path $script:BaseDir '..'), (Join-Path $script:BaseDir '..\build\libs'),
              (Join-Path $script:BaseDir '..\..\build\libs'))
    foreach ($dir in $dirs) {
       if (-not (Test-Path $dir)) { continue }
-      $all = Get-ChildItem $dir -Filter 'openaugustus-*-all.jar' -File -ErrorAction SilentlyContinue |
+      $all = Get-ChildItem $dir -Filter 'augustus-redesing-*-all.jar' -File -ErrorAction SilentlyContinue |
              Sort-Object LastWriteTime -Descending | Select-Object -First 1
       if ($all) { return $all.FullName }
+      $legacy = Get-ChildItem $dir -Filter 'openaugustus-*-all.jar' -File -ErrorAction SilentlyContinue |
+             Sort-Object LastWriteTime -Descending | Select-Object -First 1
+      if ($legacy) { return $legacy.FullName }
    }
    foreach ($dir in $dirs) {
       if (-not (Test-Path $dir)) { continue }
-      $any = Get-ChildItem $dir -Filter 'openaugustus*.jar' -File -ErrorAction SilentlyContinue |
+      $any = Get-ChildItem -Path $dir -File -ErrorAction SilentlyContinue |
+             Where-Object { $_.Name -like 'augustus-redesing*.jar' -or $_.Name -like 'openaugustus*.jar' } |
              Sort-Object LastWriteTime -Descending | Select-Object -First 1
       if ($any) { return $any.FullName }
    }

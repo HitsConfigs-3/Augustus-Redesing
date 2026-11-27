@@ -79,7 +79,7 @@ El release trae un ZIP con el lanzador, los nativos de LWJGL y el cliente ya com
 
 El lanzador funciona en dos modos y elige solo:
 
-- **Modo jar**: si encuentra `openaugustus-*-all.jar` junto a él (o en `build/libs/`), lo ejecuta con los
+- **Modo jar**: si encuentra `augustus-redesing-*-all.jar` junto a él (o en `build/libs/`), lo ejecuta con los
   nativos en `-Djava.library.path`.
 - **Modo código fuente**: si encuentra `gradlew.bat` cerca, ejecuta `gradlew runClient`, que extrae los
   nativos y descarga los assets de Minecraft 1.8 automáticamente.
@@ -106,7 +106,7 @@ Eso crea `run/`, extrae los nativos de LWJGL/OpenAL y descarga los assets de Min
 # El fat jar trae todas las dependencias; necesita los nativos y una carpeta con assets de 1.8
 java "-Djava.library.path=natives" "-Dorg.lwjgl.librarypath=natives" ^
      "-Dnet.java.games.input.librarypath=natives" -Xms512m -Xmx2g ^
-     -jar openaugustus-b4.23.3-all.jar
+     -jar augustus-redesing-b4.23.3-all.jar
 ```
 
 La clase `Start` del fat jar resuelve los assets en este orden: `assets/`, luego `run/assets/`, luego el
@@ -132,7 +132,7 @@ Ejecuta directamente `src/main/java/Start.java` (o `StartMinecraftDirectory.java
 ```powershell
 # desde la raíz del repositorio clonado
 .\gradlew.bat clean build      # build/libs/openaugustus-b4.23.3.jar
-.\gradlew.bat fatJar           # build/libs/openaugustus-b4.23.3-all.jar  (todo incluido, es el del release)
+.\gradlew.bat fatJar           # build/libs/augustus-redesing-b4.23.3-all.jar  (todo incluido, es el del release)
 .\gradlew.bat compatibilityJar # variante para JRE 8 con políticas JCE restringidas
 ```
 

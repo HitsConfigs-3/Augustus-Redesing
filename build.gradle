@@ -431,7 +431,9 @@ def fatJar = tasks.register('fatJar', Jar) {
     description = 'Builds a standalone runnable fat JAR (java -jar) with all dependencies and natives bundled.'
     dependsOn tasks.named('classes'), downgradeJava8Deps, mergeFatJarServices
 
-    archiveClassifier = 'all'
+    // Fixed release artifact name: augustus-redesing-b4.23.3-all.jar. The version part still comes from
+    // `version`, so the client version string is untouched; only the file name is branded.
+    archiveFileName = "augustus-redesing-${version}-all.jar"
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
     zip64 = true
 
