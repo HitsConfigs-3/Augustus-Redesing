@@ -2071,8 +2071,8 @@ n2 = this.debugProfilerName.length();
                in = this.mcDefaultResourcePack.getInputStreamAssets(new ResourceLocation("icons/icon_16x16.png"));
                in2 = this.mcDefaultResourcePack.getInputStreamAssets(new ResourceLocation("icons/icon_32x32.png"));
             } else {
-               in = Minecraft.class.getClassLoader().getResourceAsStream("assets/augustus/pictures/logo_16x16.png");
-               in2 = Minecraft.class.getClassLoader().getResourceAsStream("assets/augustus/pictures/logo_32x32.png");
+               in = Minecraft.class.getClassLoader().getResourceAsStream("assets/augustus/pictures/logoRedesign_16x16.png");
+               in2 = Minecraft.class.getClassLoader().getResourceAsStream("assets/augustus/pictures/logoRedesign_32x32.png");
             }
 
             if (in != null && in2 != null) {
@@ -3188,7 +3188,7 @@ b4 = 60;
    private void createDisplay() throws LWJGLException {
       Display.setResizable(true);
       
-      Display.setTitle(Augustus.getInstance().getName() + " " + Augustus.getInstance().getVersion());
+      Display.setTitle(Augustus.getInstance().getWindowTitle());
 
       try {
          Display.create(new PixelFormat().withDepthBits(24));
@@ -4245,6 +4245,18 @@ File file = new File(new File(OSUtil.detectOS().getMinecraftDirectory()), "crash
       System.exit(b);
    }
 
+   /**
+    * Startup splash: the composed "Augustus Redesing" art (dark violet backdrop, the glowing A mark and
+    * AUGUSTUS / REDESIGN / DREAM VISUALS) painted full-screen.
+    *
+    * <p>WHY pre-composed art instead of drawing the logo and text here: this runs before the resource
+    * reload that creates the font renderers, so no Inter atlas exists yet - any text drawn at this point
+    * would have to fall back to the bitmap font, which is the pixelated look the redesign removes. The
+    * texture is cover-fitted (scaled to fill, centred, overflow cropped) so a 4:3 or ultrawide window
+    * never stretches the mark, and the old "draw the same texture again as a 256 px square" step is gone:
+    * it sampled a 256 px corner of a 1920 px image and was the reason the splash read as a broken stretch.
+    * </p>
+    */
    private void drawSplashScreen(TextureManager textureManager) throws LWJGLException {
       ScaledResolution sr = new ScaledResolution(this);
       int scaleFactor = sr.getScaleFactor();
@@ -4261,28 +4273,34 @@ File file = new File(new File(OSUtil.detectOS().getMinecraftDirectory()), "crash
       GlStateManager.disableDepth();
       GlStateManager.enableTexture2D();
       BufferedImage image = null;
-      InputStream resourceAsStream = Augustus.class.getClassLoader().getResourceAsStream("assets/augustus/pictures/startLogo.png");
+      InputStream resourceAsStream = null;
 
       try {
-         image = ImageIO.read(resourceAsStream);
+         resourceAsStream = Minecraft.class.getClassLoader().getResourceAsStream("assets/augustus/pictures/splashRedesign.png");
+         if (resourceAsStream == null) {
+            // Safety net only (the art ships with the client): the previous splash art rather than a black box.
+            resourceAsStream = Minecraft.class.getClassLoader().getResourceAsStream("assets/augustus/pictures/startLogo.png");
+         }
+         if (resourceAsStream != null) {
+            image = ImageIO.read(resourceAsStream);
+         }
       } catch (IOException e) {
-         e.printStackTrace();
+         LOGGER.error("Couldn't load the Augustus splash art", e);
+      } finally {
+         IOUtils.closeQuietly(resourceAsStream);
       }
 
-      this.mojangLogo = textureManager.getDynamicTextureLocation("logo", new DynamicTexture(image));
-      textureManager.bindTexture(this.mojangLogo);
-      Tessellator instance = Tessellator.getInstance();
-      WorldRenderer worldRenderer = instance.getWorldRenderer();
-      worldRenderer.begin(7, DefaultVertexFormats.POSITION_TEX_COLOR);
-      worldRenderer.pos(0.0, (double)this.displayHeight, 0.0).tex(0.0, 0.0).color(255, 255, 255, 255).endVertex();
-      worldRenderer.pos((double)this.displayWidth, (double)this.displayHeight, 0.0).tex(0.0, 0.0).color(255, 255, 255, 255).endVertex();
-      worldRenderer.pos((double)this.displayWidth, 0.0, 0.0).tex(0.0, 0.0).color(255, 255, 255, 255).endVertex();
-      worldRenderer.pos(0.0, 0.0, 0.0).tex(0.0, 0.0).color(255, 255, 255, 255).endVertex();
-      instance.draw();
+      if (image != null) {
+         this.mojangLogo = textureManager.getDynamicTextureLocation("logo", new DynamicTexture(image));
+         textureManager.bindTexture(this.mojangLogo);
+         // Linear filtering: DynamicTexture defaults to nearest, which makes the splash text crawl when the
+         // window is not exactly 1920x1080. The art is the first thing a user sees, so it scales smoothly.
+         GlStateManager.glTexParameteri(3553, 10241, 9729);
+         GlStateManager.glTexParameteri(3553, 10240, 9729);
+         this.drawSplashArt(image.getWidth(), image.getHeight(), sr.getScaledWidth(), sr.getScaledHeight());
+      }
+
       GlStateManager.color(1.0F, 1.0F, 1.0F, 1.0F);
-      short s = 256;
-      short s2 = 256;
-      this.draw((sr.getScaledWidth() - s) / 2, (sr.getScaledHeight() - s2) / 2, (byte)0, (byte)0, s, s2, (short)255, (short)255, (short)255, (short)255);
       GlStateManager.disableLighting();
       GlStateManager.disableFog();
       framebuffer.unbindFramebuffer();
@@ -4290,6 +4308,41 @@ File file = new File(new File(OSUtil.detectOS().getMinecraftDirectory()), "crash
       GlStateManager.enableAlpha();
       GlStateManager.alphaFunc(516, 0.1F);
       this.updateDisplay();
+   }
+
+   /**
+    * Paints the splash art over the whole window, cover-fitted: the art keeps its 16:9 proportions and the
+    * overflow is cropped from the centre instead of being squeezed into the window's aspect.
+    */
+   private void drawSplashArt(int imageWidth, int imageHeight, int screenWidth, int screenHeight) {
+      float u0 = 0.0F;
+      float u1 = 1.0F;
+      float v0 = 0.0F;
+      float v1 = 1.0F;
+      if (imageWidth > 0 && imageHeight > 0 && screenWidth > 0 && screenHeight > 0) {
+         float imageAspect = (float)imageWidth / (float)imageHeight;
+         float screenAspect = (float)screenWidth / (float)screenHeight;
+         if (screenAspect > imageAspect) {
+            // Window is wider than the art: keep full width, crop the top and bottom equally.
+            float visibleV = imageAspect / screenAspect;
+            v0 = (1.0F - visibleV) * 0.5F;
+            v1 = 1.0F - v0;
+         } else if (screenAspect < imageAspect) {
+            // Window is taller than the art: keep full height, crop the left and right equally.
+            float visibleU = screenAspect / imageAspect;
+            u0 = (1.0F - visibleU) * 0.5F;
+            u1 = 1.0F - u0;
+         }
+      }
+
+      Tessellator instance = Tessellator.getInstance();
+      WorldRenderer worldRenderer = instance.getWorldRenderer();
+      worldRenderer.begin(7, DefaultVertexFormats.POSITION_TEX_COLOR);
+      worldRenderer.pos(0.0, (double)screenHeight, 0.0).tex((double)u0, (double)v1).color(255, 255, 255, 255).endVertex();
+      worldRenderer.pos((double)screenWidth, (double)screenHeight, 0.0).tex((double)u1, (double)v1).color(255, 255, 255, 255).endVertex();
+      worldRenderer.pos((double)screenWidth, 0.0, 0.0).tex((double)u1, (double)v0).color(255, 255, 255, 255).endVertex();
+      worldRenderer.pos(0.0, 0.0, 0.0).tex((double)u0, (double)v0).color(255, 255, 255, 255).endVertex();
+      instance.draw();
    }
 
    private void updateFramebufferSize() {

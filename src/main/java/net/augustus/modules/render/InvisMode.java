@@ -25,7 +25,9 @@ public class InvisMode extends Module {
 
    @Override
    public void onDisable() {
-      Display.setTitle(Augustus.getInstance().getName() + " " + Augustus.getInstance().getVersion());
+      // Restores exactly what createDisplay() installed, so toggling invisibility cannot leave the window
+      // branded with the old "Augustus b4.23.3" title.
+      Display.setTitle(Augustus.getInstance().getWindowTitle());
       mc.setWindowIcon(false);
    }
 

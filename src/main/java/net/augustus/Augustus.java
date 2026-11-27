@@ -211,6 +211,27 @@ public class Augustus {
       return this.name;
    }
 
+   /**
+    * Brand of this build for the window frame and the splash: "Augustus Redesing".
+    *
+    * <p>Kept apart from {@link #getName()} on purpose - the bare "Augustus" is the identity every other
+    * subsystem prints (buttons, chat prefix, config headers), and renaming it would ripple through all of
+    * them. Only the OS-level window title is rebranded.</p>
+    */
+   public String getDisplayName() {
+      return this.name + " Redesing";
+   }
+
+   /**
+    * OS window title: "Augustus Redesing b4.23.3 - Dream Visuals".
+    *
+    * <p>The version half is {@code this.version} verbatim - the redesign never rewrites b4.23.3, because
+    * that string is what the update checks, the configs and the user's own records key off.</p>
+    */
+   public String getWindowTitle() {
+      return this.getDisplayName() + " " + this.version + " - Dream Visuals";
+   }
+
    public String getVersion() {
       return this.version;
    }
