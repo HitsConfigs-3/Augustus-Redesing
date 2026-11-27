@@ -243,7 +243,7 @@ public class ModuleSettingsPanel {
       int contentTopY = this.computeContentTopY(this.currentModule);
       this.lastContentTopY = contentTopY;
 
-      // Elevated Level 2 Hero Module Header Card (8px radius, crisp 1px crystal reflection border)
+      // Elevated Level 2 Hero Module Header Card (crisp 1px crystal reflection border)
       float headerCardW = ModernSettingsPanel.resolveCardWidth(0, n3);
       float heroY = 2.0F;
       float heroH = 66.0F;
@@ -261,16 +261,9 @@ public class ModuleSettingsPanel {
       int accent = ClickGuiScreen.fadeArgb(UiTheme.accentColor());
       GlassRenderer.drawHeroCard(0.0F, heroY, headerCardW, heroH, UiTheme.CARD_RADIUS, this.heroCardAnim, this.heroToggleAnim, (float)n, (float)n2, accent);
 
-      // Left visual squircle icon container
-      float iconSize = 40.0F;
-      float iconBoxX = 14.0F;
-      float iconBoxY = heroY + (heroH - iconSize) * 0.5F;
-      int wellTop = UiTheme.lerpArgb(UiTheme.glassRecessedFillArgb(this.heroCardAnim * 0.4F, 0.0F, accent), UiTheme.withAlpha(UiTheme.lerpArgb(accent, 0xFF1D1833, 0.48F), 185), this.heroToggleAnim);
-      int wellBot = UiTheme.lerpArgb(wellTop, 0xFF0A0C12, 0.25F);
-      int wellBorder = ClickGuiScreen.fadeArgb(UiTheme.lerpArgb(UiTheme.GLASS_BORDER, UiTheme.withAlpha(UiTheme.accentSoftGlow(), 175), this.heroToggleAnim));
-      GlassRenderer.drawRoundedGradientBox(iconBoxX, iconBoxY, iconSize, iconSize, UiTheme.CARD_RADIUS, wellTop, wellBot, wellBorder, 1.0F, 0.08F + 0.06F * this.heroToggleAnim);
-      int glyphColor = ClickGuiScreen.fadeArgb(UiTheme.lerpArgb(UiTheme.secondaryTextColor(), UiTheme.TEXT_PRIMARY, Math.max(this.heroToggleAnim, this.heroCardAnim * 0.8F)));
-      LucideIcon.forCategory(this.currentModule.getCategorys()).drawCentered(iconBoxX + iconSize * 0.5F, iconBoxY + iconSize * 0.5F, 19.0F, glyphColor);
+      // No module icon container: the page already names the module in its title, and the squircle
+      // glyph only ate 54px of the header's leading edge. The title block starts on the card's own
+      // padding column instead, so it lines up with every card below it.
 
       // Right balanced cluster: [Bind pill] [Reset button] | [Toggle Switch]
       float rightEdge = headerCardW - 14.0F;
@@ -290,12 +283,12 @@ public class ModuleSettingsPanel {
       int bindW = this.currentModule.renderKeybindPill((int)(resetX - 8.0F), (int)actionY, n, n2);
 
       // Left hierarchy: SemiBold Title + Category badge + Regular #94A3B8 Description
-      float textLeft = iconBoxX + iconSize + 14.0F;
+      float textLeft = ModernSettingsPanel.CARD_PAD_X;
       float headerLeftMaxW = Math.max(120.0F, (resetX - 8.0F - (float)bindW) - textLeft - 14.0F);
       String catLabel = formatCategoryLabel(this.currentModule.getCategorys());
       float badgeW = FontManager.interSmall.getStringWidth(catLabel) + 14.0F;
       float titleMaxW = Math.max(80.0F, headerLeftMaxW - badgeW - 10.0F);
-      String modTitle = ModernSettingsPanel.trimToWidth(this.headerFont, this.currentModule.getModuleName(), titleMaxW);
+      String modTitle = ModernSettingsPanel.trimToWidth(this.headerFont, this.currentModule.getGuiTitle(), titleMaxW);
       String modDesc = this.currentModule.getDescription() != null ? this.currentModule.getDescription().trim() : "";
 
       float titleY = modDesc.isEmpty() ? heroY + (heroH - this.headerFont.getFontHeight()) * 0.5F : heroY + 13.0F;
@@ -304,7 +297,16 @@ public class ModuleSettingsPanel {
       float badgeX = textLeft + this.headerFont.getStringWidth(modTitle) + 10.0F;
       float badgeY = titleY + (this.headerFont.getFontHeight() - 17.0F) * 0.5F;
       if (badgeX + badgeW <= textLeft + headerLeftMaxW) {
-         GlassRenderer.drawRoundedBox(badgeX, badgeY, badgeW, 17.0F, 5.0F, UiTheme.withAlpha(accent, 42), ClickGuiScreen.fadeArgb(UiTheme.withAlpha(UiTheme.accentSoftGlow(), 125)), 1.0F);
+         GlassRenderer.drawRoundedBox(
+            badgeX,
+            badgeY,
+            badgeW,
+            17.0F,
+            8.5F,
+            ClickGuiScreen.fadeArgb(UiTheme.withAlpha(accent, 42)),
+            ClickGuiScreen.fadeArgb(UiTheme.withAlpha(UiTheme.accentSoftGlow(), 125)),
+            1.0F
+         );
          FontManager.interSmall.drawCenteredStringInBox(catLabel, (double)badgeX, (double)badgeY, (double)badgeW, 17.0, ClickGuiScreen.fadeArgb(UiTheme.accentSoftGlow()));
       }
 

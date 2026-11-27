@@ -59,10 +59,10 @@ public class ClickGuiWindow extends AbstractFeature implements MC {
     * Screen-wide open/close envelope (1 settled open, 0 fully closed), owned by {@link ClickGuiScreen}.
     *
     * <p>WHY read it from the screen instead of animating a second, window-local close here: the window shell
-    * is a long-lived singleton that outlives the GuiScreen, and the overlay's fade has to cover the dock, the
-    * window and the config panel with ONE value, otherwise the three surfaces desynchronise and the last
-    * visible frame shows leftover chrome. Folding it into {@link #getOpenProgress()} reuses the alpha plumbing
-    * the glass already has (window surface, sidebar tint, panel-blur outline), so no new draw path is added.
+     * is a long-lived singleton that outlives the GuiScreen, and the overlay's fade has to cover the window
+     * and the config panel with ONE value, otherwise the two surfaces desynchronise and the last visible
+     * frame shows leftover chrome. Folding it into {@link #getOpenProgress()} reuses the alpha plumbing
+     * the glass already has (window surface, sidebar tint, panel-blur outline), so no new draw path is added.
     */
    protected static float screenTransition() {
       return ClickGuiScreen.getScreenFade();
@@ -433,8 +433,9 @@ public class ClickGuiWindow extends AbstractFeature implements MC {
          return;
       }
 
-      // Same envelope shape and range as the dock scale in ClickGuiScreen.drawScreen, so the dock and the
-      // shell grow together instead of one reaching full size noticeably before the other.
+      // 3.5% of zoom at the closed end of the envelope: enough to read as the shell settling into place,
+// small enough that no text reflows. This is the ONLY overlay-wide scale - ClickGuiScreen has none, so
+// every window here grows with the same curve and nothing has to be kept in step with a second transform.
       float scale = 0.965F + (1.0F - 0.965F) * UiAnimation.easeOutCubic(t);
       float halfW = (float)this.getWidth() * 0.5F;
       float halfH = (float)this.getHeight() * 0.5F;
@@ -529,7 +530,7 @@ public class ClickGuiWindow extends AbstractFeature implements MC {
       // The window's own open envelope (smoothstep, delta-driven, restarted by openWindow()/setVisible) is
       // multiplied by the overlay envelope. At rest both are exactly 1.0F, so every normal frame is unchanged;
       // during a transition the product fades the shell - and everything on it that already multiplies this
-      // value in - with the dock and the panel instead of popping out at the end.
+      // value in - with the panel instead of popping out at the end.
       return UiAnimation.easeOutCubic(this.openAnim) * screenTransition();
    }
 
@@ -579,7 +580,10 @@ public class ClickGuiWindow extends AbstractFeature implements MC {
          }
       } else {
          int n3 = clickGui.clickGui.resolveShadowColor(ColorUtil.resolvePassColor(shaderRenderPass, n));
-         RenderUtil.drawRoundedRect(0.0F, 0.0F, width2, height2, radius, (byte)1, n3);
+         // The drop shadow is part of the shell, so it rides the same envelope: at full strength it
+         // survived the whole close and left a soft rounded-rectangle ghost of the window for the last
+         // frames of the fade, after the glass it belongs to had already gone.
+         RenderUtil.drawRoundedRect(0.0F, 0.0F, width2, height2, radius, (byte)1, UiTheme.scaleAlpha(n3, openAlpha));
       }
    }
 
@@ -662,9 +666,11 @@ public class ClickGuiWindow extends AbstractFeature implements MC {
                this.toggleFullScreenMode();
                ClientSounds.playSound(ClientSounds.AUGUSTUS_TEXTURE);
             } else if (this.isMouseOver(minX, 5, 24, 24, localX, localY)) {
-               // Minimize still collapses just this shell: the overlay stays open (the dock is how the user
-               // gets it back), so this one must NOT start the screen close.
+               // Minimize still collapses just this shell, so this one must NOT start the screen close. The
+               // shell is brought back by the next presentation (see ClickGuiScreen.initGui), which is what
+               // replaced the centre dock as the way to restore a minimized window.
                this.closeWindow();
+               this.closed = true;
                ClientSounds.playSound(ClientSounds.AUGUSTUS_TEXTURE);
             }
          } finally {

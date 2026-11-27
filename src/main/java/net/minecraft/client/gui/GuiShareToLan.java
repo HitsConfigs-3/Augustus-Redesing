@@ -1,5 +1,6 @@
 package net.minecraft.client.gui;
 
+import net.augustus.ui.VanillaScreenText;
 import net.minecraft.world.WorldSettings;
 import java.io.IOException;
 import net.minecraft.client.resources.I18n;
@@ -27,8 +28,8 @@ public class GuiShareToLan extends GuiScreen {
    @Override
    public void drawScreen(int mouseX, int mouseY, float partialTicks) {
       this.drawDefaultBackground();
-      drawCenteredString(this.fontRendererObj, I18n.format("lanServer.title", new Object[0]), this.width / 2, 50, 16777215);
-      drawCenteredString(this.fontRendererObj, I18n.format("lanServer.otherPlayers", new Object[0]), this.width / 2, 82, 16777215);
+      VanillaScreenText.drawCenteredOnScreen(this.width, I18n.format("lanServer.title", new Object[0]), 50, 16777215);
+      VanillaScreenText.drawCenteredOnScreen(this.width, I18n.format("lanServer.otherPlayers", new Object[0]), 82, 16777215);
       super.drawScreen(mouseX, mouseY, partialTicks);
    }
 

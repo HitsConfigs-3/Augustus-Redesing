@@ -2,6 +2,7 @@ package net.minecraft.client.gui;
 
 import java.io.IOException;
 import net.optifine.gui.GuiButtonOF;
+import net.augustus.ui.VanillaScreenText;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.resources.I18n;
 import net.minecraft.entity.player.EnumPlayerModelParts;
@@ -30,7 +31,7 @@ public class GuiCustomizeSkin extends GuiScreen {
    @Override
    public void drawScreen(int mouseX, int mouseY, float partialTicks) {
       this.drawDefaultBackground();
-      drawCenteredString(this.fontRendererObj, this.title, this.width / 2, 20, 16777215);
+      VanillaScreenText.drawCenteredOnScreen(this.width, this.title, 20, 16777215);
       super.drawScreen(mouseX, mouseY, partialTicks);
    }
 

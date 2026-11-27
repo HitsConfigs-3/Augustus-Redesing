@@ -1,9 +1,11 @@
 package net.augustus.ui.account;
 
+import net.augustus.font.FontManager;
 import net.augustus.render.RenderUtil;
 import net.augustus.settings.property.codec.JsonCodecRegistryHolder;
 import net.augustus.settings.property.codec.JsonPropertyCodec;
 import net.augustus.ui.UiIconResources;
+import net.augustus.ui.modern.font.InterFontUtil;
 import net.augustus.utils.MinotarAvatarCache;
 import net.augustus.utils.TuplePair;
 import net.augustus.utils.animation.AnimationUtil;
@@ -159,11 +161,23 @@ public class AccountEntry implements MC {
       GL11.glScaled((double)(1.0F / f5), (double)(1.0F / f5), 0.0);
       int n7 = 10;
       this.loggedIn = mc.getSession().getUsername().equals(this.username) && mc.getSession().getAccountEntry() != null && mc.getSession().getAccountEntry().equals(this);
-      if (this.isMarked()) {
+      // The three rows of an entry (name / login type / state) are painted with the client's Inter face:
+      // the '§' colour runs survive because the SDF atlas parses them itself, so the entry matches the
+      // buttons and cards around it instead of falling back to the 8 px bitmap font.
+      InterFontUtil entryFont = FontManager.body();
+      float lineStep = FontManager.listLineHeight();
+      if (entryFont == null) {
+         this.drawEntryBitmap(fontRendererObj, n, n2);
+      } else if (this.isMarked()) {
          String str = mc.getSession() != null && mc.getSession().getUsername().equals(this.username) ? "§7Name: §a" + this.username : "§7Name: §6" + this.username;
-         n7 += fontRendererObj.getStringWidth(str);
-         fontRendererObj.drawString(str, (float)n + 5.5F, (float)n2 + 3.5F, Color.white.getRGB());
-         fontRendererObj.drawString("§7Login type: §6" + this.loginType.getDisplayName(), (float)n + 5.5F, (float)n2 + 7.0F + (float)fontRendererObj.FONT_HEIGHT, Color.white.getRGB());
+         n7 += Math.round(entryFont.getStringWidth(str));
+         entryFont.drawStringWithShadow(str, (double)((float)n + 5.5F), (double)((float)n2 + 3.5F), Color.white.getRGB());
+         entryFont.drawStringWithShadow(
+            "§7Login type: §6" + this.loginType.getDisplayName(),
+            (double)((float)n + 5.5F),
+            (double)((float)n2 + 3.5F + lineStep),
+            Color.white.getRGB()
+         );
          StringBuilder sb = new StringBuilder();
          sb = sb.append("§7Account state: §6");
          String str2;
@@ -173,24 +187,31 @@ public class AccountEntry implements MC {
             str2 = "§cInvalid";
          }
 
-         fontRendererObj.drawString(sb.append(str2).toString(), (float)n + 5.5F, (float)n2 + 10.5F + (float)(fontRendererObj.FONT_HEIGHT * 2), Color.white.getRGB());
+         entryFont.drawStringWithShadow(
+            sb.append(str2).toString(), (double)((float)n + 5.5F), (double)((float)n2 + 3.5F + lineStep * 2.0F), Color.white.getRGB()
+         );
       } else {
          String str3 = mc.getSession() != null && mc.getSession().getUsername().equals(this.username) ? "§7Name: §a" + this.username : "§7Name: §f" + this.username;
-         n7 += fontRendererObj.getStringWidth(str3);
-         fontRendererObj.drawString(str3, (float)n + 5.5F, (float)n2 + 3.5F, Color.white.getRGB());
-         fontRendererObj.drawString("§7Login type: §f" + this.loginType.getDisplayName(), (float)n + 5.5F, (float)n2 + 7.0F + (float)fontRendererObj.FONT_HEIGHT, Color.white.getRGB());
+         n7 += Math.round(entryFont.getStringWidth(str3));
+         entryFont.drawStringWithShadow(str3, (double)((float)n + 5.5F), (double)((float)n2 + 3.5F), Color.white.getRGB());
+         entryFont.drawStringWithShadow(
+            "§7Login type: §f" + this.loginType.getDisplayName(),
+            (double)((float)n + 5.5F),
+            (double)((float)n2 + 3.5F + lineStep),
+            Color.white.getRGB()
+         );
          StringBuilder sb2 = new StringBuilder();
-         short s = 1245;
          sb2 = sb2.append("§7Account state: §f");
          String str4;
          if (this.working) {
             str4 = "Functional";
          } else {
-            s = 16287;
             str4 = "§cInvalid";
          }
 
-         fontRendererObj.drawString(sb2.append(str4).toString(), (float)n + 5.5F, (float)n2 + 10.5F + (float)(fontRendererObj.FONT_HEIGHT * 2), Color.white.getRGB());
+         entryFont.drawStringWithShadow(
+            sb2.append(str4).toString(), (double)((float)n + 5.5F), (double)((float)n2 + 3.5F + lineStep * 2.0F), Color.white.getRGB()
+         );
       }
 
       int n8 = 0;
@@ -210,6 +231,34 @@ public class AccountEntry implements MC {
       }
 
       GL11.glPopMatrix();
+   }
+
+   /**
+    * Stock bitmap painting of the three rows, kept for the frames before {@code FontManager.initFonts()}
+    * has produced an Inter face, so an entry can never render blank.
+    */
+   private void drawEntryBitmap(FontRenderer fontRendererObj, int n, int n2) {
+      if (this.isMarked()) {
+         String str = mc.getSession() != null && mc.getSession().getUsername().equals(this.username) ? "§7Name: §a" + this.username : "§7Name: §6" + this.username;
+         fontRendererObj.drawString(str, (float)n + 5.5F, (float)n2 + 3.5F, Color.white.getRGB());
+         fontRendererObj.drawString("§7Login type: §6" + this.loginType.getDisplayName(), (float)n + 5.5F, (float)n2 + 7.0F + (float)fontRendererObj.FONT_HEIGHT, Color.white.getRGB());
+         fontRendererObj.drawString(
+            "§7Account state: §6" + (this.working ? "Functional" : "§cInvalid"),
+            (float)n + 5.5F,
+            (float)n2 + 10.5F + (float)(fontRendererObj.FONT_HEIGHT * 2),
+            Color.white.getRGB()
+         );
+      } else {
+         String str2 = mc.getSession() != null && mc.getSession().getUsername().equals(this.username) ? "§7Name: §a" + this.username : "§7Name: §f" + this.username;
+         fontRendererObj.drawString(str2, (float)n + 5.5F, (float)n2 + 3.5F, Color.white.getRGB());
+         fontRendererObj.drawString("§7Login type: §f" + this.loginType.getDisplayName(), (float)n + 5.5F, (float)n2 + 7.0F + (float)fontRendererObj.FONT_HEIGHT, Color.white.getRGB());
+         fontRendererObj.drawString(
+            "§7Account state: §f" + (this.working ? "Functional" : "§cInvalid"),
+            (float)n + 5.5F,
+            (float)n2 + 10.5F + (float)(fontRendererObj.FONT_HEIGHT * 2),
+            Color.white.getRGB()
+         );
+      }
    }
 
    public boolean isWorking() {

@@ -1,6 +1,7 @@
 package net.minecraft.client.gui;
 
 import java.io.IOException;
+import net.augustus.ui.VanillaScreenText;
 import net.minecraft.client.resources.I18n;
 import net.minecraft.world.storage.ISaveFormat;
 import net.minecraft.world.storage.WorldInfo;
@@ -60,7 +61,7 @@ public class GuiRenameWorld extends GuiScreen {
    @Override
    public void drawScreen(int mouseX, int mouseY, float partialTicks) {
       this.drawDefaultBackground();
-      drawCenteredString(this.fontRendererObj, I18n.format("selectWorld.renameTitle", new Object[0]), this.width / 2, 20, 16777215);
+      VanillaScreenText.drawCenteredOnScreen(this.width, I18n.format("selectWorld.renameTitle", new Object[0]), 20, 16777215);
       this.drawString(this.fontRendererObj, I18n.format("selectWorld.enterName", new Object[0]), this.width / 2 - 100, 47, 10526880);
       this.nameEdit.drawTextBox();
       super.drawScreen(mouseX, mouseY, partialTicks);

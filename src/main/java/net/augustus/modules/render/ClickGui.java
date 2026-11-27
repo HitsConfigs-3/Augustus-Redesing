@@ -64,7 +64,7 @@ public class ClickGui extends Module implements DownloadTerrainListener, TickLis
    public ClickGui() {
        super("ClickGui", "KlickbareGrafischeBenutzeroberfläche", new Color(124, 58, 237), Categorys.RENDER);
       this.generalGroup = new SettingGroup(this, "General", true);
-      this.guiScale = (StringValue)new StringValue(this, "GuiScale", "Normal", new String[]{"Small", "Normal", "Large"}, this.generalGroup)
+      this.guiScale = (StringValue)new StringValue(this, "GuiScale", "Large", new String[]{"Small", "Normal", "Large"}, this.generalGroup)
          .withDisplayName("GUI Scale")
          .withChangeListener(VisualsConfigFile::saveNow);
       this.guiScale.setDescription("Adjusts ClickGUI scale cleanly with vector graphics and sharp SDF text (Small 0.85x, Normal 1.0x, Large 1.25x).");
@@ -118,13 +118,13 @@ public class ClickGui extends Module implements DownloadTerrainListener, TickLis
          .withVisibility(this.clickGui::isBlurSettingEnabled)
          .withChangeListener(this::onBlurIntensityChanged);
       this.blurIntensity.setDescription("Adjusts real-time Kawase blur radius on glass windows and popups (0 disables blur).");
-      this.glassDarkness = (DoubleValue)new DoubleValue(this, "GlassDarkness", 78.0, 0.0, 100.0, 0, this.visualsGroup)
+      this.glassDarkness = (DoubleValue)new DoubleValue(this, "GlassDarkness", 100.0, 0.0, 100.0, 0, this.visualsGroup)
          .withDisplayName("Glass Darkness")
          .withChangeListener(VisualsConfigFile::saveNow);
       this.glassDarkness.setDescription("Controls frosted glass shading from light crystal (0) to deep indigo obsidian (100).");
-      this.glassOpacity = (DoubleValue)new DoubleValue(this, "GlassOpacity", 88.0, 0.0, 100.0, 0, this.visualsGroup)
+      this.glassOpacity = (DoubleValue)new DoubleValue(this, "GlassOpacity", 100.0, 0.0, 100.0, 0, this.visualsGroup)
          .withDisplayName("Glass Opacity")
-         .withChangeListener(VisualsConfigFile::saveNow);
+         .withChangeListener(this::onGlassOpacityChanged);
       this.glassOpacity.setDescription("Controls frosted tint opacity in real time (0 keeps pure transparent liquid glass).");
       // The sidebar is an internal region of the ClickGUI window, not a separate slab, so its tint
       // has to be controllable independently of the window glass without becoming its own surface.
@@ -141,10 +141,10 @@ public class ClickGui extends Module implements DownloadTerrainListener, TickLis
       this.alpha.setDescription("Base window opacity level for legacy background compositing.");
 
       this.visibilityGroup = new SettingGroup(this, "Visibility", true);
-      this.moduleDescriptions = (BooleanValue)new BooleanValue(this, "ModuleDescriptions", true, this.visibilityGroup)
+      this.moduleDescriptions = (BooleanValue)new BooleanValue(this, "ModuleDescriptions", false, this.visibilityGroup)
          .withChangeListener(VisualsConfigFile::saveNow);
       this.moduleDescriptions.setDescription("Shows concise two-line descriptions on module rows, lists, and headers.");
-      this.settingDescriptions = (BooleanValue)new BooleanValue(this, "SettingDescriptions", true, this.visibilityGroup)
+      this.settingDescriptions = (BooleanValue)new BooleanValue(this, "SettingDescriptions", false, this.visibilityGroup)
          .withChangeListener(VisualsConfigFile::saveNow);
       this.settingDescriptions.setDescription("Shows helpful explanation text beneath setting titles inside cards.");
       StringValue setting2 = new StringValue(this, "Descriptions", "Default", new String[]{"Default"}, this.visibilityGroup);
@@ -334,6 +334,19 @@ public class ClickGui extends Module implements DownloadTerrainListener, TickLis
    private void onBlurIntensityChanged() {
       if (ClientManagers.moduleManager != null && ClientManagers.moduleManager.customClientColor != null) {
          ClientManagers.moduleManager.customClientColor.syncBlurFromClickGui(this.blurIntensity.getValue());
+      }
+      VisualsConfigFile.saveNow();
+   }
+
+   /**
+    * Keeps the Client Color page's Opacity slider on the same value as this one.
+    *
+    * <p>This setting stays the single source of truth because {@code UiTheme.glassOpacity()} reads it on
+    * every frame; the Client Color module only mirrors it for display and for its own slider.</p>
+    */
+   private void onGlassOpacityChanged() {
+      if (ClientManagers.moduleManager != null && ClientManagers.moduleManager.customClientColor != null) {
+         ClientManagers.moduleManager.customClientColor.syncOpacityFromClickGui();
       }
       VisualsConfigFile.saveNow();
    }

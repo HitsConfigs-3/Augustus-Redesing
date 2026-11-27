@@ -3,12 +3,14 @@ package net.augustus.ui.account;
 import net.augustus.Augustus;
 import net.augustus.alt.AltUsernameGenerator;
 import net.augustus.config.ClientSettingsConfigFile;
+import net.augustus.font.FontManager;
 import net.augustus.render.RenderUtil;
 import net.augustus.settings.property.BooleanProperty;
 import net.augustus.settings.property.StringProperty;
 import net.augustus.ui.GuiButtonClickHandler;
 import net.augustus.ui.GuiPasswordField;
 import net.augustus.ui.menu.ClientMenuTab;
+import net.augustus.ui.modern.font.InterFontUtil;
 import net.augustus.ui.widgets.ScrollBar;
 import net.augustus.utils.TuplePair;
 import net.augustus.utils.file.ClientFileUtil;
@@ -403,16 +405,15 @@ public class AccountManagerScreen extends ClientMenuTab {
    @Override
    public void drawContent(int n, int n2, float f) {
       super.drawContent(n, n2, f);
-      FontRenderer fontRendererObj2 = this.fontRendererObj;
       ScaledResolution sr = new ScaledResolution(this.mc);
       int n3 = sr.getScaledWidth() - 102;
       int n4 = (int)Math.max(118.0F, Math.min((float)sr.getScaledWidth() / 2.0F - 100.0F - 20.0F, 150.0F));
       if (this.emailOrTokenField != null && this.emailOrTokenField.getText().isEmpty() && !this.emailOrTokenField.isFocused()) {
-         fontRendererObj2.drawStringWithShadow("Email / Email:Password", 109.0F, 60.0F, Color.gray.getRGB());
+         this.drawFieldPlaceholder("Email / Email:Password", this.emailOrTokenField.xPosition, this.emailOrTokenField.yPosition, 20, Color.gray.getRGB());
       }
 
       if (this.passwordField != null && this.passwordField.getText().isEmpty() && !this.passwordField.isFocused()) {
-         fontRendererObj2.drawStringWithShadow("Password", 109.0F, 85.0F, Color.gray.getRGB());
+         this.drawFieldPlaceholder("Password", this.passwordField.xPosition, this.passwordField.yPosition, 20, Color.gray.getRGB());
       }
 
       int n5 = Math.min(n3 - n4 - 20, 300);
@@ -560,14 +561,26 @@ public class AccountManagerScreen extends ClientMenuTab {
    }
 
    private int drawCenteredDetailLine(String str, int n, int n2, int n3, int n4, int n5) {
-      this.fontRendererObj
-         .drawString(
+      InterFontUtil font = FontManager.body();
+      if (font == null) {
+         this.fontRendererObj
+            .drawString(
+               str,
+               (float)n + (float)(n3 - n) / 2.0F - (float)this.fontRendererObj.getStringWidth(str) / 2.0F,
+               (float)(n2 + 5 + n5),
+               Color.white.getRGB()
+            );
+      } else {
+         font.drawStringWithShadow(
             str,
-            (float)n + (float)(n3 - n) / 2.0F - (float)this.fontRendererObj.getStringWidth(str) / 2.0F,
-            (float)(n2 + 5 + n5),
+            (double)((float)n + (float)(n3 - n) / 2.0F - font.getStringWidth(str) / 2.0F),
+            (double)((float)(n2 + 5 + n5)),
             Color.white.getRGB()
          );
-      return n5 + 11;
+      }
+      // The pitch is the body face's line box, not the bitmap font's 9 px one: Inter is taller, so keeping
+      // the old 11 px step would stack the detail rows on top of each other.
+      return n5 + Math.round(FontManager.listLineHeight());
    }
 
 }

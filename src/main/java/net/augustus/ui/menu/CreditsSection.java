@@ -1,6 +1,7 @@
 package net.augustus.ui.menu;
 
 import java.util.List;
+import net.augustus.font.FontManager;
 import net.minecraft.client.Minecraft;
 
 public abstract class CreditsSection {
@@ -9,7 +10,9 @@ public abstract class CreditsSection {
    public abstract List getSocialLinks();
 
    public int calculateHeight() {
-      int n = Minecraft.getMinecraft().fontRendererObj.FONT_HEIGHT + 1;
+      // Row pitch of the Inter body face (the face the credits are painted with), not the bitmap font's
+      // 9 px box - otherwise the card would be shorter than its own text.
+      int n = Math.round(FontManager.bodyLineHeight());
       int n2 = 0;
       n2 += n * 2;
       n2 += n;

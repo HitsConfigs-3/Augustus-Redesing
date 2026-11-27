@@ -116,6 +116,30 @@ public class ModernTextInput {
       long cursorTimerMs,
       CustomFontUtil font
    ) {
+      this.renderString(x, y, width, height, text, focused, placeholder, leadingIcon, showClearButton, mouseX, mouseY, cursorTimerMs, font, UiTheme.CONTROL_RADIUS);
+   }
+
+   /**
+    * Same field with an explicit corner radius, so a call site can match the surface it sits on. The
+    * header's search field is 35.6 tall with a 10.5 radius in the reference -- a 6 would read as a
+    * different control next to the wells either side of it.
+    */
+   public void renderString(
+      float x,
+      float y,
+      float width,
+      float height,
+      String text,
+      boolean focused,
+      String placeholder,
+      LucideIcon leadingIcon,
+      boolean showClearButton,
+      int mouseX,
+      int mouseY,
+      long cursorTimerMs,
+      CustomFontUtil font,
+      float cornerRadius
+   ) {
       this.lastX = x;
       this.lastY = y;
       this.lastW = width;
@@ -133,7 +157,7 @@ public class ModernTextInput {
          y,
          width,
          height,
-         UiTheme.CONTROL_RADIUS,
+         cornerRadius,
          this.hoverAnim,
          this.focusAnim,
          (float)mouseX,
@@ -144,8 +168,8 @@ public class ModernTextInput {
 
       float padLeft = 10.0F;
       if (leadingIcon != null) {
-         leadingIcon.drawCentered(x + 14.0F, y + height * 0.5F, 13.0F, faded(focused ? UiTheme.TEXT_PRIMARY : UiTheme.mutedTextColor()));
-         padLeft = 27.0F;
+         leadingIcon.drawCentered(x + 15.5F, y + height * 0.5F, 12.6F, faded(focused ? UiTheme.TEXT_PRIMARY : UiTheme.mutedTextColor()));
+         padLeft = 30.0F;
       }
 
       float textX = x + padLeft;

@@ -81,7 +81,19 @@ public final class IconManager implements MC {
    private static final int MAX_UPLOADS_PER_FRAME = 3;
 
    private static final int MIN_PX = 8;
-   private static final int MAX_PX = 96;
+   private static final int MAX_PX = 192;
+   /**
+    * Rasterisations per device pixel.
+    *
+    * <p>WHY it is this high: 1.5x left a stroke with only ~2.2 coverage samples across it, so at the sizes
+    * the ClickGUI draws (icons land on 30 device px in a 24 px box) the shield's diagonals, the move cross
+    * and the 2x2 grid still resolved as straight chords - the "the icons need more polygons" read. At 2.5x
+    * the same stroke gets ~3.8 samples and, once the sampler actually interpolates them (see
+    * {@link #useSmoothSampling}), the outline lands where the SVG says it is instead of on the nearest
+    * texel centre. The cost is a bigger texture for a cache that never holds more than
+    * {@link #CACHE_LIMIT} entries and is opened a handful of icons per frame.
+    */
+   private static final float SUPERSAMPLE = 2.5F;
 
    /** Identifiers known to be missing or unparseable, so they are only reported once. */
    private static final Set<String> BROKEN = new HashSet<String>();
@@ -177,7 +189,7 @@ public final class IconManager implements MC {
       // Rasterise at device resolution so the glyph is crisp at every GUI scale instead of being an
       // upscaled logical-resolution bitmap.
       float largest = Math.max(width, height);
-      int px = Math.round(largest * deviceScale());
+      int px = Math.round(largest * deviceScale() * SUPERSAMPLE);
       if (px < MIN_PX) {
          px = MIN_PX;
       } else if (px > MAX_PX) {
@@ -305,6 +317,7 @@ public final class IconManager implements MC {
          if (mc != null && mc.getTextureManager() != null) {
             mc.getTextureManager().loadTexture(location, texture);
          }
+         useSmoothSampling(texture.getGlTextureId());
          Entry entry = new Entry(texture.getGlTextureId(), pixelSize, location, texture);
          CACHE.put(key, entry);
          INSERTION_ORDER.add(key);
@@ -318,6 +331,29 @@ public final class IconManager implements MC {
          System.err.println("[IconManager] could not rasterise '" + tablerId + "': " + t);
          return null;
       }
+   }
+
+   /**
+    * Switches an uploaded icon texture to bilinear sampling, clamped at the edges.
+    *
+    * <p>WHY this has to be done here: {@link DynamicTexture} uploads through
+    * {@code TextureUtil.uploadTexture}, which always leaves the texture on {@code GL_NEAREST} with
+    * {@code GL_REPEAT}. Nearest sampling throws away every sample above 1:1, so the supersampling above
+    * only made the blocky result blockier - an icon drawn smaller than its texture picked the nearest
+    * texel and kept every stair-step the larger rasterisation had just smoothed away. That combination is
+    * what "los iconos se ven facetados" was: high-resolution artwork read through a filter that cannot
+    * average. Linear sampling is also what makes the mask's anti-aliased edge resolve into a clean
+    * outline at every size instead of snapping to whole texels.
+    *
+    * <p>Clamping matters for the same reason: with {@code GL_REPEAT} the rows of texels that bleed past
+    * the quad wrap around and a sliver of the opposite edge can appear along an icon's border.
+    */
+   private static void useSmoothSampling(int textureId) {
+      GlStateManager.bindTexture(textureId);
+      GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MIN_FILTER, GL11.GL_LINEAR);
+      GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MAG_FILTER, GL11.GL_LINEAR);
+      GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_WRAP_S, GL11.GL_CLAMP);
+      GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_WRAP_T, GL11.GL_CLAMP);
    }
 
    private static String svgTextFor(String tablerId) {

@@ -21,6 +21,7 @@ import net.augustus.utils.network.IpLookupResult;
 import net.augustus.Augustus;
 import net.augustus.utils.network.IpAsnInfo;
 import net.augustus.utils.TimeHelper;
+import net.augustus.ui.VanillaScreenText;
 import net.minecraft.client.multiplayer.ServerAddress;
 import net.minecraft.client.multiplayer.ServerData;
 import net.minecraft.client.resources.I18n;
@@ -187,7 +188,7 @@ public class GuiScreenServerList extends GuiScreen {
    @Override
    public void drawScreen(int mouseX, int mouseY, float partialTicks) {
       this.drawDefaultBackground();
-      drawCenteredString(this.fontRendererObj, I18n.format("selectServer.direct", new Object[0]), this.width / 2, 20, 16777215);
+      VanillaScreenText.drawCenteredOnScreen(this.width, I18n.format("selectServer.direct", new Object[0]), 20, 16777215);
       this.drawString(this.fontRendererObj, I18n.format("addServer.enterIp", new Object[0]), this.width / 2 - 100, 100, 10526880);
       this.ipEdit.drawTextBox();
       super.drawScreen(mouseX, mouseY, partialTicks);

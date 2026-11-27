@@ -17,10 +17,21 @@ public final class UiTheme {
    public static final float SEPARATOR_THICKNESS = 1.0F;
 
    public static final float WINDOW_RADIUS = 12.0F;
-   public static final float CARD_RADIUS = 8.0F;
-   public static final float CONTROL_RADIUS = 6.0F;
-   public static final float PILL_RADIUS = 6.0F;
-   public static final float POPUP_RADIUS = 8.0F;
+   /**
+    * Corner radii of everything nested inside a window.
+    *
+    * <p>The scale was one step tighter at every level (card 8, control 6, pill 6, popup 8) and that is
+    * what made a settings page read as a stack of small boxes: at the sizes this UI uses - a 24px toggle,
+    * a 26px field, a 34px segment tray - a 6px corner is a quarter of the shape's height, i.e. a rounded
+    * rectangle. The scale below keeps the same three-step hierarchy but lands every control at or past a
+    * third of its height, so a field, a button, a segmented tray and a popup all read as soft, continuous
+    * shapes instead of as rectangles with the corners knocked off. Cards move with them so a card never
+    * ends up with a tighter corner than the controls it contains.
+    */
+   public static final float CARD_RADIUS = 11.0F;
+   public static final float CONTROL_RADIUS = 9.0F;
+   public static final float PILL_RADIUS = 9.0F;
+   public static final float POPUP_RADIUS = 11.0F;
 
    // Material read (consumed by liquid_glass.frag). Strengthened: the sheen, edge refraction and
    // backdrop saturation are what still read as "glass" once the tint is thin, and the old values
@@ -92,6 +103,23 @@ public final class UiTheme {
 
    public static int accentSoftGlow() {
       return lerpArgb(accentColor(), 0xFFDAD0FF, 0.36F);
+   }
+
+   /**
+    * Top of the brand mark's vertical gradient: the accent lifted towards white by 18 %.
+    *
+    * <p>WHY the mark carries its own two anchors instead of reusing {@link #accentSoftGlow()}: the mark is
+    * a large, saturated shape, so it has to read as a solid violet that follows the chosen accent, not as
+    * the pale wash the glow token is tuned for. These are the only two colours the logo uses, and both
+    * derive from the accent, so the mark is never pinned to a hue the user did not pick.
+    */
+   public static int accentMarkTop() {
+      return lerpArgb(accentColor(), 0xFFFFFFFF, 0.18F);
+   }
+
+   /** Bottom of the brand mark's vertical gradient: the accent pulled towards black by 14 %. */
+   public static int accentMarkBottom() {
+      return lerpArgb(accentColor(), 0xFF000000, 0.14F);
    }
 
    public static int enabledColor() {
@@ -228,17 +256,104 @@ public final class UiTheme {
 
    /**
     * Interpolates glass base RGB smoothly from icy light crystal (0.0) through deep indigo obsidian
-    * rgb(14, 16, 26) around default darkness (0.78) to ultra-deep ink (1.0).
+    * rgb(14, 16, 26) around default darkness (0.78) to ultra-deep ink (1.0), then applies the user's
+    * Client Colour as a hue/saturation tint.
     */
    public static int glassBaseRgb(float darkness) {
       float d = UiAnimation.clamp01(darkness);
+      int neutral;
       if (d <= 0.42F) {
-         return lerpArgb(0xFFE7ECF8, 0xFF161929, d / 0.42F);
+         neutral = lerpArgb(0xFFE7ECF8, 0xFF161929, d / 0.42F);
+      } else if (d <= 0.78F) {
+         neutral = lerpArgb(0xFF161929, 0xFF0E101A, (d - 0.42F) / 0.36F);
+      } else {
+         neutral = lerpArgb(0xFF0E101A, 0xFF07080E, (d - 0.78F) / 0.22F);
       }
-      if (d <= 0.78F) {
-         return lerpArgb(0xFF161929, 0xFF0E101A, (d - 0.42F) / 0.36F);
+      return applyClientGlassTint(neutral);
+   }
+
+   /**
+    * Colour the glass is tinted with: the Client Color module's colour (RGB only), or -1 when the module is
+    * not available yet (startup, tests). A negative sentinel rather than 0 so that a picked pure black
+    * ({@code #000000}) is a real tint instead of reading as "no colour".
+    *
+    * <p>The colour's own alpha is deliberately ignored: strength is the Opacity slider's job
+    * ({@link #glassTintMix()}), so the picker's alpha can never silently switch the tint off.</p>
+    */
+   public static int clientGlassTintRgb() {
+      if (ClientManagers.moduleManager != null
+         && ClientManagers.moduleManager.customClientColor != null
+         && ClientManagers.moduleManager.customClientColor.color2 != null) {
+         return ClientManagers.moduleManager.customClientColor.color2.getColorInt((byte)0) & 0x00FFFFFF;
       }
-      return lerpArgb(0xFF0E101A, 0xFF07080E, (d - 0.78F) / 0.22F);
+      return -1;
+   }
+
+   /**
+    * Highest saturation a glass tint may take. The sources are brand colours (Cyan and Emerald sit at 0.9),
+    * and at 0.9 the elevated levels read as neon plastic instead of tinted glass; 0.80 keeps them glass.
+    */
+   private static final float GLASS_TINT_SATURATION_CAP = 0.80F;
+   /** Tint the current glass colour was resolved from, with its cached HSB so the hot path stays cheap. */
+   private static int cachedGlassTintRgb = -1;
+   private static float cachedGlassTintHue = 0.75F;
+   private static float cachedGlassTintSaturation = 0.75F;
+   private static boolean cachedGlassTintNeutral = false;
+
+   /**
+    * Tints a glass colour with the Client Colour: hue and saturation come from the user's colour, brightness
+    * stays the one the material had.
+    *
+    * <p>WHY this is the whole Glass tint feature in one function: every surface of the ClickGUI derives its
+    * resting colour from {@link #glassBaseRgb} or {@link #glassLevelRgb} (window shell through
+    * {@link #glassWindowTintArgb} and the liquid-glass shader's {@code glassTint} uniform, the sidebar, every
+    * card, well, control and popup), so re-tinting here re-tints all of it in the same frame and no caller has
+    * to be taught about the colour.</p>
+    *
+    * <p>WHY only hue and saturation: brightness is the elevation ladder (raised lighter, recessed darker), the
+    * Glass Darkness ramp and the contrast budget the whole glass model is tuned around. Keeping it also means a
+    * tint can never turn a surface into a flat solid colour: the tint colour's alpha is never read here, so
+    * {@link #glassTintMix()} stays the only thing that decides how much blurred backdrop survives.</p>
+    *
+    * <p>WHY the level colour is re-tinted after its luminance shift instead of only at the base: the elevation
+    * shift lerps towards a near-white / near-black reference, which drains most of the hue out of the elevated
+    * levels. Re-applying the client hue at each level's own brightness keeps cards, controls and popups reading
+    * as the chosen colour while the ladder stays intact.</p>
+    */
+   private static int applyClientGlassTint(int rgb) {
+      int tint = clientGlassTintRgb();
+      if (tint < 0) {
+         return rgb;
+      }
+      refreshGlassTintCache(tint);
+
+      int red = rgb >> 16 & 255;
+      int green = rgb >> 8 & 255;
+      int blue = rgb & 255;
+      // HSB brightness is max(r,g,b)/255, so the hot path needs no conversion at all.
+      float brightness = Math.max(0.02F, (float)Math.max(red, Math.max(green, blue)) / 255.0F);
+      if (!cachedGlassTintNeutral) {
+         return 0xFF000000 | (Color.HSBtoRGB(cachedGlassTintHue, cachedGlassTintSaturation, brightness) & 0x00FFFFFF);
+      }
+
+      // A near-grey colour (the Neutral preset) keeps a hint of the material's own hue instead of washing the
+      // glass out to a flat grey.
+      float[] baseHsb = ColorUtil.toHsb(rgb);
+      float saturation = Math.min(GLASS_TINT_SATURATION_CAP, baseHsb[1] * 0.35F);
+      return 0xFF000000 | (Color.HSBtoRGB(baseHsb[0], saturation, brightness) & 0x00FFFFFF);
+   }
+
+   private static void refreshGlassTintCache(int tint) {
+      if (tint == cachedGlassTintRgb) {
+         return;
+      }
+      float[] hsb = ColorUtil.toHsb(ColorUtil.withFullAlpha(tint));
+      cachedGlassTintRgb = tint;
+      cachedGlassTintHue = hsb[0];
+      cachedGlassTintSaturation = Math.min(GLASS_TINT_SATURATION_CAP, hsb[1]);
+      // Threshold below the Neutral swatch on purpose: #94A3B8 is HSL-slate at saturation 0.196, so a lower
+      // cut-off would leave Neutral as a faint blue rather than a near-neutral glass.
+      cachedGlassTintNeutral = hsb[1] < 0.22F;
    }
 
    /**
@@ -458,6 +573,10 @@ public final class UiTheme {
          // Hover always brightens the pane, on every level, whatever its resting shift was.
          rgb = shiftLuminance(rgb, Math.max(0.0F, shift) + interactionLift);
       }
+      // Re-tint at this level's own brightness, then let the accent feedback on top: the elevation shift
+      // above lerps towards a near-white reference, which would otherwise drain the user's tint out of
+      // every elevated surface (see applyClientGlassTint).
+      rgb = applyClientGlassTint(rgb);
       if (h > 0.001F || a > 0.001F) {
          rgb = lerpArgb(rgb, accentArgb, h * 0.05F + a * 0.10F);
       }

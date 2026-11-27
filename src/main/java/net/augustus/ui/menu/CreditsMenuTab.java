@@ -1,6 +1,7 @@
 package net.augustus.ui.menu;
 
 import net.augustus.ClientManagers;
+import net.augustus.font.FontManager;
 import net.augustus.render.RenderUtil;
 import net.augustus.ui.AugustusGuiScreen;
 import net.augustus.ui.widgets.ScrollBar;
@@ -32,7 +33,7 @@ public class CreditsMenuTab extends ClientMenuTab {
 
    public CreditsMenuTab() {
        super("Credits");
-      this.scrollBar = new ScrollBar(Minecraft.getMinecraft().fontRendererObj.FONT_HEIGHT + 1);
+      this.scrollBar = new ScrollBar(Math.round(FontManager.bodyLineHeight()));
    }
 
    public void mouseClicked(int mouseX, int mouseY, int mouseButton) throws IOException {
@@ -92,7 +93,7 @@ public class CreditsMenuTab extends ClientMenuTab {
             float f5 = (float)(29 + n5);
             float f6 = 3.0F;
             ((AugustusGuiScreen)this).drawString(str2, f6, f5);
-            n5 += this.fontRendererObj.FONT_HEIGHT + 1;
+            n5 += Math.round(FontManager.bodyLineHeight());
          }
 
          int n6 = 39 + n5;
@@ -118,7 +119,7 @@ public class CreditsMenuTab extends ClientMenuTab {
             float f9 = (float)(10 + n6 + n7);
             float f10 = 3.0F;
             ((AugustusGuiScreen)this).drawString((String)str5, f10, f9);
-            n7 += this.fontRendererObj.FONT_HEIGHT + 1;
+            n7 += Math.round(FontManager.bodyLineHeight());
          }
 
          GlStateManager.popMatrix();

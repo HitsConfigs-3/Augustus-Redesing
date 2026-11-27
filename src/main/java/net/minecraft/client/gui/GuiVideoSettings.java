@@ -4,6 +4,7 @@ import java.io.IOException;
 import net.augustus.modules.Module;
 import net.augustus.Augustus;
 import net.augustus.events.listeners.GuiScaleListener;
+import net.augustus.ui.VanillaScreenText;
 import net.minecraft.client.resources.I18n;
 import net.minecraft.client.settings.GameSettings;
 import net.optifine.Lang;
@@ -41,7 +42,7 @@ public class GuiVideoSettings extends GuiScreen {
    @Override
    public void drawScreen(int mouseX, int mouseY, float partialTicks) {
       this.drawDefaultBackground();
-      drawCenteredString(this.fontRendererObj, this.screenTitle, this.width / 2, 15, 16777215);
+      VanillaScreenText.drawCenteredOnScreen(this.width, this.screenTitle, 15, 16777215);
       this.drawString(
          this.fontRendererObj,
          ((Module)Augustus.getInstance().getModuleManager().invisMode).isToggled() ? "OptiFine HD M5 Ultra" : "OptiFine HD M5 Ultra (Hard-forked by EnZaXD & DasNeueUpdate)",

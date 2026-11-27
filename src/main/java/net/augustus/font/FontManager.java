@@ -57,6 +57,41 @@ public class FontManager {
    public static final String CLIENT_DATA_DIR;
    public static DynamicFontUtil comfortaaArrayList;
 
+   /**
+    * The one body face every non-ClickGUI surface paints with: the stock menus (main menu, tab bar, account
+    * and proxy lists, credits, changelog), stock buttons, text fields and the HUD editor.
+    *
+    * <p>WHY one accessor instead of each screen picking a size: a single screen that mixes two Inter sizes
+    * for the same kind of text reads as two different clients stitched together - which is exactly how the
+    * menus looked while some rows still fell back to the 8 px bitmap font. Screens ask for "the body face"
+    * and get a consistent one; the only fallback is the next size up, and only during the frames before
+    * {@link #initFonts()} has finished (a screen built that early has no Inter at all).</p>
+    */
+   public static InterFontUtil body() {
+      return interSmall != null ? interSmall : interMedium;
+   }
+
+   /** Visual height of {@link #body()}; the stock 9 px bitmap height before Inter exists. */
+   public static float bodyHeight() {
+      InterFontUtil font = body();
+      return font != null ? font.getFontHeight() : 9.0F;
+   }
+
+   /**
+    * Row pitch of {@link #body()}: the glyph box plus 1 px of leading, i.e. the same "FONT_HEIGHT + 1"
+    * rhythm the bitmap font used to set, so list rows keep their density while the glyphs get bigger.
+    */
+   public static float bodyLineHeight() {
+      InterFontUtil font = body();
+      return font != null ? font.getFontHeight() + 1.0F : 10.0F;
+   }
+
+   /** Baseline-to-baseline pitch of the multi-line list rows (account/proxy entries, detail panels). */
+   public static float listLineHeight() {
+      InterFontUtil font = body();
+      return font != null ? Math.max(font.getFontHeight() + 0.35F, 12.5F) : 12.5F;
+   }
+
    public static void initFonts() {
       esp44 = new CustomFontUtil("Esp", loadFontResource("esp.ttf", 44));
       esp16 = new CustomFontUtil("Esp", loadFontResource("esp.ttf", 16));

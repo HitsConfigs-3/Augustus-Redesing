@@ -61,6 +61,7 @@ public enum LucideIcon implements MC {
    ACTIVITY("activity"),
    SHIELD("shield"),
    LOCK("lock"),
+   LOGOUT("logout"),
    EDIT_HUD("layout-dashboard");
 
    private static final Map<Categorys, LucideIcon> CATEGORY_MAP = new EnumMap<Categorys, LucideIcon>(Categorys.class);

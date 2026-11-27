@@ -34,9 +34,9 @@ public class AbstractMainMenuScreen extends AugustusGuiScreen {
       this.drawString(str2, 2.0F, 2.0F);
       String str3 = "Created by " + instance.getAuthors();
       f = (float)(this.width - this.getStringWidth(str3) - 2);
-      this.drawString(str3, f, (float)(this.height - this.fontRendererObj.FONT_HEIGHT - 2));
+      this.drawString(str3, f, (float)this.height - this.getFontHeight() - 2.0F);
       String version = instance.getVersion();
-      float f8 = (float)(this.height - this.fontRendererObj.FONT_HEIGHT - 2);
+      float f8 = (float)this.height - this.getFontHeight() - 2.0F;
       this.drawString(version, 2.0F, f8);
    }
 

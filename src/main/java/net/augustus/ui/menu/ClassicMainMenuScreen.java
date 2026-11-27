@@ -78,7 +78,10 @@ public class ClassicMainMenuScreen extends AbstractMainMenuScreen {
       BlurShadowManager.submitRenderTask(false, shaderRenderPass -> this.renderMenuBackdrop(shaderRenderPass));
       super.drawContent(n, n2, f);
       GlStateManager.color(1.0F, 1.0F, 1.0F, 1.0F);
-      this.drawCenteredScaledString(Augustus.getInstance().getName(), (float)this.getCenterX() / 5.0F, (((float)this.getCenterY() / 2.0F - 24.0F) / 5.0F - 3.0F) / 2.0F + 3.0F, 5.0F);
+      // The stock title sat on the bitmap font's 9 px line; drawBrandTitle centres the glyph box on the y it
+      // is given, so the old top edge plus half that line keeps the title where it always was.
+      float titleTop = (((float)this.getCenterY() / 2.0F - 24.0F) / 5.0F - 3.0F) / 2.0F + 3.0F;
+      this.drawBrandTitle(Augustus.getInstance().getName(), (float)this.getCenterX() / 5.0F, titleTop + 4.5F, 5.0F);
    }
 
    private void onOptionsClick(GuiButton button) {

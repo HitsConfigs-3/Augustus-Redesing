@@ -1,5 +1,8 @@
 package net.augustus.ui;
 
+import net.augustus.font.FontManager;
+import net.augustus.ui.modern.font.InterFontUtil;
+import net.augustus.ui.modern.render.UiAnimation;
 import net.augustus.utils.render.BlurShadowManager;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -111,12 +114,42 @@ public class AugustusGuiScreen extends GuiScreen {
       }
    }
 
+   /**
+    * Text of the redesigned menus (main menu corners, tab title, status line, credits, changelog, account
+    * and proxy forms) is painted with the client's Inter face rather than the 8 px bitmap font, which is
+    * what made a screen that already used Inter for its buttons and cards still look half-stock.
+    *
+    * <p>Width and painting must come from the same face: {@link #getStringWidth(String)} is the Inter width
+    * now, so the right-aligned corner texts and the centred tab titles stay exactly centred. The bitmap
+    * path survives only as a fallback for the frames before {@link FontManager#initFonts()} has completed.
+    * The old 3/5x {@code glScaled} of the bitmap glyphs (the giant "Augustus" on the main menu) is now the
+    * same face drawn at scale * size, so a scaled title is sharp instead of blocky.</p>
+    */
+   private static InterFontUtil uiFont() {
+      return FontManager.body();
+   }
+
+   /** Line box of {@link #uiFont()}; the stock 9 px bitmap height before Inter exists. */
+   public float getFontHeight() {
+      return FontManager.bodyHeight();
+   }
+
    public void drawCenteredString(String str, float f, float f2, int n) {
-      Minecraft.getMinecraft().fontRendererObj.drawStringWithShadow(str, f - (float)Minecraft.getMinecraft().fontRendererObj.getStringWidth(str) / 2.0F, f2, n);
+      InterFontUtil font = uiFont();
+      if (font == null) {
+         Minecraft.getMinecraft().fontRendererObj.drawStringWithShadow(str, f - (float)Minecraft.getMinecraft().fontRendererObj.getStringWidth(str) / 2.0F, f2, n);
+         return;
+      }
+      font.drawStringWithShadow(str, (double)(f - font.getStringWidth(str) / 2.0F), (double)f2, n);
    }
 
    public void drawString(String str, float f, float f2, int n) {
-      Minecraft.getMinecraft().fontRendererObj.drawStringWithShadow(str, f, f2, n);
+      InterFontUtil font = uiFont();
+      if (font == null) {
+         Minecraft.getMinecraft().fontRendererObj.drawStringWithShadow(str, f, f2, n);
+         return;
+      }
+      font.drawStringWithShadow(str, (double)f, (double)f2, n);
    }
 
    public void openScreen(GuiScreen screen) {
@@ -145,10 +178,61 @@ public class AugustusGuiScreen extends GuiScreen {
    }
 
    public void drawCenteredScaledString(String str, float f, float f2, float f3) {
-      this.drawScaledString(str, f - (float)Minecraft.getMinecraft().fontRendererObj.getStringWidth(str) / 2.0F, f2, f3, (byte)-1);
+      this.drawCenteredScaledString(str, f, f2, f3, uiFont());
+   }
+
+   /**
+    * Centre of a {@code f3}-scaled line, drawn with a caller-chosen face so brand titles can ask for Inter
+    * Bold (the face the splash art uses for "Augustus") while section headings keep the body face.
+    *
+    * <p>The caller's coordinates are in pre-scale space because the bitmap version scaled the matrix; the
+    * Inter version multiplies both the origin and the glyph size by {@code f3} instead, which keeps the
+    * optical centre identical (the atlas' advance is linear in size) and stays sharp at 3x and 5x.</p>
+    */
+   public void drawCenteredScaledString(String str, float f, float f2, float f3, InterFontUtil font) {
+      if (font == null) {
+         this.drawCenteredScaledStringBitmap(str, f, f2, f3);
+         return;
+      }
+      this.drawScaledString(str, f - font.getStringWidth(str) / 2.0F, f2, f3, -1, font);
    }
 
    public void drawScaledString(String str, float f, float f2, float f3, int n) {
+      this.drawScaledString(str, f, f2, f3, n, uiFont());
+   }
+
+   public void drawScaledString(String str, float f, float f2, float f3, int n, InterFontUtil font) {
+      if (font == null) {
+         this.drawScaledStringBitmap(str, f, f2, f3, n);
+         return;
+      }
+      font.drawStringAtSize(str, f * f3, f2 * f3, font.getEffectiveSize() * f3, n, true);
+   }
+
+   /**
+    * The client name as a menu's brand title: Inter Bold (the face the splash art sets "Augustus" in),
+    * horizontally centred on {@code f} and vertically centred on {@code f2} at {@code f3}x.
+    *
+    * <p>WHY the vertical offset is half the brand face's own height: the callers pass the screen's centre
+    * line, and the old bitmap code subtracted half of the 9 px bitmap box. The Inter box is taller, so the
+    * same formula with the face that is actually drawn (in pre-scale space - see
+    * {@link #drawScaledString(String, float, float, float, int, InterFontUtil)}) is what keeps the title on
+    * the centre line instead of hanging below it.</p>
+    */
+   public void drawBrandTitle(String str, float f, float f2, float f3) {
+      InterFontUtil font = FontManager.interBold != null ? FontManager.interBold : FontManager.body();
+      if (font == null) {
+         this.drawCenteredScaledStringBitmap(str, f, f2 - 4.5F, f3);
+         return;
+      }
+      this.drawScaledString(str, f - font.getStringWidth(str) / 2.0F, f2 - font.getFontHeight() / 2.0F, f3, -1, font);
+   }
+
+   private void drawCenteredScaledStringBitmap(String str, float f, float f2, float f3) {
+      this.drawScaledStringBitmap(str, f - (float)Minecraft.getMinecraft().fontRendererObj.getStringWidth(str) / 2.0F, f2, f3, (byte)-1);
+   }
+
+   private void drawScaledStringBitmap(String str, float f, float f2, float f3, int n) {
       GL11.glPushMatrix();
       GL11.glScalef(f3, f3, f3);
       Minecraft.getMinecraft().fontRendererObj.drawStringWithShadow(str, f, f2, n);
@@ -177,6 +261,9 @@ public class AugustusGuiScreen extends GuiScreen {
 
    @Override
    public void drawScreen(int mouseX, int mouseY, float partialTicks) {
+      // Frame clock for the glass buttons this screen hosts (see GuiButton.drawGlassButton): exactly one
+      // beginFrame per rendered frame, before any button draws, so hover/press smoothing is real-time.
+      UiAnimation.beginFrame();
       if (this.renderDefaultBackground) {
          this.drawDefaultBackground();
          BlurShadowManager.flushRenderQueues(new ScaledResolution(this.mc), true);
@@ -224,7 +311,32 @@ public class AugustusGuiScreen extends GuiScreen {
    }
 
    public int getStringWidth(String str) {
-      return Minecraft.getMinecraft().fontRendererObj.getStringWidth(str);
+      InterFontUtil font = uiFont();
+      if (font == null) {
+         return Minecraft.getMinecraft().fontRendererObj.getStringWidth(str);
+      }
+      // Rounded for the right-aligned corner lines, which measure in ints; the painting stays float.
+      return Math.round(font.getStringWidth(str));
+   }
+
+   /**
+    * Hint text of an empty field, drawn at the same inset and vertical centre
+    * {@code GuiTextField.drawTextBoxWithShadowOption} uses for typed text: the hint sits exactly where the
+    * first character will appear, in the same Inter face, so a form is no longer a bitmap-font island on an
+    * Inter screen.
+    */
+   public void drawFieldPlaceholder(String text, int fieldX, int fieldY, int fieldHeight, int color) {
+      InterFontUtil font = uiFont();
+      if (font == null) {
+         Minecraft.getMinecraft().fontRendererObj.drawStringWithShadow(text, (float)(fieldX + 4), (float)(fieldY + (fieldHeight - 8) / 2), color);
+         return;
+      }
+      font.drawStringWithShadow(
+         text,
+         (double)((float)fieldX + 4.0F),
+         (double)((float)fieldY + ((float)fieldHeight - font.getFontHeight()) / 2.0F),
+         color
+      );
    }
 
    public GuiTextField addTextField(int n, int n2, int n3, int n4) {

@@ -6,9 +6,11 @@ import java.util.List;
 import net.augustus.Augustus;
 import net.augustus.ClientManagers;
 import net.augustus.config.VisualsConfigFile;
+import net.augustus.font.FontManager;
 import net.augustus.modules.Module;
 import net.augustus.modules.ModuleManager;
 import net.augustus.settings.DoubleValue;
+import net.augustus.ui.modern.font.InterFontUtil;
 import net.augustus.ui.modern.render.GlassRenderer;
 import net.augustus.ui.modern.render.UiTheme;
 import net.augustus.ui.modern.render.UiAnimation;
@@ -106,6 +108,20 @@ public class HudEditorScreen extends GuiScreen {
         }
     }
 
+    /**
+     * Labels of the HUD editor (widget cards and the "Back to ClickGUI" pill) use the same Inter body face
+     * as the ClickGUI that opened them; the pill is measured with this face too, so its width still hugs
+     * the text.
+     */
+    private static InterFontUtil labelFont() {
+        return FontManager.body();
+    }
+
+    private int backPillLabelWidth() {
+        InterFontUtil font = labelFont();
+        return font == null ? this.fontRendererObj.getStringWidth("Back to ClickGUI") : Math.round(font.getStringWidth("Back to ClickGUI"));
+    }
+
     // --- Drawing -------------------------------------------------------------
 
     @Override
@@ -144,7 +160,12 @@ public class HudEditorScreen extends GuiScreen {
 
             // Label
             int textCol = active ? UiTheme.TEXT_PRIMARY : UiTheme.secondaryTextColor();
-            drawCenteredString(this.fontRendererObj, w.label, wx + ww / 2, wy + (wh - 8) / 2, textCol);
+            InterFontUtil font = labelFont();
+            if (font == null) {
+                drawCenteredString(this.fontRendererObj, w.label, wx + ww / 2, wy + (wh - 8) / 2, textCol);
+            } else {
+                font.drawCenteredStringInBox(w.label, wx, wy, ww, wh, textCol);
+            }
 
             // Active indicator dot
             if (active) {
@@ -155,14 +176,19 @@ public class HudEditorScreen extends GuiScreen {
 
         // Bottom pill: "Back to ClickGUI"
         String backText = "Back to ClickGUI";
-        int tw = this.fontRendererObj.getStringWidth(backText);
+        int tw = this.backPillLabelWidth();
         int pillW = tw + 24;
         int pillH = 20;
         int pillX = (this.width - pillW) / 2;
         int pillY = this.height - 36;
         GlassRenderer.drawRoundedRect((float) pillX, (float) pillY, (float) pillW, (float) pillH, 10.0F, UiTheme.glassCardFillArgb(0.0F, 0.0F, UiTheme.accentColor()));
         GlassRenderer.drawRoundedOutline((float) pillX, (float) pillY, (float) pillW, (float) pillH, 10.0F, 1.0F, UiTheme.GLASS_BORDER);
-        drawCenteredString(this.fontRendererObj, backText, pillX + pillW / 2, pillY + 6, UiTheme.TEXT_PRIMARY);
+        InterFontUtil pillFont = labelFont();
+        if (pillFont == null) {
+            drawCenteredString(this.fontRendererObj, backText, pillX + pillW / 2, pillY + 6, UiTheme.TEXT_PRIMARY);
+        } else {
+            pillFont.drawCenteredStringInBox(backText, pillX, pillY, pillW, pillH, UiTheme.TEXT_PRIMARY);
+        }
 
         super.drawScreen(mouseX, mouseY, partialTicks);
     }
@@ -177,7 +203,7 @@ public class HudEditorScreen extends GuiScreen {
 
         // Check "Back to ClickGUI" pill
         String backText = "Back to ClickGUI";
-        int tw = this.fontRendererObj.getStringWidth(backText);
+        int tw = this.backPillLabelWidth();
         int pillW = tw + 24;
         int pillH = 20;
         int pillX = (this.width - pillW) / 2;

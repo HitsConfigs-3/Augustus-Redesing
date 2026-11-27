@@ -5,6 +5,7 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import net.augustus.utils.input.MouseInputUtil;
+import net.augustus.ui.VanillaScreenText;
 import net.minecraft.client.audio.PositionedSoundRecord;
 import net.minecraft.entity.EntityList;
 import net.minecraft.stats.StatBase;
@@ -231,7 +232,7 @@ public class GuiStats extends GuiScreen implements IProgressMeter {
          );
       } else {
          this.displaySlot.drawScreen(mouseX, mouseY, partialTicks);
-         drawCenteredString(this.fontRendererObj, this.screenTitle, this.width / 2, 20, 16777215);
+         VanillaScreenText.drawCenteredOnScreen(this.width, this.screenTitle, 20, 16777215);
          super.drawScreen(mouseX, mouseY, partialTicks);
       }
    }

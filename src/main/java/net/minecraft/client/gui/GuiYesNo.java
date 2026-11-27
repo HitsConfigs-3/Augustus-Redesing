@@ -6,6 +6,7 @@ import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.MoreExecutors;
 import java.io.IOException;
 import java.util.List;
+import net.augustus.ui.VanillaScreenText;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.resources.I18n;
 import net.minecraft.network.NetworkManager;
@@ -27,11 +28,11 @@ public class GuiYesNo extends GuiScreen {
    @Override
    public void drawScreen(int mouseX, int mouseY, float partialTicks) {
       this.drawDefaultBackground();
-      drawCenteredString(this.fontRendererObj, this.messageLine1, this.width / 2, 70, 16777215);
+      VanillaScreenText.drawCenteredOnScreen(this.width, this.messageLine1, 70, 16777215);
       int n = 90;
 
       for (String str : (Iterable<String>)(this.listLines)) {
-         drawCenteredString(this.fontRendererObj, str, this.width / 2, n, 16777215);
+         VanillaScreenText.drawCenteredOnScreen(this.width, str, n, 16777215);
          n += this.fontRendererObj.FONT_HEIGHT;
       }
 

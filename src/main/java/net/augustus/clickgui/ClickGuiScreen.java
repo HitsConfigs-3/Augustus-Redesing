@@ -45,8 +45,6 @@ public class ClickGuiScreen extends GuiScreen {
    public static boolean configEditable = true;
    private final ConfigSystemPanel configPanel;
    public static boolean protectedConfigCreator = false;
-   private float dockLeftHoverAnim = 0.0F;
-   private float dockRightHoverAnim = 0.0F;
    private float guiOpenAnim = 0.0F;
 
    /** Target the open/close envelope travels to: 1 while the overlay is presented, 0 once it is dismissing. */
@@ -80,36 +78,29 @@ public class ClickGuiScreen extends GuiScreen {
     * reaches 99% after {@code ln(100)/k = 4.6/16 = 0.288 s} (288 ms). The design tokens cap ordinary
     * transitions at ~240 ms and allow an overlay enter/exit up to ~320 ms; 288 ms sits inside that window and
     * looks deliberate rather than sluggish. It also matches the surrounding UI (window open envelope k=18,
-    * dock hover k=16, popups k=22) so the overlay does not fight the components it contains.
+    * row hover k=16, popups k=22) so the overlay does not fight the components it contains.
     */
    private static final float SCREEN_TRANSITION_SPEED = 16.0F;
 
    /**
-    * Scale the overlay is drawn at when the envelope is still fully closed.
-    *
-    * <p>WHY 0.965: a 3.5% zoom is large enough to read as the panel settling into place and small enough that
-    * text never visibly reflows - the brief asks for a "progresivo y sutil" scale. The value is applied on
-    * top of the window's own local scale transform, at the same anchor (see ClickGuiWindow.drawWindow).
-    */
-   private static final float SCREEN_SCALE_FROM = 0.965F;
-
-   /**
-    * Alpha every glass surface and dock element drawn by the overlay has to be multiplied with.
+    * Alpha every glass surface drawn by the overlay has to be multiplied with.
     *
     * <p>WHY this hand-off exists: the transition alpha cannot ride on GL state. The glass surfaces are drawn
     * through a shader that hard-resets {@code GlStateManager.color(1,1,1,1)} before every quad
     * (GlassRenderer primitive pass), and the font renderer resets the colour state after each string, so a
     * global {@code glColor} fade is silently dropped by exactly the two heaviest subsystems. Exposing the
     * envelope as a value lets the window write it into the alpha parameters it already threads through
-    * {@code getOpenProgress()} (window shell + sidebar) and lets this class fade the dock explicitly.
+    * {@code getOpenProgress()} (window shell + sidebar tint), and lets GlassRenderer carry it into the
+    * surfaces it paints on its own ({@link GlassRenderer#setOverlayEnvelope}).
     */
    private static float screenFade = 1.0F;
 
    /**
     * Current alpha of the overlay's open/close envelope, 1 when fully settled open, 0 when fully closed.
     *
-    * <p>Read by {@code ClickGuiWindow.getOpenProgress()} and by the dock drawing below. Static because the
-    * window objects are long-lived singletons that outlive this GuiScreen instance.
+    * <p>Read by {@code ClickGuiWindow.getOpenProgress()}, by {@code fadeArgb} below and by the components
+    * that fade their own colours (see {@code ModernToggleSwitch.faded}). Static because the window objects
+    * are long-lived singletons that outlive this GuiScreen instance.
     */
    public static float getScreenFade() {
       return screenFade;
@@ -199,18 +190,14 @@ public class ClickGuiScreen extends GuiScreen {
       return !this.closing && this.guiOpenAnim >= 0.999F;
    }
 
-   private boolean isMouseOver(int n, int n2, int n3, int n4, int n5, int n6) {
-      return n5 >= n && n6 >= n2 && n5 < n + n3 && n6 < n2 + n4;
-   }
-
    /**
     * Window hit test in raw framebuffer pixels.
     *
     * <p>WHY not the stored rect: the GUI Scale setting moves and resizes the on-screen shell, so the
     * exact same transform the window uses for rendering and for its own mouse mapping
     * ({@link ClickGuiWindow#getScaleTransform()}) has to be used here as well. Comparing the raw mouse
-    * against the unscaled X/Y/Width/Height would desynchronise window activation and the dock hover
-    * test from what is actually drawn.
+    * against the unscaled X/Y/Width/Height would desynchronise window activation from what is actually
+    * drawn.
     */
    private boolean isOverWindow(ClickGuiWindow window, int framebufferMouseX, int framebufferMouseY) {
       ClickGuiWindow.ScaleTransform transform = window.getScaleTransform();
@@ -300,6 +287,17 @@ public class ClickGuiScreen extends GuiScreen {
       }
 
       this.configPanel.onPanelOpened();
+      // A shell dismissed from its own title bar (X or minimize) is restored with the next presentation.
+      // Those two controls hide the window and leave the overlay up but empty, and the centre dock used to
+      // be the way back; the dock is gone, so the restore has to happen here or reopening the ClickGUI
+      // would show a scrim with nothing on it. The Configs window is deliberately NOT restored: it is a
+      // secondary window that must stay closed until asked for, and the sidebar's Configs tab is what
+      // opens it.
+      if (this.mainWindow.closed || !this.mainWindow.isVisible()) {
+         this.mainWindow.openWindow();
+         this.mainWindow.closed = false;
+      }
+
       this.activeWindow = null;
       // Open transition. initGui() is the hook Minecraft calls every time this screen is handed to
       // displayGuiScreen (including a re-open), which is exactly when the open animation has to start over:
@@ -314,8 +312,7 @@ public class ClickGuiScreen extends GuiScreen {
       this.moduleArmedForAutoClose = false;
       activeScreen = this;
       screenFade = 0.0F;
-      UiAnimation.setState("dock_left_act", 0.0F);
-      UiAnimation.setState("dock_right_act", 0.0F);
+      GlassRenderer.setOverlayEnvelope(0.0F);
       GuiScreen.NO_TOGGLE_SCREENS.add(Minecraft.getMinecraft().currentScreen);
    }
 
@@ -357,6 +354,11 @@ public class ClickGuiScreen extends GuiScreen {
       // then corrected on the next frame: the sampled value IS this frame's value.
       float fade = this.guiOpenAnim;
       screenFade = fade;
+      // Publish the same value to the renderer: the nested glass panes and the sheen/cursor-light weights
+      // are drawn by GlassRenderer, which has no other way to learn the overlay is mid-transition. See
+      // GlassRenderer.setOverlayEnvelope. Scoped to this frame's overlay pass by the reset in
+      // onGuiClosed()/finishClose(), so nothing drawn outside the overlay ever sees a faded value.
+      GlassRenderer.setOverlayEnvelope(fade);
       this.guiOpenAnim = UiAnimation.smooth(this.guiOpenAnim, this.guiOpenTarget, SCREEN_TRANSITION_SPEED);
       // Snap the tail instead of integrating forever: UiAnimation.smooth stops at 1e-3, and the input gate
       // below compares against a 0.999F threshold, so pin the envelope once it is visually done. This also
@@ -370,123 +372,28 @@ public class ClickGuiScreen extends GuiScreen {
       TextFieldComponent.anyFieldFocused = false;
       BlurShadowManager.disableGuiLayer();
       ScaledResolution sr = new ScaledResolution(this.mc);
-      // Resolve the framebuffer and its centre BEFORE any transform is applied: the transition scale is
-      // anchored on this centre and must not depend on the current matrix. (The dock drawing below still
-      // reassigns these from the same source, so nothing else changes.)
+      // Resolve the framebuffer and its centre BEFORE any transform is applied: the transition zoom the
+      // windows apply is anchored on this centre and must not depend on the current matrix.
       this.framebufferWidth = this.mc.getFramebuffer().framebufferWidth;
       this.framebufferHeight = this.mc.getFramebuffer().framebufferHeight;
       this.centerX = (int)((float)this.framebufferWidth / 2.0F);
       this.centerY = (int)((float)this.framebufferHeight / 2.0F);
 
-      // Subtle progressive scale, anchored on the framebuffer centre and driven by the same envelope as the
-      // fade, so the overlay grows/moves as one piece.
+      // The world dim rides the same envelope as the overlay (RenderGuiBackgroundListener samples the
+      // screen envelope), so it cannot be left painted at full strength on the last faded frame. It is a
+      // full-screen scrim, so it is drawn here, in framebuffer space, immediately before the windows.
       //
-      // WHY the scale lives here and NOT in ClickGuiWindow.getScaleTransform(): that transform is also the
-      // mouse inverse map (toLocalX/toLocalY) and the source of every glScissor rect in MainClickGuiWindow.
-      // Deforming it mid-transition would make every clip rect drift away from the drawn content - the exact
-      // bug class the brief calls out (scissor computed from final geometry while the visual scale is
-      // animating). Scaling only the dock, which owns no clip bound and no input mapping of its own, keeps
-      // every clipping surface in the project on the transform its own geometry was computed with. The
-      // window shell gets its own equivalent, equally clip-safe zoom in ClickGuiWindow.drawWindow, applied
-      // INSIDE the transform the window already uses for drawing and clipping.
-      float eased = UiAnimation.easeOutCubic(fade);
-      float scale = SCREEN_SCALE_FROM + (1.0F - SCREEN_SCALE_FROM) * eased;
-      // Whether the overlay is allowed to react. Captured from the SAME sampled envelope the alpha and scale
-      // use above and below, so hover/press feedback cannot contradict the click gate in mouseClicked(): a
-      // dock button can never look pressable while clicks are being refused.
-      boolean interactive = !this.closing && fade >= 0.999F;
-      GlStateManager.pushMatrix();
-      GlStateManager.translate((double)this.centerX, (double)this.centerY, 0.0);
-      GlStateManager.scale((double)scale, (double)scale, 1.0);
-      GlStateManager.translate((double)(-this.centerX), (double)(-this.centerY), 0.0);
+      // WHY there is no overlay-wide scale transform here any more: it existed to make the centre dock pop
+      // in and out with the fade. The dock is gone - the sidebar's own Configs tab and each window's title
+      // bar cover both of its actions - and every window already carries its own clip-safe zoom inside the
+      // transform it draws and clips with (ClickGuiWindow.applyTransitionZoom), so a second, screen-level
+      // transform would only be one more thing to keep in step with it.
       if (this.mainWindow.isVisible() || this.configPanel.isVisible()) {
-         // Inside the transition, so the world dim rides the same envelope as the overlay and cannot be
-         // left painted at full strength on the last faded frame. It is drawn after pushMatrix above and
-         // before the dock's own 1/guiScale matrix, i.e. still in full-screen framebuffer space, so the
-         // scrim keeps covering the whole screen instead of shrinking with the dock.
          RenderGuiBackgroundListener.postRenderGuiBackground(this);
       }
 
-      GlStateManager.pushMatrix();
-      GlStateManager.scale(1.0 / (double)sr.getScaleFactor(), 1.0 / (double)sr.getScaleFactor(), 1.0);
       int n = mouseX;
       int n2 = mouseY;
-      mouseX *= sr.getScaleFactor();
-      mouseY *= sr.getScaleFactor();
-      byte b = 6;
-      if (!this.mainWindow.isFullScreen() && !this.configPanel.isFullScreen()) {
-         BlurShadowManager.enableOneShotPass(false, ClientManagers.moduleManager.clickGui.clickGui.isShadowActive());
-         BlurShadowManager.submitRenderTask(false, shaderRenderPass -> this.renderDockBackgroundPass(b, shaderRenderPass));
-         boolean overLeftDock = this.isMouseOver(this.centerX - 43 - b, (byte)0, (byte)42, 37 + b, mouseX, mouseY)
-            && (!this.isOverWindow(this.configPanel, mouseX, mouseY) || !this.configPanel.isVisible())
-            && (!this.isOverWindow(this.mainWindow, mouseX, mouseY) || !this.mainWindow.isVisible())
-            && interactive;
-         boolean overRightDock = this.isMouseOver(this.centerX + 1, (byte)0, (byte)42, 37 + b, mouseX, mouseY)
-            && (!this.isOverWindow(this.configPanel, mouseX, mouseY) || !this.configPanel.isVisible())
-            && (!this.isOverWindow(this.mainWindow, mouseX, mouseY) || !this.mainWindow.isVisible())
-            && interactive;
-
-         int accent = UiTheme.accentColor();
-         boolean leftVis = this.mainWindow.isVisible();
-         boolean rightVis = this.configPanel.isVisible();
-         // Raw button state is read for the press animation only while the overlay is interactive, so the press
-         // highlight can never contradict the click gate in mouseClicked(). overLeftDock/overRightDock already
-         // carry that gate plus the geometry test.
-         boolean leftPressed = overLeftDock && UiAnimation.isPrimaryMouseDown();
-         boolean rightPressed = overRightDock && UiAnimation.isPrimaryMouseDown();
-         this.dockLeftHoverAnim = UiAnimation.smooth(this.dockLeftHoverAnim, overLeftDock ? 1.0F : 0.0F, 16.0F);
-         this.dockRightHoverAnim = UiAnimation.smooth(this.dockRightHoverAnim, overRightDock ? 1.0F : 0.0F, 16.0F);
-         float leftActiveT = UiAnimation.smoothState("dock_left_act", leftVis ? 1.0F : 0.0F, 16.0F);
-         float rightActiveT = UiAnimation.smoothState("dock_right_act", rightVis ? 1.0F : 0.0F, 16.0F);
-         float leftPressT = UiAnimation.smoothState("dock_left_prs", leftPressed ? 1.0F : 0.0F, 28.0F);
-         float rightPressT = UiAnimation.smoothState("dock_right_prs", rightPressed ? 1.0F : 0.0F, 28.0F);
-
-         float dockBtnY = 3.0F;
-         float dockBtnH = (float)(37 + b - 7);
-         float leftBtnX = (float)(this.centerX - 43 - b + 3);
-         float rightBtnX = (float)(this.centerX + 3);
-         float dockBtnW = 42.0F;
-
-         if (this.dockLeftHoverAnim > 0.02F || leftActiveT > 0.02F) {
-            float mixL = Math.max(leftActiveT * 0.85F, this.dockLeftHoverAnim);
-            int topL = UiTheme.lerpArgb(UiTheme.glassControlFillArgb(this.dockLeftHoverAnim, 0.0F, accent), UiTheme.withAlpha(UiTheme.lerpArgb(accent, 0xFF282058, 0.28F), 200), leftActiveT);
-            int botL = UiTheme.lerpArgb(UiTheme.lerpArgb(topL, 0xFF0A0A14, 0.25F), UiTheme.withAlpha(UiTheme.accentDeep(), 190), leftActiveT);
-            int borderL = UiTheme.lerpArgb(UiTheme.GLASS_BORDER, UiTheme.withAlpha(UiTheme.accentSoftGlow(), 220), mixL);
-            if (leftActiveT > 0.05F) {
-               GlassRenderer.drawSoftShadow(leftBtnX, dockBtnY, dockBtnW, dockBtnH, 7.0F, 7.0F, 1.0F, UiTheme.withAlpha(accent, Math.round(58.0F * leftActiveT)));
-            }
-            GlassRenderer.drawInteractiveSurface(leftBtnX, dockBtnY, dockBtnW, dockBtnH, 7.0F, topL, botL, borderL, UiTheme.BORDER_THICKNESS, UiTheme.glassTopHighlightAlpha(mixL), this.dockLeftHoverAnim, leftPressT, true, (float)mouseX, (float)mouseY, accent);
-         }
-         if (this.dockRightHoverAnim > 0.02F || rightActiveT > 0.02F) {
-            float mixR = Math.max(rightActiveT * 0.85F, this.dockRightHoverAnim);
-            int topR = UiTheme.lerpArgb(UiTheme.glassControlFillArgb(this.dockRightHoverAnim, 0.0F, accent), UiTheme.withAlpha(UiTheme.lerpArgb(accent, 0xFF282058, 0.28F), 200), rightActiveT);
-            int botR = UiTheme.lerpArgb(UiTheme.lerpArgb(topR, 0xFF0A0A14, 0.25F), UiTheme.withAlpha(UiTheme.accentDeep(), 190), rightActiveT);
-            int borderR = UiTheme.lerpArgb(UiTheme.GLASS_BORDER, UiTheme.withAlpha(UiTheme.accentSoftGlow(), 220), mixR);
-            if (rightActiveT > 0.05F) {
-               GlassRenderer.drawSoftShadow(rightBtnX, dockBtnY, dockBtnW, dockBtnH, 7.0F, 7.0F, 1.0F, UiTheme.withAlpha(accent, Math.round(58.0F * rightActiveT)));
-            }
-            GlassRenderer.drawInteractiveSurface(rightBtnX, dockBtnY, dockBtnW, dockBtnH, 7.0F, topR, botR, borderR, UiTheme.BORDER_THICKNESS, UiTheme.glassTopHighlightAlpha(mixR), this.dockRightHoverAnim, rightPressT, true, (float)mouseX, (float)mouseY, accent);
-         }
-
-         GlassRenderer.drawSeparator((float)this.centerX, 7.0F, (float)this.centerX, (float)(37 + b - 7), 1.0F, UiTheme.scaleAlpha(UiTheme.GLASS_DIVIDER, fade));
-         int leftIconCol = fadeArgb(UiTheme.lerpArgb(UiTheme.secondaryTextColor(), UiTheme.TEXT_PRIMARY, Math.max(leftActiveT, this.dockLeftHoverAnim)));
-         int rightIconCol = fadeArgb(UiTheme.lerpArgb(UiTheme.secondaryTextColor(), UiTheme.TEXT_PRIMARY, Math.max(rightActiveT, this.dockRightHoverAnim)));
-         LucideIcon.SLIDERS_HORIZONTAL.drawCentered(leftBtnX + dockBtnW * 0.5F, dockBtnY + dockBtnH * 0.5F + leftPressT * 0.5F - leftActiveT * 1.0F, 17.5F, leftIconCol);
-         LucideIcon.FOLDER.drawCentered(rightBtnX + dockBtnW * 0.5F, dockBtnY + dockBtnH * 0.5F + rightPressT * 0.5F - rightActiveT * 1.0F, 17.5F, rightIconCol);
-         if (leftActiveT > 0.04F) {
-            float barW = 14.0F * leftActiveT;
-            GlassRenderer.drawRoundedRect(leftBtnX + (dockBtnW - barW) * 0.5F, dockBtnY + dockBtnH - 4.0F, barW, 2.2F, 1.1F, UiTheme.withAlpha(UiTheme.accentSoftGlow(), Math.round(235.0F * leftActiveT)));
-         }
-         if (rightActiveT > 0.04F) {
-            float barW = 14.0F * rightActiveT;
-            GlassRenderer.drawRoundedRect(rightBtnX + (dockBtnW - barW) * 0.5F, dockBtnY + dockBtnH - 4.0F, barW, 2.2F, 1.1F, UiTheme.withAlpha(UiTheme.accentSoftGlow(), Math.round(235.0F * rightActiveT)));
-         }
-      }
-
-      // Closes the transition-scale matrix opened before the dock. Paired with the pushMatrix above, so the
-      // stack is balanced even when the dock branch is skipped (full-screen window).
-      GlStateManager.popMatrix();
-      GlStateManager.popMatrix();
       if (this.activeWindow != null) {
          if (this.activeWindow.equals(this.mainWindow)) {
             if (!this.mainWindow.isFullScreen()) {
@@ -514,14 +421,16 @@ public class ClickGuiScreen extends GuiScreen {
    /**
     * Ends the close transition: clears the shared transition state and really dismisses the screen.
     *
-    * <p>WHY a single exit point: the state that the dock and the window shell read through
-    * {@link #getScreenFade()} is static (it outlived this GuiScreen by design), so leaving the overlay
-    * without restoring it to 1.0F would permanently fade out the next presentation. Resetting it here - and
-    * in {@link #initGui} for the re-open path - keeps the envelope symmetric.
+    * <p>WHY a single exit point: the state that the window shell and the renderer read through
+    * {@link #getScreenFade()} / {@code GlassRenderer.setOverlayEnvelope} is static (it outlived this
+    * GuiScreen by design), so leaving the overlay without restoring it to 1.0F would permanently fade out
+    * the next presentation. Resetting it here - and in {@link #onGuiClosed} for the replaced-screen path -
+    * keeps the envelope symmetric.
     */
    private void finishClose() {
       this.presented = false;
       screenFade = 1.0F;
+      GlassRenderer.setOverlayEnvelope(1.0F);
       if (Minecraft.getMinecraft().currentScreen == this) {
          Minecraft.getMinecraft().displayGuiScreen((GuiScreen)null);
       }
@@ -552,40 +461,6 @@ public class ClickGuiScreen extends GuiScreen {
       this.configPanel.mouseReleased(-1, -1, -1);
    }
 
-   private void renderDockBackgroundPass(int n, ShaderRenderPass shaderRenderPass) {
-      if (shaderRenderPass == ShaderRenderPass.SHADOW) {
-         RenderUtil.drawRoundedRect((float)(this.centerX - 43 - n), (float)(-n), (float)(this.centerX + 43 + n), (float)(37 + n), (float)n, 1, ClientManagers.moduleManager.clickGui.clickGui.resolveShadowColor(Color.black.getRGB()));
-      } else if (ClientManagers.moduleManager.clickGui.isPanelBlurActive()) {
-         GlassRenderer.drawLiquidGlassSurface(
-            (float)(this.centerX - 43 - n),
-            (float)(-n),
-            (float)(86 + n * 2),
-            (float)(37 + n * 2),
-            0.0F,
-            0.0F,
-            (float)(n + 4),
-            (float)(n + 4),
-            ClientManagers.moduleManager.clickGui.getBlurRadius(),
-            UiTheme.THICK_BORDER_THICKNESS,
-            UiTheme.GLASS_BORDER_STRONG
-         );
-      } else {
-         GlassRenderer.drawLiquidGlassSurface(
-            (float)(this.centerX - 43 - n),
-            (float)(-n),
-            (float)(86 + n * 2),
-            (float)(37 + n * 2),
-            0.0F,
-            0.0F,
-            (float)(n + 4),
-            (float)(n + 4),
-            0.0F,
-            UiTheme.THICK_BORDER_THICKNESS,
-            UiTheme.GLASS_BORDER_STRONG
-         );
-      }
-   }
-
    @Override
    public void actionPerformed(GuiButton button) throws IOException {
       super.actionPerformed(button);
@@ -599,7 +474,7 @@ public class ClickGuiScreen extends GuiScreen {
       super.mouseClicked(mouseX, mouseY, mouseButton);
       // Input is refused for the whole transition, in both directions. While closing this matters most: the
       // shell is fully transparent long before it is removed, and without this gate a click would still
-      // activate the dock or a button the user has already dismissed. While opening it also keeps the very
+      // activate a button the user has already dismissed. While opening it also keeps the very
       // first frames - drawn at alpha 0 - from swallowing a click aimed at the game behind them.
       if (!this.isTransitionSettled()) {
          return;
@@ -642,38 +517,6 @@ public class ClickGuiScreen extends GuiScreen {
          }
       }
 
-      if (mouseButton == 0 && (!this.configPanel.isFullScreen() || !this.configPanel.isVisible()) && (!this.mainWindow.isFullScreen() || !this.mainWindow.isVisible())) {
-         byte b = 6;
-         if (this.isMouseOver(this.centerX - 43 - b, (byte)0, (byte)42, 37 + b, mouseX, mouseY)) {
-            if (!this.isOverWindow(this.configPanel, mouseX, mouseY) || !this.configPanel.isVisible()) {
-               if (!this.isOverWindow(this.mainWindow, mouseX, mouseY) || !this.mainWindow.isVisible()) {
-                  if (!this.mainWindow.isVisible() && this.mainWindow.closed) {
-                     this.activeWindow = this.mainWindow;
-                  }
-
-                  String str = "ClickGui";
-                  this.mainWindow.toggleWindow(str);
-                  this.activeWindow = this.mainWindow;
-                  ClientSounds.playSound(ClientSounds.AUGUSTUS_TEXTURE);
-               }
-            }
-         }
-
-         if (this.isMouseOver(this.centerX + 1, (byte)0, (byte)42, 37 + b, mouseX, mouseY)) {
-            if (!this.isOverWindow(this.configPanel, mouseX, mouseY) || !this.configPanel.isVisible()) {
-               if (!this.isOverWindow(this.mainWindow, mouseX, mouseY) || !this.mainWindow.isVisible()) {
-                  if (!this.configPanel.isVisible() && this.configPanel.closed) {
-                     this.activeWindow = this.configPanel;
-                  }
-
-                  String str2 = "Configs";
-                  this.configPanel.toggleWindow(str2);
-                  this.activeWindow = this.configPanel;
-                  ClientSounds.playSound(ClientSounds.AUGUSTUS_TEXTURE);
-               }
-            }
-         }
-      }
    }
 
    @Override
@@ -732,9 +575,10 @@ public class ClickGuiScreen extends GuiScreen {
       this.mainWindow.onClose();
       this.presented = false;
       this.closing = false;
-      // Hand the shared envelope back at full strength: the dock and the window shell read it statically, so
-      // the next presentation must not start from a faded value.
+      // Hand the shared envelope back at full strength: the window shell and the renderer's nested glass
+      // panes read it statically, so the next presentation must not start from a faded value.
       screenFade = 1.0F;
+      GlassRenderer.setOverlayEnvelope(1.0F);
       if (activeScreen == this) {
          activeScreen = null;
       }
@@ -744,7 +588,11 @@ public class ClickGuiScreen extends GuiScreen {
 
    public ClickGuiScreen() {
        super();
-      this.mainWindow = new MainClickGuiWindow("ClickGui", -1, -1, 1154, 680);
+      // Measured off the reference screenshot, whose rail is 228 content px across 281 reference px:
+      // the panel is 1173.1 x 640.9 content px, so that is the window. The rail width is unchanged, so
+      // the extra 19 px all land in the content column -- which is exactly where the reference puts
+      // them (its cards are 887.8 wide against our 878).
+      this.mainWindow = new MainClickGuiWindow("ClickGui", -1, -1, 1173, 641);
       this.configPanel = (new ConfigSystemPanel("Configs", -1, -1, 872, 380)).initPanel();
       this.glStateSaver = GlStateSaver.create();
       this.activeWindow = null;
@@ -756,6 +604,7 @@ public class ClickGuiScreen extends GuiScreen {
       // freshly constructed screen can never inherit a half-faded value from a previous profile/session, and
       // the window shell stays fully visible if anything draws it before initGui() runs.
       screenFade = 1.0F;
+      GlassRenderer.setOverlayEnvelope(1.0F);
    }
 
    public void setMc(Minecraft mc2) {

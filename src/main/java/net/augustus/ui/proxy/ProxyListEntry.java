@@ -1,7 +1,9 @@
 package net.augustus.ui.proxy;
 
 import net.augustus.Augustus;
+import net.augustus.font.FontManager;
 import net.augustus.render.RenderUtil;
+import net.augustus.ui.modern.font.InterFontUtil;
 import net.augustus.utils.animation.AnimationUtil;
 import net.augustus.utils.animation.EasingType;
 import net.augustus.utils.input.KeyboardInputUtil;
@@ -55,7 +57,6 @@ public class ProxyListEntry implements MC {
          GL11.glScaled((double)(1.0F / f5), (double)(1.0F / f5), 0.0);
          ProxyEntry proxy = Augustus.getInstance().getProxy();
          StringBuilder sb2 = new StringBuilder();
-         short s = 923;
          sb = sb2.append("§7IP: ");
 if (proxy != null) {
 if (proxy.matches(this.proxyEntry)) {
@@ -67,33 +68,40 @@ str = this.isFavorite() ? "§6" : "§f";
 str = this.isFavorite() ? "§6" : "§f";
 }
 
-      fontRendererObj.drawString(sb.append(str).append(this.proxyEntry.getHost()).toString(), (float)n3 + 5.5F, (float)n4 + 3.5F, Color.white.getRGB());
+      // Inter, like every other row of the client menu: the '§' runs are parsed by the SDF atlas itself, so
+      // host/port/ping keep the colours their strings ask for instead of dropping back to the bitmap font.
+      InterFontUtil font = FontManager.body();
+      float lineStep = FontManager.listLineHeight();
+      String lineIp = sb.append(str).append(this.proxyEntry.getHost()).toString();
       StringBuilder sb3 = new StringBuilder();
-      short s2 = 29509;
       StringBuilder sb4 = sb3.append("§7Port: ");
       if (this.isFavorite()) {
          str = "§6";
       } else {
-         short s3 = 23372;
          str = "§f";
       }
 
-      fontRendererObj.drawString(
-         sb4.append(str).append(this.proxyEntry.getPort()).toString(), (float)n3 + 5.5F, (float)n4 + 7.0F + (float)fontRendererObj.FONT_HEIGHT, Color.white.getRGB()
-      );
+      String linePort = sb4.append(str).append(this.proxyEntry.getPort()).toString();
       StringBuilder sb5 = new StringBuilder();
-      short s4 = 1778;
       sb5 = sb5.append("§7Ping: ");
       String str2;
       if (this.isFavorite()) {
          str2 = "§6";
       } else {
-         short s5 = 23372;
          str2 = "§f";
       }
 
-      String str3 = sb5.append(str2).append(this.proxyEntry.getPing()).toString();
-      fontRendererObj.drawString(str3, (float)n3 + ((float)(n5 - fontRendererObj.getStringWidth(str3)) - 5.5F), (float)n4 + 3.5F, Color.white.getRGB());
+      String linePing = sb5.append(str2).append(this.proxyEntry.getPing()).toString();
+      if (font == null) {
+         fontRendererObj.drawString(lineIp, (float)n3 + 5.5F, (float)n4 + 3.5F, Color.white.getRGB());
+         fontRendererObj.drawString(linePort, (float)n3 + 5.5F, (float)n4 + 7.0F + (float)fontRendererObj.FONT_HEIGHT, Color.white.getRGB());
+         fontRendererObj.drawString(linePing, (float)n3 + ((float)(n5 - fontRendererObj.getStringWidth(linePing)) - 5.5F), (float)n4 + 3.5F, Color.white.getRGB());
+      } else {
+         font.drawStringWithShadow(lineIp, (double)((float)n3 + 5.5F), (double)((float)n4 + 3.5F), Color.white.getRGB());
+         font.drawStringWithShadow(linePort, (double)((float)n3 + 5.5F), (double)((float)n4 + 3.5F + lineStep), Color.white.getRGB());
+         font.drawStringWithShadow(linePing, (double)((float)n3 + (float)n5 - font.getStringWidth(linePing) - 5.5F), (double)((float)n4 + 3.5F), Color.white.getRGB());
+      }
+
       GL11.glPopMatrix();
    }
 

@@ -68,7 +68,7 @@ public class ModernSlider {
       float chipReserve = 58.0F;
       float gap = 12.0F;
       float sliderBarW = Math.max(60.0F, trackW - chipReserve - gap);
-      float barH = 4.0F;
+      float barH = 5.0F;
       float barY = trackY + (rowHeight - barH) * 0.5F;
 
       this.trackX = trackX;
@@ -99,18 +99,23 @@ public class ModernSlider {
       this.knobScaleAnim = UiAnimation.smooth(this.knobScaleAnim, dragging ? 1.0F : (barHovered ? 0.55F : 0.0F), 18.0F);
 
       int accent = UiTheme.accentColor();
-      // Sleek 4px recessed rail track. The rail is only 4 px tall, so it deliberately does NOT spend a
-      // blur sample on its own material (a 4 px strip of blurred world is invisible), but its colour is
-      // still the WELL level's tint plus a depth rim — no hand-written opaque fill, so the slider rail
-      // stays in the same colour family as the wells and fields around it.
-      int railTop = UiTheme.glassLevelRgb(UiTheme.LEVEL_WELL, this.hoverAnim, 0.0F, accent) | 0xFF000000;
+      // The rail is GLASS, not a painted strip.
+      //
+      // WHY this changed: it used to force its own alpha to 0xFF (`| 0xFF000000`) on top of the well level's
+      // colour, which made the slider the one opaque control in the whole GUI - the backdrop could not read
+      // through it, so it sat on the card as a flat dark line instead of as a groove cut into the same
+      // material as the wells and fields around it. Two things fix that: the coverage now comes from the
+      // shared well level (so the rail is translucent like every other nested surface), and the rail is
+      // 5 px tall instead of 4 so it is tall enough to earn a real material pane - the same blur sample the
+      // recessed wells take - rather than only a tint.
+      GlassRenderer.drawGlassMaterialPane(trackX, barY, sliderBarW, barH, barH * 0.5F, UiTheme.LEVEL_WELL);
       GlassRenderer.drawRoundedBox(
          trackX,
          barY,
          sliderBarW,
          barH,
          barH * 0.5F,
-         faded(railTop),
+         faded(UiTheme.glassRecessedFillArgb(this.hoverAnim, 0.0F, accent)),
          faded(UiTheme.GLASS_BORDER),
          0.85F
       );
@@ -121,14 +126,17 @@ public class ModernSlider {
             GlassRenderer.drawSoftShadow(trackX, barY, Math.max(barH, fillW), barH, barH * 0.5F, 5.5F, 0.0F, faded(UiTheme.withAlpha(accent, Math.round(72.0F * this.hoverAnim))));
          }
          int fillLeft = UiTheme.lerpArgb(accent, UiTheme.accentSoftGlow(), 0.12F);
-         int fillRight = UiTheme.withAlpha(UiTheme.accentSoftGlow(), 248);
+         // Not fully saturated alpha: the filled part carries the value, but it is a fill OF the glass
+         // rail rather than a stick of opaque paint lying on top of it, so a little of the rail's
+         // backdrop keeps reading through the violet.
+         int fillRight = UiTheme.withAlpha(UiTheme.accentSoftGlow(), 226);
          GlassRenderer.drawRoundedGradientBox(
             trackX,
             barY,
             Math.max(barH, fillW),
             barH,
             barH * 0.5F,
-            faded(UiTheme.withAlpha(fillLeft, 245)),
+            faded(UiTheme.withAlpha(fillLeft, 214)),
             faded(fillRight),
             0,
             0.0F,

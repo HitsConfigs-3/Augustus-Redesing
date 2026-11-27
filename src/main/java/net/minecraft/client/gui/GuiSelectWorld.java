@@ -1,6 +1,7 @@
 package net.minecraft.client.gui;
 
 import java.util.Date;
+import net.augustus.ui.VanillaScreenText;
 import net.minecraft.util.EnumChatFormatting;
 import java.io.IOException;
 import java.text.DateFormat;
@@ -69,7 +70,7 @@ public class GuiSelectWorld extends GuiScreen implements GuiYesNoCallback {
    @Override
    public void drawScreen(int mouseX, int mouseY, float partialTicks) {
       this.availableWorlds.drawScreen(mouseX, mouseY, partialTicks);
-      drawCenteredString(this.fontRendererObj, this.screenTitle, this.width / 2, 20, 16777215);
+      VanillaScreenText.drawCenteredOnScreen(this.width, this.screenTitle, 20, 16777215);
       super.drawScreen(mouseX, mouseY, partialTicks);
       ClientSettings.renderMainMenuAccountInfo();
    }

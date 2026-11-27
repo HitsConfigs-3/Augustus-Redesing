@@ -3,6 +3,8 @@ package net.minecraft.client.gui;
 import com.google.common.base.Predicate;
 import com.google.common.base.Predicates;
 import java.util.function.Consumer;
+import net.augustus.font.FontManager;
+import net.augustus.ui.modern.font.InterFontUtil;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.GlStateManager;
 import net.minecraft.client.renderer.Tessellator;
@@ -37,6 +39,18 @@ public class GuiTextField extends Gui {
 
    public int getMaxStringLength() {
       return this.maxStringLength;
+   }
+
+   /**
+    * The face every text field is drawn with: the client's Inter, so an input no longer drops back to the
+    * 8 px bitmap font while every surrounding control uses Inter (the last stock-looking piece of the
+    * redesigned menus).
+    *
+    * <p>All caret, scroll-offset and text-width maths below goes through this same face - a field cannot
+    * be drawn with Inter and measured with the bitmap font, or the caret drifts away from the glyphs.</p>
+    */
+   private static InterFontUtil textFieldFont() {
+      return FontManager.body();
    }
 
    public void writeText(String str) {
@@ -148,8 +162,14 @@ public class GuiTextField extends Gui {
             n -= 4;
          }
 
-         String str = this.fontRendererInstance.trimStringToWidth(this.text.substring(this.lineScrollOffset), this.getWidth());
-         this.setCursorPosition(this.fontRendererInstance.trimStringToWidth(str, n).length() + this.lineScrollOffset);
+         InterFontUtil font = textFieldFont();
+         if (font == null) {
+            String str = this.fontRendererInstance.trimStringToWidth(this.text.substring(this.lineScrollOffset), this.getWidth());
+            this.setCursorPosition(this.fontRendererInstance.trimStringToWidth(str, n).length() + this.lineScrollOffset);
+         } else {
+            String str = font.trimToWidth(this.text.substring(this.lineScrollOffset), (float)this.getWidth());
+            this.setCursorPosition(font.trimToWidth(str, (float)n).length() + this.lineScrollOffset);
+         }
       }
    }
 
@@ -206,15 +226,29 @@ public class GuiTextField extends Gui {
          }
 
          int width2 = this.getWidth();
-         int n2 = this.fontRendererInstance.trimStringToWidth(this.text.substring(this.lineScrollOffset), width2).length() + this.lineScrollOffset;
-         if (n == this.lineScrollOffset) {
-            this.lineScrollOffset = this.lineScrollOffset - this.fontRendererInstance.trimStringToWidth(this.text, width2, true).length();
-         }
+         InterFontUtil font = textFieldFont();
+         if (font == null) {
+            int n2 = this.fontRendererInstance.trimStringToWidth(this.text.substring(this.lineScrollOffset), width2).length() + this.lineScrollOffset;
+            if (n == this.lineScrollOffset) {
+               this.lineScrollOffset = this.lineScrollOffset - this.fontRendererInstance.trimStringToWidth(this.text, width2, true).length();
+            }
 
-         if (n > n2) {
-            this.lineScrollOffset += n - n2;
-         } else if (n <= this.lineScrollOffset) {
-            this.lineScrollOffset = this.lineScrollOffset - (this.lineScrollOffset - n);
+            if (n > n2) {
+               this.lineScrollOffset += n - n2;
+            } else if (n <= this.lineScrollOffset) {
+               this.lineScrollOffset = this.lineScrollOffset - (this.lineScrollOffset - n);
+            }
+         } else {
+            int n2 = font.trimToWidth(this.text.substring(this.lineScrollOffset), (float)width2).length() + this.lineScrollOffset;
+            if (n == this.lineScrollOffset) {
+               this.lineScrollOffset = this.lineScrollOffset - font.trimToWidthReverse(this.text, (float)width2).length();
+            }
+
+            if (n > n2) {
+               this.lineScrollOffset += n - n2;
+            } else if (n <= this.lineScrollOffset) {
+               this.lineScrollOffset = this.lineScrollOffset - (this.lineScrollOffset - n);
+            }
          }
 
          this.lineScrollOffset = MathHelper.clamp_int(this.lineScrollOffset, 0, length);
@@ -388,53 +422,104 @@ public class GuiTextField extends Gui {
    }
 
    public void drawTextBoxWithShadowOption(boolean flag) {
-      if (this.getVisible()) {
-         if (this.getEnableBackgroundDrawing()) {
-            drawRect(this.xPosition - 1, this.yPosition - 1, this.xPosition + this.width + 1, this.yPosition + this.height + 1, -6250336);
-            drawRect(this.xPosition, this.yPosition, this.xPosition + this.width, this.yPosition + this.height, -16777216);
-         }
+      if (!this.getVisible()) {
+         return;
+      }
+      InterFontUtil font = textFieldFont();
+      if (font == null) {
+         this.drawTextBoxFallback(flag);
+         return;
+      }
+      if (this.getEnableBackgroundDrawing()) {
+         drawRect(this.xPosition - 1, this.yPosition - 1, this.xPosition + this.width + 1, this.yPosition + this.height + 1, -6250336);
+         drawRect(this.xPosition, this.yPosition, this.xPosition + this.width, this.yPosition + this.height, -16777216);
+      }
 
-         int n = this.isEnabled ? this.textColor : this.disabledTextColour;
-         int n2 = this.cursorPosition - this.lineScrollOffset;
-         int n3 = this.selectionEnd - this.lineScrollOffset;
-         String str = this.fontRendererInstance.trimStringToWidth(this.text.substring(this.lineScrollOffset), this.getWidth());
-         boolean flag2 = n2 >= 0 && n2 <= str.length();
-         boolean flag3 = this.isFocused && this.cursorCounter / 6 % 2 == 0 && flag2;
-         int n4 = this.enableBackgroundDrawing ? this.xPosition + 4 : this.xPosition;
-         int n5 = this.enableBackgroundDrawing ? this.yPosition + (this.height - 8) / 2 : this.yPosition;
-         int n6 = n4;
-         if (n3 > str.length()) {
-            n3 = str.length();
-         }
+      int textArgb = this.isEnabled ? this.textColor : this.disabledTextColour;
+      int caretPos = this.cursorPosition - this.lineScrollOffset;
+      int selectionPos = this.selectionEnd - this.lineScrollOffset;
+      int scrollStart = Math.min(this.lineScrollOffset, this.text.length());
+      String visibleText = font.trimToWidth(this.text.substring(scrollStart), (float)this.getWidth());
+      boolean caretInside = caretPos >= 0 && caretPos <= visibleText.length();
+      boolean blinkVisible = this.isFocused && this.cursorCounter / 6 % 2 == 0 && caretInside;
+      float textX = this.enableBackgroundDrawing ? (float)(this.xPosition + 4) : (float)this.xPosition;
+      float fontHeight = font.getFontHeight();
+      float textY = this.enableBackgroundDrawing
+         ? (float)this.yPosition + ((float)this.height - fontHeight) * 0.5F
+         : (float)this.yPosition;
+      float penX = textX;
+      if (selectionPos > visibleText.length()) {
+         selectionPos = visibleText.length();
+      }
 
-         if (str.length() > 0) {
-            String str2 = flag2 ? str.substring(0, n2) : str;
-            n6 = this.fontRendererInstance.drawString(str2, (float)n4, (float)n5, n, flag);
-         }
-
-         boolean flag4 = this.cursorPosition < this.text.length() || this.text.length() >= this.getMaxStringLength();
-         int n7 = n6;
-         if (!flag2) {
-            n7 = n2 > 0 ? n4 + this.width : n4;
-         } else if (flag4) {
-            n7 = n6 - 1;
-            n6--;
-         }
-
-         if (str.length() > 0 && flag2 && n2 < str.length()) {
-            n6 = this.fontRendererInstance.drawString(str.substring(n2), (float)n6, (float)n5, n, flag);
-         }
-
-         if (flag3) {
-            if (flag4) {
-               Gui.drawRect(n7, n5 - 1, n7 + 1, n5 + 1 + this.fontRendererInstance.FONT_HEIGHT, -3092272);
+      if (!visibleText.isEmpty()) {
+         int headEnd = caretInside ? Math.max(0, Math.min(caretPos, visibleText.length())) : visibleText.length();
+         String head = visibleText.substring(0, headEnd);
+         if (!head.isEmpty()) {
+            if (flag) {
+               font.drawStringWithShadow(head, (double)penX, (double)textY, textArgb);
             } else {
-               this.fontRendererInstance.drawString("_", (float)n7, (float)n5, n, flag);
+               font.drawString(head, (double)penX, (double)textY, textArgb);
             }
+            penX += font.getStringWidth(head);
          }
+      }
 
-         if (n3 != n2) {
-            this.drawCursorVertical(n7, n5 - 1, (n4 + this.fontRendererInstance.getStringWidth(str.substring(0, n3))) - 1, n5 + 1 + this.fontRendererInstance.FONT_HEIGHT);
+      boolean caretAtEnd = this.cursorPosition < this.text.length() || this.text.length() >= this.getMaxStringLength();
+      float caretX = penX;
+      if (!caretInside) {
+         caretX = caretPos > 0 ? textX + (float)this.width : textX;
+      } else if (caretAtEnd) {
+         caretX = penX - 1.0F;
+         penX -= 1.0F;
+      }
+
+      if (!visibleText.isEmpty() && caretInside && caretPos < visibleText.length()) {
+         String tail = visibleText.substring(caretPos);
+         if (flag) {
+            font.drawStringWithShadow(tail, (double)penX, (double)textY, textArgb);
+         } else {
+            font.drawString(tail, (double)penX, (double)textY, textArgb);
+         }
+      }
+
+      int caretHeight = (int)Math.ceil((double)fontHeight);
+      if (blinkVisible) {
+         if (caretAtEnd) {
+            drawRect((int)caretX, (int)textY - 1, (int)caretX + 1, (int)textY + 1 + caretHeight, -3092272);
+         } else if (flag) {
+            font.drawStringWithShadow("_", (double)caretX, (double)textY, textArgb);
+         } else {
+            font.drawString("_", (double)caretX, (double)textY, textArgb);
+         }
+      }
+
+      if (selectionPos != caretPos) {
+         String selectionHead = visibleText.substring(0, Math.max(0, Math.min(selectionPos, visibleText.length())));
+         float selectionX = textX + font.getStringWidth(selectionHead);
+         this.drawCursorVertical((int)caretX, (int)textY - 1, (int)selectionX - 1, (int)textY + 1 + caretHeight);
+      }
+   }
+
+   /**
+    * Last-resort painting for the (practically unreachable) window where {@code FontManager.initFonts()}
+    * has not run yet: the stock bitmap path, minus the caret precision the Inter path provides.
+    */
+   private void drawTextBoxFallback(boolean flag) {
+      if (this.getEnableBackgroundDrawing()) {
+         drawRect(this.xPosition - 1, this.yPosition - 1, this.xPosition + this.width + 1, this.yPosition + this.height + 1, -6250336);
+         drawRect(this.xPosition, this.yPosition, this.xPosition + this.width, this.yPosition + this.height, -16777216);
+      }
+
+      int n = this.isEnabled ? this.textColor : this.disabledTextColour;
+      int n2 = this.enableBackgroundDrawing ? this.xPosition + 4 : this.xPosition;
+      int n3 = this.enableBackgroundDrawing ? this.yPosition + (this.height - 8) / 2 : this.yPosition;
+      String str = this.fontRendererInstance.trimStringToWidth(this.text.substring(Math.min(this.lineScrollOffset, this.text.length())), this.getWidth());
+      if (!str.isEmpty()) {
+         if (flag) {
+            this.fontRendererInstance.drawStringWithShadow(str, (float)n2, (float)n3, n);
+         } else {
+            this.fontRendererInstance.drawString(str, (float)n2, (float)n3, n);
          }
       }
    }

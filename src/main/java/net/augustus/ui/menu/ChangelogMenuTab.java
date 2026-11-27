@@ -3,6 +3,7 @@ package net.augustus.ui.menu;
 import net.augustus.Augustus;
 import net.augustus.ClientManagers;
 import net.augustus.changelog.ChangelogEntry;
+import net.augustus.font.FontManager;
 import net.augustus.render.RenderUtil;
 import net.augustus.ui.AugustusGuiScreen;
 import net.augustus.ui.widgets.ScrollBar;
@@ -59,7 +60,7 @@ public class ChangelogMenuTab extends ClientMenuTab {
 
    public ChangelogMenuTab() {
        super("Changelog");
-      this.scrollBar = new ScrollBar(Minecraft.getMinecraft().fontRendererObj.FONT_HEIGHT + 1);
+      this.scrollBar = new ScrollBar(Math.round(FontManager.bodyLineHeight()));
       this.wrappedSections = new ArrayList();
    }
 

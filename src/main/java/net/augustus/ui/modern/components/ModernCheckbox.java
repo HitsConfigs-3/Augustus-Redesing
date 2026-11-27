@@ -64,7 +64,9 @@ public class ModernCheckbox {
          this.checkAnim * 0.85F
       );
 
-      float radius = Math.max(4.5F, size * 0.28F);
+      // Softer than a plain rounded square: at 42 % of its own side a checkbox reads as a small squircle,
+// which is the same corner family as the fields and trays it is aligned with.
+      float radius = Math.max(5.5F, size * 0.42F);
       if (this.checkAnim > 0.05F) {
          GlassRenderer.drawSoftShadow(x, y, size, size, radius, 5.0F, 1.0F, faded(UiTheme.withAlpha(accent, Math.round(52.0F * this.checkAnim))));
       }

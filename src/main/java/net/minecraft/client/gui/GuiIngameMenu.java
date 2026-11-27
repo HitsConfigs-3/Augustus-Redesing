@@ -8,7 +8,9 @@ import net.augustus.Augustus;
 import net.augustus.ClientManagers;
 import net.augustus.ui.menu.AbstractMainMenuScreen;
 import net.augustus.ui.menu.ClientTabContainerScreen;
+import net.augustus.ui.modern.render.UiAnimation;
 import net.augustus.ui.multiplayer.ServerListHost;
+import net.augustus.ui.VanillaScreenText;
 import net.minecraft.client.gui.achievement.GuiAchievements;
 import net.minecraft.client.gui.achievement.GuiStats;
 import net.minecraft.client.multiplayer.GuiConnecting;
@@ -23,8 +25,11 @@ public class GuiIngameMenu extends GuiScreen implements ServerListHost {
 
    @Override
    public void drawScreen(int mouseX, int mouseY, float partialTicks) {
+      // Frame clock for the glass buttons (see GuiButton.drawGlassButton): one beginFrame per frame,
+      // before any button draws, so hover/press smoothing runs at real time and the blur capture advances.
+      UiAnimation.beginFrame();
       this.drawDefaultBackground();
-      drawCenteredString(this.fontRendererObj, I18n.format("menu.game", new Object[0]), this.width / 2, 40, 16777215);
+      VanillaScreenText.drawCenteredOnScreen(this.width, I18n.format("menu.game", new Object[0]), 40, 16777215);
       super.drawScreen(mouseX, mouseY, partialTicks);
    }
 

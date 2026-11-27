@@ -4,10 +4,12 @@ import java.awt.Color;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import net.augustus.ClientManagers;
 import net.augustus.clickgui.ClickGuiScreen;
 import net.augustus.font.CustomFontUtil;
 import net.augustus.font.FontManager;
+import net.augustus.ui.modern.font.InterFontUtil;
 import net.augustus.modules.Module;
 import net.augustus.modules.misc.Dummy;
 import net.augustus.render.RenderUtil;
@@ -226,18 +228,21 @@ public class DynamicSettingList extends Setting {
 
    @Override
    public void render(int n, int n2, int n3, int n4, int n5, int n6, CustomFontUtil customFontUtil, boolean flag) {
-      customFontUtil = FontManager.interBold;
-      super.render(n, n2, n3, n4, n5, n6, customFontUtil, flag);
-      String str = this.getFormattedDisplayName();
+      // Same 12px upper-case divider type as the plain section titles and the collapsible group
+      // headers (ModernSettingsPanel.drawSectionTitle / drawCollapsibleSectionHeader): this is another
+      // divider label, so it must not be the one heading rendered at three times their size.
+      InterFontUtil headerFace = FontManager.interSection;
+      super.render(n, n2, n3, n4, n5, n6, FontManager.interMedium, flag);
+      String str = ModernSettingsPanel.formatUiLabel(this.getFormattedDisplayName()).toUpperCase(Locale.ROOT);
       boolean flag2 = this.labelWidth == -1;
       if (this.consumeLabelDirty(flag2)) {
-         this.labelWidth = (int)customFontUtil.getStringWidth(str);
+         this.labelWidth = (int)headerFace.getStringWidthSpaced(str, 1.1F);
       }
 
       float cardW = ModernSettingsPanel.resolveCardWidth(n3, n5);
-      int headerH = 30;
+      int headerH = 24;
       if (flag) {
-         customFontUtil.drawVerticallyCenteredString(str, (double)(n3 + 2), (double)n4, (double)headerH, faded(UiTheme.TEXT_PRIMARY));
+         headerFace.drawStringSpaced(str, n3 + 2, n4 + (headerH - headerFace.getFontHeight()) * 0.5F, 1.1F, faded(UiTheme.mutedTextColor()));
          float addBtnW = 68.0F;
          float addX = (float)n3 + cardW - addBtnW;
          float addY = (float)n4 + (float)(headerH - 22) * 0.5F;
@@ -272,7 +277,7 @@ public class DynamicSettingList extends Setting {
             int childY = n4 + this.renderedHeight;
             int childX = n3 + 28;
             boolean childVisible = flag && childY + setting.getHeight() > -20 && childY < n6 + 20;
-            setting.render(n, n2, childX, childY, n5, n6, customFontUtil, childVisible);
+            setting.render(n, n2, childX, childY, n5, n6, FontManager.interMedium, childVisible);
             if (childVisible) {
                ModernButton remBtn = this.removeButtons.get(i);
                float remY = (float)childY + (float)(Math.min(42, setting.getHeight()) - 22) * 0.5F;

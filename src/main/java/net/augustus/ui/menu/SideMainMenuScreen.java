@@ -74,7 +74,7 @@ public final class SideMainMenuScreen extends AbstractMainMenuScreen {
       BlurShadowManager.enableNormalPassOnce();
       BlurShadowManager.submitRenderTask(false, shaderRenderPass -> this.renderSidebarBackdrop(shaderRenderPass));
       super.drawContent(n, n2, f);
-      this.drawCenteredScaledString(Augustus.getInstance().getName(), 26.0F + (float)this.getCenterX() / 3.0F, (float)this.getCenterY() / 3.0F - (float)this.mc.fontRendererObj.FONT_HEIGHT / 2.0F, 3.0F);
+      this.drawBrandTitle(Augustus.getInstance().getName(), 26.0F + (float)this.getCenterX() / 3.0F, (float)this.getCenterY() / 3.0F, 3.0F);
       GL11.glPushMatrix();
       GL11.glTranslated(78.0, (double)(this.getCenterY() + this.mc.fontRendererObj.FONT_HEIGHT * 2), 0.0);
       GlStateManager.color(1.0F, 1.0F, 1.0F, 1.0F);

@@ -242,7 +242,8 @@ public class ModernModeSelector {
             y + 2.0F,
             this.sliderW - 4.0F,
             height - 4.0F,
-            5.5F,
+            // Tray radius minus the 2px inset, so the moving pill's arcs stay concentric with the tray's.
+            Math.max(4.0F, UiTheme.CONTROL_RADIUS - 2.0F),
             faded(fillTop),
             faded(fillBot),
             faded(UiTheme.withAlpha(UiTheme.accentSoftGlow(), 220)),
@@ -421,7 +422,7 @@ public class ModernModeSelector {
                curY,
                chipW,
                chipH,
-               6.0F,
+               UiTheme.CONTROL_RADIUS,
                faded(fillTop),
                faded(fillBot),
                faded(border),

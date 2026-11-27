@@ -1,5 +1,6 @@
 package net.minecraft.client.gui;
 
+import net.augustus.ui.VanillaScreenText;
 import net.minecraft.client.network.LanServerDetector;
 import com.google.common.base.Splitter;
 import com.google.common.collect.Lists;
@@ -246,7 +247,7 @@ public class GuiMultiplayer extends GuiScreen implements ServerListHost, GuiYesN
       this.hoveringText = null;
       this.drawDefaultBackground();
       this.serverListSelector.drawScreen(mouseX, mouseY, partialTicks);
-      drawCenteredString(this.fontRendererObj, I18n.format("multiplayer.title", new Object[0]), this.width / 2, 20, 16777215);
+      VanillaScreenText.drawCenteredOnScreen(this.width, I18n.format("multiplayer.title", new Object[0]), 20, 16777215);
       super.drawScreen(mouseX, mouseY, partialTicks);
       ClientSettings.renderMainMenuAccountInfo();
       this.renderHoveringText(this, mouseX, mouseY);

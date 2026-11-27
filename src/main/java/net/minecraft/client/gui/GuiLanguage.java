@@ -3,6 +3,7 @@ package net.minecraft.client.gui;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import java.util.Map;
+import net.augustus.ui.VanillaScreenText;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.resources.Language;
 import java.io.IOException;
@@ -21,8 +22,8 @@ public class GuiLanguage extends GuiScreen {
    @Override
    public void drawScreen(int mouseX, int mouseY, float partialTicks) {
       this.list.drawScreen(mouseX, mouseY, partialTicks);
-      drawCenteredString(this.fontRendererObj, I18n.format("options.language", new Object[0]), this.width / 2, 16, 16777215);
-      drawCenteredString(this.fontRendererObj, "(" + I18n.format("options.languageWarning", new Object[0]) + ")", this.width / 2, this.height - 56, 8421504);
+      VanillaScreenText.drawCenteredOnScreen(this.width, I18n.format("options.language", new Object[0]), 16, 16777215);
+      VanillaScreenText.drawCenteredOnScreen(this.width, "(" + I18n.format("options.languageWarning", new Object[0]) + ")", this.height - 56, 8421504);
       super.drawScreen(mouseX, mouseY, partialTicks);
    }
 

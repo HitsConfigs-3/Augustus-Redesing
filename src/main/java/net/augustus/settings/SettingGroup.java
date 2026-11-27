@@ -296,8 +296,10 @@ public class SettingGroup extends Setting {
    @Override
    public void render(int n, int n2, int n3, int n4, int n5, int n6, CustomFontUtil customFontUtil, boolean flag) {
       boolean nested = this.getParentGroup() != null;
-      customFontUtil = nested ? FontManager.interSemiBold : FontManager.interBold;
-      super.render(n, n2, n3, n4, n5, n6, customFontUtil, flag);
+      // The group's own label is a 12px divider label now (see ModernSettingsPanel.drawCollapsibleSectionHeader),
+      // so the cached width it feeds to the description tooltip has to be measured with the same face.
+      customFontUtil = FontManager.interSection;
+      super.render(n, n2, n3, n4, n5, n6, FontManager.interMedium, flag);
       String displayName2 = this.getFormattedDisplayName();
       boolean flag2 = this.labelWidth == -1.0F;
       if (this.consumeLabelDirty(flag2)) {
@@ -384,7 +386,7 @@ public class SettingGroup extends Setting {
                   }
                   int childY = n4 + headerH + measuredBodyH;
                   boolean childVisible = flag && childY + setting.getHeight() > -20 && childY < n6 + 20;
-                  setting.render(n, n2, childX, childY, n5, n6, customFontUtil, childVisible);
+                  setting.render(n, n2, childX, childY, n5, n6, FontManager.interMedium, childVisible);
                   measuredBodyH += setting.getHeight();
                   int cw = setting.getContentWidth() + (nested ? 14 : 0);
                   if (this.maxChildWidth < cw) {

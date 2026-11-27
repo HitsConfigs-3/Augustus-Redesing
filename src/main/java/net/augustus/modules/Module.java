@@ -6,6 +6,7 @@ import java.util.ArrayList;
 import java.util.Locale;
 import java.util.function.Consumer;
 import net.augustus.modules.misc.ClientSettings;
+import net.augustus.clickgui.ClickGuiScreen;
 import net.augustus.modules.misc.RotationRecorder;
 import net.augustus.modules.misc.RotationRenderer;
 import net.augustus.modules.render.ClickGui;
@@ -368,6 +369,18 @@ public abstract class Module extends AbstractFeature implements MC, Comparable {
       return this.name;
    }
 
+   /**
+    * Title this module shows in ClickGUI chrome (settings-page breadcrumb and hero card).
+    *
+    * <p>WHY it is not just {@link #getModuleName()}: the module name is the key its settings are persisted
+    * under in {@code visuals.json}, so it can never be renamed, while a few modules have a UI label that
+    * reads better than the internal identifier (e.g. {@code CustomClientColor} -> "Client Color"). Modules
+    * whose internal name is already user-facing inherit the default and need no override.</p>
+    */
+   public String getGuiTitle() {
+      return this.name;
+   }
+
    public void setName(String str) {
       this.name = str;
       this.updateDisplayName();
@@ -632,6 +645,21 @@ public abstract class Module extends AbstractFeature implements MC, Comparable {
       return this.settings;
    }
 
+   /**
+    * Applies the ClickGUI open/close envelope to one ARGB at the point of draw.
+    *
+    * <p>WHY per colour and not on GL state: neither subsystem this page paints with can carry a global
+    * {@code glColor} - {@code GlassRenderer}'s primitive pass resets the colour before every quad and the
+    * font renderer resets it after every string - so a colour that skips this call stays at FULL opacity
+    * while the rest of the overlay fades. That is exactly what used to be visible for the last frames of the
+    * close transition: the behaviour card and the bind pill hanging in the air over a world with no window.
+    *
+    * <p>Call it exactly once per token, at the draw; never hand an already-faded ARGB back in.
+    */
+   private static int faded(int argb) {
+      return ClickGuiScreen.getScreenFade() >= 0.999F ? argb : ClickGuiScreen.fadeArgb(argb);
+   }
+
    public int renderKeybindPill(int rightEdgeX, int y, int mouseX, int mouseY) {
       CustomFontUtil font = FontManager.interMedium;
       String keyStr = this.bindingKey ? "Press key..." : KeyboardInputUtil.getKeyDisplayName(this.getKeyCode());
@@ -648,14 +676,14 @@ public abstract class Module extends AbstractFeature implements MC, Comparable {
       float prsT = net.augustus.ui.modern.render.UiAnimation.smoothState("mod_bind_prs", keyHovered && net.augustus.ui.modern.render.UiAnimation.isPrimaryMouseDown() ? 1.0F : 0.0F, 30.0F);
       int accent = UiTheme.accentColor();
       if (this.bindingKey) {
-         GlassRenderer.drawSoftShadow((float)this.keyBindX, (float)this.keyBindY, (float)pillW, (float)pillH, UiTheme.CONTROL_RADIUS, 7.0F, 1.0F, UiTheme.withAlpha(0xF59E0B, 82));
-         GlassRenderer.drawRoundedBox((float)this.keyBindX, (float)this.keyBindY, (float)pillW, (float)pillH, UiTheme.CONTROL_RADIUS, UiTheme.withAlpha(0xF59E0B, 60), 0xFFFBBF24, UiTheme.THICK_BORDER_THICKNESS);
+         GlassRenderer.drawSoftShadow((float)this.keyBindX, (float)this.keyBindY, (float)pillW, (float)pillH, UiTheme.CONTROL_RADIUS, 7.0F, 1.0F, faded(UiTheme.withAlpha(0xF59E0B, 82)));
+         GlassRenderer.drawRoundedBox((float)this.keyBindX, (float)this.keyBindY, (float)pillW, (float)pillH, UiTheme.CONTROL_RADIUS, faded(UiTheme.withAlpha(0xF59E0B, 60)), faded(0xFFFBBF24), UiTheme.THICK_BORDER_THICKNESS);
       } else {
-         GlassRenderer.drawRecessedWell((float)this.keyBindX, (float)this.keyBindY, (float)pillW, (float)pillH, UiTheme.CONTROL_RADIUS, hovT, prsT * 0.4F, (float)mouseX, (float)mouseY, accent, UiTheme.BORDER_THICKNESS);
+         GlassRenderer.drawRecessedWell((float)this.keyBindX, (float)this.keyBindY, (float)pillW, (float)pillH, UiTheme.CONTROL_RADIUS, hovT, prsT * 0.4F, (float)mouseX, (float)mouseY, faded(accent), UiTheme.BORDER_THICKNESS);
       }
       int fg = this.bindingKey ? 0xFFFDE68A : (keyHovered ? UiTheme.TEXT_PRIMARY : UiTheme.secondaryTextColor());
-      LucideIcon.KEYBOARD.drawCentered((float)(this.keyBindX + 13), (float)this.keyBindY + (float)pillH * 0.5F + prsT * 0.35F, 12.5F, fg);
-      font.drawVerticallyCenteredString(label, (double)(this.keyBindX + 24), (double)this.keyBindY + prsT * 0.35F, (double)pillH, fg);
+      LucideIcon.KEYBOARD.drawCentered((float)(this.keyBindX + 13), (float)this.keyBindY + (float)pillH * 0.5F + prsT * 0.35F, 12.5F, faded(fg));
+      font.drawVerticallyCenteredString(label, (double)(this.keyBindX + 24), (double)this.keyBindY + prsT * 0.35F, (double)pillH, faded(fg));
       return pillW;
    }
 
@@ -673,15 +701,12 @@ public abstract class Module extends AbstractFeature implements MC, Comparable {
       String[] labels = new String[]{"Load Config", "Show ArrayList", "Toggle Sound", "Key Hold"};
       boolean configEditable = Augustus.getInstance().isConfigEditingEnabled();
       int accent = UiTheme.accentColor();
-
-      if (drawVisuals) {
-         boolean cardHover = RenderUtil.isHovered((float)x, (float)y, cardW, (float)cardH, mouseX, mouseY);
-         ModernSettingsPanel.drawGlassCardSurface("beh_" + this.getName(), (float)x, (float)y, cardW, (float)cardH, ModernSettingsPanel.CARD_RADIUS, cardHover, false, true, mouseX, mouseY);
-      }
-
       CustomFontUtil font = FontManager.interMedium;
+
       if (!twoByTwo) {
-         // Left: "Load Config" styled cleanly as a secondary toggle button with subtle border (no orphan switch!)
+         // "Load Config" is an ACTION, not one of the module's behaviour switches: it stands on its own
+         // as a secondary button and the glass card wraps only the three toggles. It keeps the exact
+         // x/y/size it always had - only the card that used to enclose it moved to its right.
          float loadPadX = 12.0F;
          float btnX = (float)x + 8.0F;
          float btnH = 24.0F;
@@ -692,7 +717,16 @@ public abstract class Module extends AbstractFeature implements MC, Comparable {
          this.behaviorCellBounds[0][2] = btnW;
          this.behaviorCellBounds[0][3] = btnH;
 
+         // The toggles' own card: same height and corner family as before, starting just after the
+         // button instead of at the panel's leading edge.
+         float groupLeft = btnX + btnW + 10.0F;
+         float groupW = Math.max(240.0F, (float)x + cardW - groupLeft);
+         float colW = Math.max(70.0F, groupW / 3.0F);
+
          if (drawVisuals) {
+            boolean cardHover = RenderUtil.isHovered(groupLeft, (float)y, groupW, (float)cardH, mouseX, mouseY);
+            ModernSettingsPanel.drawGlassCardSurface("beh_" + this.getName(), groupLeft, (float)y, groupW, (float)cardH, ModernSettingsPanel.CARD_RADIUS, cardHover, false, true, mouseX, mouseY);
+
             boolean locked = !configEditable;
             boolean btnHovered = !locked && RenderUtil.isHovered(btnX, btnY, btnW, btnH, mouseX, mouseY);
             boolean btnPressed = btnHovered && net.augustus.ui.modern.render.UiAnimation.isPrimaryMouseDown();
@@ -716,9 +750,9 @@ public abstract class Module extends AbstractFeature implements MC, Comparable {
                btnW,
                btnH,
                UiTheme.CONTROL_RADIUS,
-               topF,
-               botF,
-               btnBorder,
+               faded(topF),
+               faded(botF),
+               faded(btnBorder),
                UiTheme.BORDER_THICKNESS,
                UiTheme.glassTopHighlightAlpha(Math.max(hovT, actT * 0.5F)),
                hovT,
@@ -726,37 +760,31 @@ public abstract class Module extends AbstractFeature implements MC, Comparable {
                !locked,
                (float)mouseX,
                (float)mouseY,
-               accent
+               faded(accent)
             );
 
             float dotCx = btnX + 11.0F;
             float dotCy = btnY + btnH * 0.5F + prsT * 0.35F;
             if (locked) {
-               LucideIcon.LOCK.drawCentered(dotCx, dotCy, 10.0F, UiTheme.disabledTextColor());
+               LucideIcon.LOCK.drawCentered(dotCx, dotCy, 10.0F, faded(UiTheme.disabledTextColor()));
             } else {
                int dotCol = UiTheme.lerpArgb(UiTheme.mutedTextColor(), UiTheme.lerpArgb(accent, 0xFFFFFFFF, 0.30F), actT);
-               GlassRenderer.drawCircle(dotCx, dotCy, 2.7F, dotCol);
+               GlassRenderer.drawCircle(dotCx, dotCy, 2.7F, faded(dotCol));
             }
             int txtCol = locked
                ? UiTheme.disabledTextColor()
                : (states[0] || btnHovered ? UiTheme.primaryTextColor() : UiTheme.secondaryTextColor());
-            font.drawVerticallyCenteredString(labels[0], (double)(btnX + 19.0F), (double)(btnY + prsT * 0.35F), (double)btnH, txtCol);
-         }
+            font.drawVerticallyCenteredString(labels[0], (double)(btnX + 19.0F), (double)(btnY + prsT * 0.35F), (double)btnH, faded(txtCol));
 
-         // Right: 3 evenly distributed toggle options separated cleanly (no orphan switch on far right)
-         float togglesLeft = btnX + btnW + 12.0F;
-         float togglesRight = (float)x + cardW - 4.0F;
-         float colW = Math.max(90.0F, (togglesRight - togglesLeft) / 3.0F);
-         if (drawVisuals) {
-            GlassRenderer.drawSeparator(togglesLeft - 6.0F, (float)y + 9.0F, togglesLeft - 6.0F, (float)y + (float)cardH - 9.0F, 1.0F, UiTheme.GLASS_DIVIDER);
+            // Cell dividers inside the card only: the card's own edge separates it from the button.
             for (int c = 1; c < 3; c++) {
-               float sx = togglesLeft + colW * (float)c;
-               GlassRenderer.drawSeparator(sx, (float)y + 9.0F, sx, (float)y + (float)cardH - 9.0F, 1.0F, UiTheme.GLASS_DIVIDER);
+               float sx = groupLeft + colW * (float)c;
+               GlassRenderer.drawSeparator(sx, (float)y + 9.0F, sx, (float)y + (float)cardH - 9.0F, 1.0F, faded(UiTheme.GLASS_DIVIDER));
             }
          }
 
          for (int i = 1; i <= 3; i++) {
-            float cx = togglesLeft + colW * (float)(i - 1);
+            float cx = groupLeft + colW * (float)(i - 1);
             float cy = (float)y;
             this.behaviorCellBounds[i][0] = cx;
             this.behaviorCellBounds[i][1] = cy;
@@ -767,7 +795,7 @@ public abstract class Module extends AbstractFeature implements MC, Comparable {
                boolean cellHovered = RenderUtil.isHovered(cx, cy, colW, (float)cardH, mouseX, mouseY);
                float cHovT = net.augustus.ui.modern.render.UiAnimation.smoothState("beh_cell_" + i, cellHovered ? 1.0F : 0.0F, 16.0F);
                if (cHovT > 0.03F) {
-                  GlassRenderer.drawRoundedRect(cx + 4.0F, cy + 4.0F, colW - 8.0F, (float)cardH - 8.0F, UiTheme.CONTROL_RADIUS, UiTheme.withAlpha(accent, Math.round(24.0F * cHovT)));
+                  GlassRenderer.drawRoundedRect(cx + 4.0F, cy + 4.0F, colW - 8.0F, (float)cardH - 8.0F, UiTheme.CONTROL_RADIUS, faded(UiTheme.withAlpha(accent, Math.round(24.0F * cHovT))));
                }
                float switchW = 34.0F;
                float switchH = 18.0F;
@@ -776,18 +804,22 @@ public abstract class Module extends AbstractFeature implements MC, Comparable {
                float textMaxW = Math.max(40.0F, switchX - (cx + 14.0F) - 8.0F);
                String safeLabel = ModernSettingsPanel.trimToWidth(font, labels[i], textMaxW);
                int fg = cellHovered || states[i] ? UiTheme.primaryTextColor() : UiTheme.secondaryTextColor();
-               font.drawVerticallyCenteredString(safeLabel, (double)(cx + 14.0F), (double)cy, (double)cardH, fg);
+               font.drawVerticallyCenteredString(safeLabel, (double)(cx + 14.0F), (double)cy, (double)cardH, faded(fg));
                this.behaviorSwitches[i].setEnabled(true);
                this.behaviorSwitches[i].render(switchX, switchY, switchW, switchH, states[i], mouseX, mouseY);
             }
          }
       } else {
+         if (drawVisuals) {
+            boolean cardHover = RenderUtil.isHovered((float)x, (float)y, cardW, (float)cardH, mouseX, mouseY);
+            ModernSettingsPanel.drawGlassCardSurface("beh_" + this.getName(), (float)x, (float)y, cardW, (float)cardH, ModernSettingsPanel.CARD_RADIUS, cardHover, false, true, mouseX, mouseY);
+         }
          int cols = 2;
          float cellW = cardW / 2.0F;
          float cellH = (float)cardH / 2.0F;
          if (drawVisuals) {
-            GlassRenderer.drawSeparator((float)x + cellW, (float)y + 8.0F, (float)x + cellW, (float)y + (float)cardH - 8.0F, 1.0F, UiTheme.GLASS_DIVIDER);
-            GlassRenderer.drawSeparator((float)x + 12.0F, (float)y + cellH, (float)x + cardW - 12.0F, (float)y + cellH, 1.0F, UiTheme.GLASS_DIVIDER);
+            GlassRenderer.drawSeparator((float)x + cellW, (float)y + 8.0F, (float)x + cellW, (float)y + (float)cardH - 8.0F, 1.0F, faded(UiTheme.GLASS_DIVIDER));
+            GlassRenderer.drawSeparator((float)x + 12.0F, (float)y + cellH, (float)x + cardW - 12.0F, (float)y + cellH, 1.0F, faded(UiTheme.GLASS_DIVIDER));
          }
 
          for (int i = 0; i < 4; i++) {
@@ -808,8 +840,8 @@ public abstract class Module extends AbstractFeature implements MC, Comparable {
                   boolean locked = !configEditable;
                   int fill = locked ? UiTheme.glassDisabledFillArgb() : (states[0] ? UiTheme.withAlpha(accent, 90) : UiTheme.glassControlFillArgb(0.0F, 0.0F, accent));
                   int border = locked ? UiTheme.GLASS_BORDER : (states[0] ? UiTheme.withAlpha(UiTheme.accentSoftGlow(), 165) : 0x1AFFFFFF);
-                  GlassRenderer.drawRoundedBox(bx, by, btnW, btnH, UiTheme.CONTROL_RADIUS, fill, border, 1.0F);
-                  font.drawCenteredStringInBox(labels[0], (double)bx, (double)by, (double)btnW, (double)btnH, locked ? UiTheme.disabledTextColor() : UiTheme.TEXT_PRIMARY);
+                  GlassRenderer.drawRoundedBox(bx, by, btnW, btnH, UiTheme.CONTROL_RADIUS, faded(fill), faded(border), 1.0F);
+                  font.drawCenteredStringInBox(labels[0], (double)bx, (double)by, (double)btnW, (double)btnH, faded(locked ? UiTheme.disabledTextColor() : UiTheme.TEXT_PRIMARY));
                }
             } else {
                this.behaviorCellBounds[i][0] = cx;
@@ -825,7 +857,7 @@ public abstract class Module extends AbstractFeature implements MC, Comparable {
                   float textMaxW = Math.max(40.0F, switchX - (cx + 14.0F) - 6.0F);
                   String safeLabel = ModernSettingsPanel.trimToWidth(font, labels[i], textMaxW);
                   int fg = cellHovered || states[i] ? UiTheme.primaryTextColor() : UiTheme.secondaryTextColor();
-                  font.drawVerticallyCenteredString(safeLabel, (double)(cx + 14.0F), (double)cy, (double)cellH, fg);
+                  font.drawVerticallyCenteredString(safeLabel, (double)(cx + 14.0F), (double)cy, (double)cellH, faded(fg));
                   this.behaviorSwitches[i].setEnabled(true);
                   this.behaviorSwitches[i].render(switchX, switchY, switchW, switchH, states[i], mouseX, mouseY);
                }

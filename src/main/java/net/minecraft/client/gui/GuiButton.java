@@ -1,18 +1,20 @@
 package net.minecraft.client.gui;
 
 import java.awt.Color;
+import net.augustus.font.FontManager;
 import net.augustus.modules.Module;
 import net.augustus.modules.misc.ClientSettings;
 import net.augustus.ClientManagers;
 import net.augustus.render.RenderUtil;
-import net.augustus.utils.render.ColorUtil;
-import net.augustus.Augustus;
-import net.augustus.utils.animation.EasingType;
-import net.augustus.utils.animation.AnimationUtil;
+import net.augustus.ui.modern.font.InterFontUtil;
+import net.augustus.ui.modern.render.GlassRenderer;
+import net.augustus.ui.modern.render.UiAnimation;
+import net.augustus.ui.modern.render.UiTheme;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.audio.SoundHandler;
 import net.minecraft.client.renderer.GlStateManager;
 import net.minecraft.util.ResourceLocation;
+import org.lwjgl.input.Mouse;
 import org.lwjgl.opengl.GL11;
 
 public class GuiButton extends Gui {
@@ -27,18 +29,9 @@ public class GuiButton extends Gui {
    public boolean visible;
    public boolean hovered;
    public boolean forceVanillaStyle;
-   private final AnimationUtil hoverScaleAnimation = new AnimationUtil(0.0F, 0.0F, 0.0F, 0.0F);
-   private final AnimationUtil hoverColorAnimation = new AnimationUtil(0.0F, 0.0F, 0.0F, 0.0F);
-
-   private int interpolateHoverColor(int n, double d) {
-      int n2 = this.darkenColor(n, d);
-      float f = 1.0F - (float)this.hoverColorAnimation.getEasedProgress();
-      int n3 = ColorUtil.interpolateChannel((double)f, ColorUtil.getRed(n), ColorUtil.getRed(n2));
-      int n4 = ColorUtil.interpolateChannel((double)f, ColorUtil.getGreen(n), ColorUtil.getGreen(n2));
-      int n5 = ColorUtil.interpolateChannel((double)f, ColorUtil.getBlue(n), ColorUtil.getBlue(n2));
-      int n6 = ColorUtil.interpolateChannel((double)f, ColorUtil.getAlpha(n), ColorUtil.getAlpha(n2));
-      return new Color(n3, n4, n5, n6).getRGB();
-   }
+   /** Owned hover/press envelopes for the glass rendering (per button: no shared-key collisions). */
+   private float glassHoverAnim = 0.0F;
+   private float glassPressAnim = 0.0F;
 
    public int darkenColor(int n, double d) {
       return RenderUtil.adjustColorBrightness(n, d);
@@ -51,60 +44,11 @@ public class GuiButton extends Gui {
    public void drawButton(Minecraft mc, int n, int n2) {
       if (this.visible) {
          if (!((Module)ClientManagers.moduleManager.invisMode).isToggled() && !this.forceVanillaStyle) {
-            FontRenderer fontRendererObj = mc.fontRendererObj;
-            mc.getTextureManager().bindTexture(buttonTextures);
-            GlStateManager.color(1.0F, 1.0F, 1.0F, 1.0F);
-            boolean hovered2 = this.hovered;
+            // Pointer state for this frame. The hover/press ENVELOPES are smooth floats owned by the
+            // glass renderer below, so there is no 100 ms keyframe pop to start here any more.
             this.hovered = n >= this.xPosition && n2 >= this.yPosition && n < this.xPosition + this.width && n2 < this.yPosition + this.height;
-            if (hovered2 != this.hovered) {
-               this.hoverScaleAnimation.start(100, EasingType.easeInSine, this.hovered ? 1 : 0, false);
-               this.hoverColorAnimation.start(100, EasingType.easeInSine, this.hovered ? 1 : 0, false);
-            }
 
-            float f = (float)this.width / 2.0F;
-            float f2 = (float)this.height / 2.0F;
-            float f3 = (float)this.xPosition + f;
-            float f4 = (float)this.yPosition + f2;
-            GL11.glPushMatrix();
-            float f5 = (float)(1.0 - this.hoverScaleAnimation.getEasedProgress() * 0.019999999552965164);
-            GL11.glScaled((double)f5, (double)f5, 1.0);
-            f3 /= f5;
-            f4 /= f5;
-            GlStateManager.enableBlend();
-            GlStateManager.tryBlendFuncSeparate(770, 771, 1, 0);
-            GlStateManager.blendFunc(770, 771);
-            if (ClientManagers.moduleManager.clientSettings.roundedButtons.getValue()) {
-               RenderUtil.drawRoundedRect(
-                  f3 - f,
-                  f4 - f2,
-                  f3 + f,
-                  f4 + f2,
-                  (float)ClientManagers.moduleManager.clientSettings.roundFactor.getValue(),
-                  1,
-                  new Color(this.interpolateHoverColor(Augustus.getInstance().getClientColor(), -0.15))
-               );
-               GlStateManager.enableBlend();
-            } else {
-               RenderUtil.drawRect(
-                  (double)(f3 - f),
-                  (double)(f4 - f2),
-                  (double)(f3 + f),
-                  (double)(f4 + f2),
-                  this.interpolateHoverColor(Augustus.getInstance().getClientColor(), -0.15)
-               );
-            }
-
-            GlStateManager.enableBlend();
-            GL11.glPopMatrix();
-            this.mouseDragged(mc, n, n2);
-            int n3 = 14737632;
-            if (!this.enabled) {
-               n3 = 10526880;
-            } else if (this.hovered) {
-               n3 = 16777120;
-            }
-
-            drawCenteredString(fontRendererObj, this.displayString, this.xPosition + this.width / 2, this.yPosition + (this.height - 8) / 2, n3);
+            this.drawGlassButton(mc, n, n2);
          } else {
             FontRenderer fontRendererObj2 = mc.fontRendererObj;
             mc.getTextureManager().bindTexture(buttonTextures);
@@ -134,6 +78,120 @@ public class GuiButton extends Gui {
    }
 
    public void drawButtonForegroundLayer(int n, int n2) {
+   }
+
+   /**
+    * Draws this button as a ClickGUI glass control instead of the flat client-coloured plate.
+    *
+    * <p>What it draws, and why every piece comes from the ClickGUI's own pipeline:</p>
+    * <ul>
+    *   <li>{@code GlassRenderer.drawInteractiveSurface} paints the shared glass <em>material</em>
+    *       (the frame's blurred backdrop capture + the level's tint mix), then the control's state
+    *       layer, the overhead sheen, the cursor-following light and the press detent - the exact call
+    *       the ClickGUI uses for its buttons, pills, tabs and segmented controls. So a menu button and a
+    *       ClickGUI button are literally the same object, not two look-alikes.</li>
+    *   <li>The accent comes from {@link UiTheme#accentColor()}, i.e. the client colour, so hover glow,
+    *       rim and label all follow whatever the user set - the old flat fill did this too, but now it is
+    *       the accent <em>inside</em> the glass rather than an opaque blue slab over it.</li>
+    *   <li>Motion uses {@link UiTheme#smoothState(float, float)} / {@link UiTheme#smoothPress(float,
+    *       boolean)}: the one hover curve and press detent every other control obeys, so the menus settle
+    *       at the same rhythm as the ClickGUI instead of the old 100 ms scale pop.</li>
+    *   <li>The label is drawn with the client's Inter face (the bitmap font was the last stock-looking
+    *       thing in these menus) and scaled down when a stock label is wider than the button, so no label
+    *       is ever truncated.</li>
+    * </ul>
+    *
+    * <p>Screens that contain these buttons must advance {@link UiAnimation#beginFrame()} once per frame
+    * (the ClickGUI does it in its own {@code drawScreen}); the menus call it at the top of their
+    * {@code drawScreen} for exactly that reason.</p>
+    */
+   private void drawGlassButton(Minecraft mc, int mouseX, int mouseY) {
+      float x = (float)this.xPosition;
+      float y = (float)this.yPosition;
+      float w = (float)this.width;
+      float h = (float)this.height;
+      int accent = UiTheme.accentColor();
+
+      this.glassHoverAnim = UiTheme.smoothState(this.glassHoverAnim, this.enabled && this.hovered ? 1.0F : 0.0F);
+      this.glassPressAnim = UiTheme.smoothPress(this.glassPressAnim, this.enabled && this.hovered && Mouse.isButtonDown(0));
+      float hovT = this.glassHoverAnim;
+      float prsT = this.glassPressAnim;
+      // The ClickGUI's corner family (cards 11, controls 9), capped at half the height so a stock 20 px
+      // row reads as a pill rather than as a rounded rectangle. "RoundedButtons off" still means square;
+      // RoundFactor no longer shapes these buttons - the shape is a design-system decision now, and the
+      // old 1..20 px knob produced corners that belonged to neither the cards nor the pills.
+      float radius = ClientManagers.moduleManager.clientSettings.roundedButtons.getValue()
+         ? Math.min(h * 0.5F, UiTheme.CARD_RADIUS)
+         : 0.0F;
+
+      if (this.enabled && hovT > 0.02F) {
+         // The accent halo the ClickGUI casts under a hovered pill or card.
+         GlassRenderer.drawSoftShadow(x, y, w, h, radius, 8.0F + 2.0F * hovT, 1.0F, UiTheme.withAlpha(accent, Math.round(70.0F * hovT)));
+      }
+
+      int fill = this.enabled ? UiTheme.glassControlFillArgb(hovT, 0.0F, accent) : UiTheme.glassDisabledFillArgb();
+      int bottomFill = this.enabled ? UiTheme.lerpArgb(fill, 0xFF0A0C12, 0.20F) : fill;
+      int border = this.enabled
+         ? UiTheme.lerpArgb(0x1AFFFFFF, UiTheme.withAlpha(UiTheme.accentSoftGlow(), 175), hovT * 0.7F)
+         : UiTheme.scaleAlpha(UiTheme.GLASS_BORDER, 0.55F);
+      GlassRenderer.drawInteractiveSurface(
+         x,
+         y,
+         w,
+         h,
+         radius,
+         fill,
+         bottomFill,
+         border,
+         UiTheme.BORDER_THICKNESS,
+         UiTheme.glassTopHighlightAlpha(Math.max(0.30F, hovT)),
+         hovT,
+         prsT,
+         this.enabled,
+         (float)mouseX,
+         (float)mouseY,
+         accent
+      );
+
+      this.mouseDragged(mc, mouseX, mouseY);
+
+      // Label: the client's Inter face, centred in the box exactly as the bitmap-font call it replaces.
+      // WHY it is scaled instead of trimmed: the stock labels are authored for an 8 px bitmap font, so
+      // "Can't download in single player" would lose its meaning at full size inside a 98 px button.
+      // Scaling about the box centre keeps the original glyphs (no ellipsis, no clipping) and keeps one
+      // type size across a menu - a shrunken label reads as intentional, a truncated one reads as a bug.
+      //
+      // WHY the '§' branch is gone: labels such as "Difficulty: §cHard", "Remove invalid: §cFalse" or
+      // "§cFernan's Altshop" used to be bounced back to the bitmap FontRenderer (the SDF atlas has no
+      // section-sign glyph), which is precisely why a few buttons on an otherwise Inter-only screen still
+      // looked pixelated. drawStringFormatted() parses the codes and paints every run with Inter, so the
+      // face is uniform and the colours the strings asked for survive.
+      InterFontUtil font = FontManager.body();
+      String label = this.displayString == null ? "" : this.displayString;
+      int fg = this.enabled
+         ? UiTheme.lerpArgb(UiTheme.primaryTextColor(), 0xFFFFFFFF, UiAnimation.clamp01(Math.max(hovT, prsT)))
+         : UiTheme.disabledTextColor();
+      if (font == null) {
+         // Only reachable before FontManager.initFonts() has run (e.g. a screen built during startup).
+         drawCenteredString(mc.fontRendererObj, label, this.xPosition + this.width / 2, this.yPosition + (this.height - 8) / 2, fg);
+         return;
+      }
+      float textW = font.getStringWidthFormatted(label);
+      // Padding is a share of the height so a 20 px row and a 26 px row keep the same optical inset.
+      float availableW = Math.max(24.0F, w - Math.max(12.0F, h * 0.7F));
+      float labelScale = textW > availableW ? availableW / textW : 1.0F;
+      if (labelScale < 1.0F) {
+         float cx = x + w * 0.5F;
+         float cy = y + h * 0.5F + prsT * 0.4F;
+         GL11.glPushMatrix();
+         GL11.glTranslatef(cx, cy, 0.0F);
+         GL11.glScalef(labelScale, labelScale, 1.0F);
+         GL11.glTranslatef(-cx, -cy, 0.0F);
+         font.drawCenteredStringFormattedInBox(label, (double)x, (double)(y + prsT * 0.4F), (double)w, (double)h, fg);
+         GL11.glPopMatrix();
+      } else {
+         font.drawCenteredStringFormattedInBox(label, (double)x, (double)(y + prsT * 0.4F), (double)w, (double)h, fg);
+      }
    }
 
    static {

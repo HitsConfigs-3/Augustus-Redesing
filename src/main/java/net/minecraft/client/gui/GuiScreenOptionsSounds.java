@@ -1,5 +1,6 @@
 package net.minecraft.client.gui;
 
+import net.augustus.ui.VanillaScreenText;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.audio.PositionedSoundRecord;
 import net.minecraft.client.audio.SoundHandler;
@@ -87,7 +88,7 @@ public class GuiScreenOptionsSounds extends GuiScreen {
    @Override
    public void drawScreen(int mouseX, int mouseY, float partialTicks) {
       this.drawDefaultBackground();
-      drawCenteredString(this.fontRendererObj, this.title, this.width / 2, 15, 16777215);
+      VanillaScreenText.drawCenteredOnScreen(this.width, this.title, 15, 16777215);
       super.drawScreen(mouseX, mouseY, partialTicks);
    }
 

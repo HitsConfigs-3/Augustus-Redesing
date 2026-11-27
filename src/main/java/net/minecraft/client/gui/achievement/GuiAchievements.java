@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.util.Random;
 import net.augustus.utils.input.MouseInputUtil;
 import net.augustus.Augustus;
+import net.augustus.ui.VanillaScreenText;
 import net.minecraft.block.Block;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiButton;
@@ -291,7 +292,7 @@ public class GuiAchievements extends GuiScreen implements IProgressMeter {
    public void drawTitle() {
       int n = (this.width - this.imageWidth) / 2;
       int n2 = (this.height - this.imageHeight) / 2;
-      this.fontRendererObj.drawString(I18n.format("gui.achievements", new Object[0]), n + 15, n2 + 5, 4210752);
+      VanillaScreenText.drawString(I18n.format("gui.achievements", new Object[0]), n + 15, n2 + 5, 4210752);
    }
 
    @Override

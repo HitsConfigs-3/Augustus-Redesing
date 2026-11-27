@@ -33,8 +33,54 @@ public final class GlassRenderer {
    private static ShaderProgram primitiveShader;
    private static boolean shaderInitialized = false;
    private static boolean shaderFailed = false;
+   /** Separate program for {@link #drawRadialGlow}: the shape program's uniform set stays untouched. */
+   private static ShaderProgram glowShader;
+   private static boolean glowShaderInitialized = false;
+   private static boolean glowShaderFailed = false;
+
+   /**
+    * The overlay's open/close envelope, 1 while the ClickGUI is settled and 0 when it has fully closed.
+    *
+    * <p>WHY the renderer needs its own copy: everything the overlay draws <em>on top of the window shell</em>
+    * - the cards, wells and controls that go through {@link #drawGlassMaterialPane} - used to be composited
+    * at the level's own coverage with no transition term at all, because the only envelope the shell knew
+    * about was the one threaded into {@code getOpenProgress()} (window surface, sidebar tint, window
+    * chrome). Fading the shell therefore left its nested panes at full strength: on the exit frame the
+    * window dissolved around a set of bright plates that then vanished with it, which is the "the cards
+    * pop out at the end" the close animation showed. Multiplying the envelope into the nested panes'
+    * coverage makes every surface of the overlay leave together.
+    *
+    * <p>It is set once per frame, before anything is drawn, from the one sampler that already advances the
+    * envelope ({@code ClickGuiScreen.drawScreen}); anything that draws outside that frame - the HUD, the
+    * offscreen warm-up - keeps the default of 1 and is therefore unaffected.
+    */
+   private static float overlayEnvelope = 1.0F;
 
    private GlassRenderer() {
+   }
+
+   /**
+    * Publishes the overlay's open/close envelope for the frame about to be drawn. Called once per frame by
+    * the ClickGUI screen; see {@link #overlayEnvelope} for why the renderer needs it at all.
+    */
+   public static void setOverlayEnvelope(float envelope) {
+      overlayEnvelope = UiAnimation.clamp01(envelope);
+   }
+
+   /** Current overlay open/close envelope, 1 when the overlay is settled or not drawn at all. */
+   public static float overlayEnvelope() {
+      return overlayEnvelope;
+   }
+
+   /**
+    * {@code argb} with its alpha multiplied by the frame's overlay envelope (RGB untouched).
+    *
+    * <p>Only for colours this renderer computes itself. A caller-supplied colour is the caller's to fade
+    * (the overlay's window passes every one of them through {@code ClickGuiScreen.fadeArgb}), and fading
+    * it here as well would apply the envelope at the square of its intended rate.
+    */
+   private static int envelopeArgb(int argb) {
+      return overlayEnvelope >= 0.999F ? argb : UiTheme.scaleAlpha(argb, overlayEnvelope);
    }
 
    /**
@@ -104,6 +150,115 @@ public final class GlassRenderer {
          return true;
       } catch (Throwable t) {
          shaderFailed = true;
+         t.printStackTrace();
+         return false;
+      }
+   }
+
+   /**
+    * Draws a soft elliptical wash clipped by a rounded rectangle, in one analytical pass.
+    *
+    * <p>The reference's brand area carries a violet glow that peaks at the window's top-left corner and
+    * is gone by roughly 230 px across and 90 px down. It cannot be a plain glow primitive: the GUI's
+    * only scissor is a rectangle, so anything painted near that corner would spill past the window's own
+    * 15 px radius and leave a violet square notch. Evaluating the Gaussian and the round-rect coverage
+    * together keeps the wash inside the silhouette.
+    *
+    * @param cx        glow centre, in the same coordinate space as {@code x/y} but local to the box
+    * @param rx,ry     per-axis falloff scale; {@code exp(-exponent)} at that distance
+    * @param ex,ey     per-axis exponents, so the wash can die out faster across than down
+    * @param argb      glow colour, its alpha being the peak coverage at the centre
+    */
+   public static void drawRadialGlow(
+      float x,
+      float y,
+      float width,
+      float height,
+      float radius,
+      float cx,
+      float cy,
+      float rx,
+      float ry,
+      float ex,
+      float ey,
+      int argb
+   ) {
+      if (width <= 0.0F || height <= 0.0F || (argb >>> 24) == 0 || rx <= 0.5F || ry <= 0.5F) {
+         return;
+      }
+      if (!ensureGlowShader()) {
+         return;
+      }
+
+      int prevBlendSrc = GlStateManager.getBlendSrcFactor();
+      int prevBlendDst = GlStateManager.getBlendDstFactor();
+      int prevBlendSrcAlpha = GlStateManager.getBlendSrcFactorAlpha();
+      int prevBlendDstAlpha = GlStateManager.getBlendDstFactorAlpha();
+      int prevAlphaFunc = GlStateManager.getAlphaFunc();
+      float prevAlphaRef = GlStateManager.getAlphaRef();
+
+      STATE_SAVER.setBlend(true);
+      STATE_SAVER.setAlpha(false);
+      STATE_SAVER.setDepth(false);
+      STATE_SAVER.setCull(false);
+      STATE_SAVER.setLighting(false);
+      STATE_SAVER.setTexture2D(false);
+      GlStateManager.tryBlendFuncSeparate(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA, GL11.GL_ONE, GL11.GL_ONE_MINUS_SRC_ALPHA);
+      GlStateManager.alphaFunc(GL11.GL_GREATER, 0.0F);
+      GlStateManager.color(1.0F, 1.0F, 1.0F, 1.0F);
+
+      glowShader.bind();
+      glowShader.setUniform2f("size", width, height);
+      glowShader.setUniform4f("cornerRadius", radius, radius, radius, radius);
+      glowShader.setUniform2f("glowCenter", cx - x, cy - y);
+      glowShader.setUniform2f("glowRadius", rx, ry);
+      glowShader.setUniform2f("glowExponent", ex, ey);
+      glowShader.setUniform1f("smoothness", DEFAULT_SMOOTHNESS);
+      glowShader.setUniform4f(
+         "glowColor",
+         (float)(argb >> 16 & 255) / 255.0F,
+         (float)(argb >> 8 & 255) / 255.0F,
+         (float)(argb & 255) / 255.0F,
+         (float)(argb >>> 24 & 255) / 255.0F
+      );
+
+      Tessellator tessellator = Tessellator.getInstance();
+      WorldRenderer wr = tessellator.getWorldRenderer();
+      wr.begin(GL11.GL_QUADS, DefaultVertexFormats.POSITION_TEX);
+      wr.pos((double)x, (double)(y + height), 0.0).tex(0.0, 1.0).endVertex();
+      wr.pos((double)(x + width), (double)(y + height), 0.0).tex(1.0, 1.0).endVertex();
+      wr.pos((double)(x + width), (double)y, 0.0).tex(1.0, 0.0).endVertex();
+      wr.pos((double)x, (double)y, 0.0).tex(0.0, 0.0).endVertex();
+      tessellator.draw();
+
+      glowShader.unbind();
+
+      GlStateManager.alphaFunc(prevAlphaFunc, prevAlphaRef);
+      GlStateManager.tryBlendFuncSeparate(prevBlendSrc, prevBlendDst, prevBlendSrcAlpha, prevBlendDstAlpha);
+      STATE_SAVER.restoreTexture2D();
+      STATE_SAVER.restoreLighting();
+      STATE_SAVER.restoreCull();
+      STATE_SAVER.restoreDepth();
+      STATE_SAVER.restoreAlpha();
+      STATE_SAVER.restoreBlend();
+      GlStateManager.color(1.0F, 1.0F, 1.0F, 1.0F);
+   }
+
+   private static boolean ensureGlowShader() {
+      if (glowShaderInitialized) {
+         return true;
+      }
+      if (glowShaderFailed) {
+         return false;
+      }
+      try {
+         String vert = RenderSystemAssetLoader.loadAssetString("impl/glass/glass_primitive.vert");
+         String frag = RenderSystemAssetLoader.loadAssetString("impl/glass/glass_glow.frag");
+         glowShader = new ShaderProgram(vert, frag);
+         glowShaderInitialized = true;
+         return true;
+      } catch (Throwable t) {
+         glowShaderFailed = true;
          t.printStackTrace();
          return false;
       }
@@ -179,6 +334,7 @@ public final class GlassRenderer {
          0.0F,
          0.0F,
          0,
+         0.0F,
          0.0F,
          0.0F,
          0.0F,
@@ -301,7 +457,64 @@ public final class GlassRenderer {
          0.0F,
          0.0F,
          0.0F,
+         0.0F,
          0.0F
+      );
+   }
+
+   /**
+    * The same primitive as {@link #drawRoundedGradientBox}, with its fill gradient rotated: the shape
+    * interpolates from {@code leadingFillArgb} on its own left edge to {@code trailingFillArgb} on its
+    * right edge instead of from top to bottom. Everything else - the SDF, the anti-aliasing, the corner
+    * radii - is the same code path, so a horizontal gradient is a rotation of one shape rather than a
+    * second shape that has to be kept in step with the first.
+    *
+    * <p>WHY it exists: the reference draws its selected sidebar item as a plate that is brightest on its
+    * leading edge and settles towards its trailing one. The vertical gradient this renderer already had
+    * could not express that, so the alternative was a flat plate or a hand-rolled stack of bands - the
+    * first loses the reference's depth cue, the second reintroduces exactly the seams this renderer
+    * exists to avoid.
+    */
+   public static void drawRoundedGradientBoxHorizontal(
+      float x,
+      float y,
+      float width,
+      float height,
+      float radius,
+      int leadingFillArgb,
+      int trailingFillArgb,
+      float gradientMix
+   ) {
+      if (width <= 0.0F || height <= 0.0F) {
+         return;
+      }
+      drawPrimitiveInternal(
+         x,
+         y,
+         width,
+         height,
+         radius,
+         radius,
+         radius,
+         radius,
+         leadingFillArgb,
+         trailingFillArgb,
+         gradientMix,
+         0,
+         0,
+         0.0F,
+         0.0F,
+         0.0F,
+         -9999.0F,
+         -9999.0F,
+         0.0F,
+         0.0F,
+         0,
+         0.0F,
+         0.0F,
+         0.0F,
+         0.0F,
+         1.0F
       );
    }
 
@@ -365,7 +578,8 @@ public final class GlassRenderer {
          blurRadius,
          width,
          height,
-         offsetY * 0.15F
+         offsetY * 0.15F,
+         0.0F
       );
    }
 
@@ -407,8 +621,10 @@ public final class GlassRenderer {
          return false;
       }
       // The one shared coverage transfer: no floor, no per-surface curve (see
-      // UiTheme.glassLevelAlpha for the measured contrast that justifies not clamping it).
-      float coverage = UiTheme.glassLevelAlpha(level);
+      // UiTheme.glassLevelAlpha for the measured contrast that justifies not clamping it). The overlay's
+      // own open/close envelope is folded in here so a nested pane fades with the shell it sits on
+      // instead of outliving it (see overlayEnvelope).
+      float coverage = UiTheme.glassLevelAlpha(level) * overlayEnvelope;
       if (coverage <= 0.02F) {
          return false;
       }
@@ -592,9 +808,12 @@ public final class GlassRenderer {
       float h = UiAnimation.clamp01(hoverT);
       float e = UiAnimation.clamp01(enableT);
 
-      drawSoftShadow(x, y, width, height, radius, 10.0F, 2.5F, UiTheme.glassShadowArgb(0.18F));
+      drawSoftShadow(x, y, width, height, radius, 10.0F, 2.5F, envelopeArgb(UiTheme.glassShadowArgb(0.18F)));
       if (e > 0.04F || h > 0.04F) {
-         drawSoftShadow(x, y, width, height, radius, 10.0F, 1.0F, UiTheme.withAlpha(accentArgb, Math.round((e * 0.14F + h * 0.06F) * 255.0F)));
+         drawSoftShadow(
+            x, y, width, height, radius, 10.0F, 1.0F,
+            envelopeArgb(UiTheme.withAlpha(accentArgb, Math.round((e * 0.14F + h * 0.06F) * 255.0F)))
+         );
       }
 
       // Same self-contained glass material as the window, crossfaded at the hero level's coverage.
@@ -609,7 +828,7 @@ public final class GlassRenderer {
          );
       }
       int bottomFill = UiTheme.lerpArgb(topFill, UiTheme.glassBaseRgb(Math.min(1.0F, UiTheme.glassDarkness() + 0.08F)), body ? 0.0F : 0.22F);
-      int borderArgb = UiTheme.lerpArgb(UiTheme.GLASS_BORDER, UiTheme.withAlpha(UiTheme.accentSoftGlow(), 175), Math.max(e * 0.55F, h * 0.45F));
+      int borderArgb = envelopeArgb(UiTheme.lerpArgb(UiTheme.GLASS_BORDER, UiTheme.withAlpha(UiTheme.accentSoftGlow(), 175), Math.max(e * 0.55F, h * 0.45F)));
 
       drawRoundedGradientBox(
          x,
@@ -699,9 +918,13 @@ public final class GlassRenderer {
          ? interactionFeedbackArgb(level, h, f, accentArgb)
          : UiTheme.glassLevelFillArgb(level, h, f, accentArgb);
       int bottomFill = UiTheme.lerpArgb(topFill, UiTheme.glassRecessedDepthRgb(), 0.22F);
+      // The reference's wells have NO rim at rest: its edge is a 5-9 px feather whose peak deviation
+      // from the surrounding surface is only 4-6 luminance. A full-strength 1 px border reads as an
+      // outline the reference does not have, so the idle ring is dropped to 42 % and the hover/focus
+      // rings -- which the reference does draw when you point at a control -- are untouched.
       int borderArgb = f > 0.02F
          ? UiTheme.lerpArgb(UiTheme.glassBorderFocusedOrHover(h * 0.65F, accentArgb), UiTheme.withAlpha(UiTheme.accentSoftGlow(), 242), f)
-         : UiTheme.glassBorderFocusedOrHover(h * 0.65F, accentArgb);
+         : UiTheme.scaleAlpha(UiTheme.glassBorderFocusedOrHover(h * 0.65F, accentArgb), 0.42F);
 
       drawRoundedGradientBox(
          x,
@@ -888,7 +1111,8 @@ public final class GlassRenderer {
       float shadowBlur,
       float shadowW,
       float shadowH,
-      float shadowOffsetY
+      float shadowOffsetY,
+      float gradientAxis
    ) {
       if (width <= 0.0F || height <= 0.0F) {
          return;
@@ -927,13 +1151,17 @@ public final class GlassRenderer {
       setColorUniform("fillColor", fillArgb);
       setColorUniform("fillColorBottom", bottomFillArgb);
       primitiveShader.setUniform1f("gradientMix", gradientMix);
+      primitiveShader.setUniform1f("gradientAxis", gradientAxis);
+      // Sheen and cursor-light weights are opacity, not geometry, and no caller fades them (they are
+      // factors, not colours), so the overlay's envelope is applied here - otherwise a card's bevel and
+      // hover light survive the fade that just dimmed the card they belong to.
+      primitiveShader.setUniform1f("topHighlightAlpha", topHighlightAlpha * overlayEnvelope);
+      primitiveShader.setUniform1f("innerBottomAlpha", innerBottomAlpha * overlayEnvelope);
       setColorUniform("borderColor", borderArgb);
       setColorUniform("borderColorBottom", bottomBorderArgb);
       primitiveShader.setUniform1f("borderWidth", borderWidth);
-      primitiveShader.setUniform1f("topHighlightAlpha", topHighlightAlpha);
-      primitiveShader.setUniform1f("innerBottomAlpha", innerBottomAlpha);
       primitiveShader.setUniform2f("hoverPos", hoverLocalX, hoverLocalY);
-      primitiveShader.setUniform1f("hoverLightAlpha", hoverLightAlpha);
+      primitiveShader.setUniform1f("hoverLightAlpha", hoverLightAlpha * overlayEnvelope);
       primitiveShader.setUniform1f("hoverLightRadius", hoverLightRadius);
       setColorUniform("hoverLightColor", hoverLightArgb);
       primitiveShader.setUniform1f("shadowBlur", shadowBlur);
@@ -1086,7 +1314,7 @@ public final class GlassRenderer {
       // Previously this was a *second* card implementation that only blurred when no window/panel blur
       // was active, i.e. a card was a flat tint whenever a window blur existed. One path now: a card is
       // always a nested pane of the same material as its window (see drawNestedGlassPane).
-      drawGlassCard(x, y, width, height, cornerRadius, 0.0F, 0.0F, UiTheme.accentColor(), borderArgb, borderWidth);
+      drawGlassCard(x, y, width, height, cornerRadius, 0.0F, 0.0F, envelopeArgb(UiTheme.accentColor()), borderArgb, borderWidth);
    }
 
    /**
@@ -1204,9 +1432,12 @@ public final class GlassRenderer {
 
    /** Crisp anti-aliased SDF vector left/right navigation arrows (<- / ->). */
    public static void drawVectorArrow(float cx, float cy, float size, boolean pointingRight, int argb) {
-      float halfW = size * 0.42F;
-      float armLen = size * 0.34F;
-      float stroke = 1.4F;
+      // Proportions fitted to the reference's own arrows: the ink is 12.95 x 10.50 (height/width 0.81)
+      // with a 2.2 shaft, i.e. a head whose arms sit at 45 degrees and reach 0.455*size back from the
+      // tip. The previous arms were 0.34*size, which left our arrows 40 % too short.
+      float halfW = size * 0.5F;
+      float armLen = size * 0.455F;
+      float stroke = size * 0.17F;
       float tipX = pointingRight ? cx + halfW : cx - halfW;
       float stemX = cx - halfW + (pointingRight ? 0.0F : stroke * 0.45F);
       float stemW = halfW * 2.0F - stroke * 0.45F;

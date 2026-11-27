@@ -8,12 +8,14 @@ import net.augustus.events.EventPacket;
 import net.augustus.events.listeners.PacketListener;
 import net.augustus.events.listeners.TickListener;
 import net.augustus.events.listeners.WindowResizeListener;
+import net.augustus.font.FontManager;
 import net.augustus.modules.Categorys;
 import net.augustus.modules.Module;
 import net.augustus.settings.BooleanValue;
 import net.augustus.settings.DoubleValue;
 import net.augustus.settings.SettingGroup;
 import net.augustus.settings.StringValue;
+import net.augustus.ui.modern.font.InterFontUtil;
 import net.augustus.utils.ClientHoliday;
 import net.augustus.utils.HolidayDetector;
 import net.augustus.utils.TimeHelper;
@@ -171,8 +173,19 @@ public class ClientSettings extends Module implements TickListener, PacketListen
       if (!ClientManagers.moduleManager.clientSettings.hideMainMenuAccountInfos.getValue()) {
          ProxyEntry proxy = Augustus.getInstance().getProxy();
          String statusColor = mc.session.getToken().length() < 5 ? "§c" : "§a";
-         mc.fontRendererObj.drawStringWithShadow("Account: " + statusColor + mc.getSession().getUsername(), 2.0F, 2.0F, -1);
-         mc.fontRendererObj.drawStringWithShadow("Proxy: " + (proxy == null ? "§cNot connected!" : "§7" + proxy.getHost() + ":" + proxy.getPort()), 2.0F, 12.0F, -1);
+         String accountLine = "Account: " + statusColor + mc.getSession().getUsername();
+         String proxyLine = "Proxy: " + (proxy == null ? "§cNot connected!" : "§7" + proxy.getHost() + ":" + proxy.getPort());
+         // Inter, like the rest of the menu's chrome: these two corner lines sit on every tab, so leaving
+         // them in the bitmap font made the whole client menu look like it had two type systems.
+         InterFontUtil font = FontManager.body();
+         if (font == null) {
+            mc.fontRendererObj.drawStringWithShadow(accountLine, 2.0F, 2.0F, -1);
+            mc.fontRendererObj.drawStringWithShadow(proxyLine, 2.0F, 12.0F, -1);
+            return;
+         }
+         float lineStep = Math.max(font.getFontHeight() + 1.0F, 12.0F);
+         font.drawStringWithShadow(accountLine, 2.0, 2.0, -1);
+         font.drawStringWithShadow(proxyLine, 2.0, 2.0 + (double)lineStep, -1);
       }
    }
 

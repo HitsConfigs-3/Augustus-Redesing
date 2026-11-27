@@ -8,6 +8,7 @@ import net.augustus.font.CustomFontUtil;
 import net.augustus.font.FontManager;
 import net.augustus.font.TextWrapper;
 import net.augustus.render.RenderUtil;
+import net.augustus.ui.modern.font.InterFontUtil;
 import net.augustus.ui.modern.render.GlassRenderer;
 import net.augustus.ui.modern.render.LucideIcon;
 import net.augustus.ui.modern.render.UiAnimation;
@@ -28,8 +29,11 @@ public final class ModernSettingsPanel {
    public static final float CARD_PAD_Y = 9.0F;
    public static final int MIN_CARD_HEIGHT = 40;
    public static final int SECTION_TITLE_HEIGHT = 24;
-   public static final int TOP_GROUP_HEADER_HEIGHT = 30;
-   public static final int SUB_GROUP_HEADER_HEIGHT = 26;
+   // A collapsible group header is a section divider with an accordion chevron, not a heading: it uses
+   // the same 12px upper-case label as SECTION_TITLE_HEIGHT, so its band only has to be tall enough for
+   // the chevron button (24 top level / 21 nested) plus a 1px breathing edge.
+   public static final int TOP_GROUP_HEADER_HEIGHT = 26;
+   public static final int SUB_GROUP_HEADER_HEIGHT = 23;
 
    private ModernSettingsPanel() {
    }
@@ -347,8 +351,13 @@ public final class ModernSettingsPanel {
    }
 
    /**
-    * Draws a bold section header matching reference section dividers ("Hand", "Elder Guardian"),
-    * with a subtle count badge, horizontal divider, and smooth rotating accordion chevron button.
+    * Draws a collapsible section divider with a subtle count badge, horizontal divider and a smooth
+    * rotating accordion chevron button.
+    *
+    * <p>The label is deliberately drawn with the SAME typography as {@link #drawSectionTitle} (12px bold,
+    * upper case, 1.1 tracking): a group header is a divider that happens to fold, so it must not read as a
+    * heading twice the size of the plain "MODULE" / "SETTINGS" rules around it. Only the chevron and the
+    * count chip distinguish it.</p>
     */
    public static float drawCollapsibleSectionHeader(
       float x,
@@ -362,24 +371,25 @@ public final class ModernSettingsPanel {
       int mouseX,
       int mouseY
    ) {
-      CustomFontUtil font = nested ? FontManager.interSemiBold : FontManager.interBold;
+      // Typed as InterFontUtil, not CustomFontUtil: the letter-spaced label API lives on the Inter face.
+      InterFontUtil font = FontManager.interSection;
       float headerH = nested ? (float)SUB_GROUP_HEADER_HEIGHT : (float)TOP_GROUP_HEADER_HEIGHT;
-      String cleanTitle = formatUiLabel(title);
+      String cleanTitle = formatUiLabel(title).toUpperCase(java.util.Locale.ROOT);
       boolean hovered = RenderUtil.isHovered(x, y, width, headerH, mouseX, mouseY);
       float hovT = UiTheme.smoothState("grp_hov_" + cleanTitle + "_" + nested, hovered ? 1.0F : 0.0F);
       float prsT = UiTheme.smoothPress("grp_prs_" + cleanTitle + "_" + nested, 0.0F, hovered && UiAnimation.isPrimaryMouseDown());
       float expT = UiAnimation.clamp01(expandProgress);
       int accent = UiTheme.accentColor();
 
-      int idleTitle = nested ? UiTheme.secondaryTextColor() : UiTheme.TEXT_PRIMARY;
-      int titleColor = UiTheme.lerpArgb(idleTitle, UiTheme.accentSoftGlow(), hovT * 0.85F);
-      font.drawVerticallyCenteredString(cleanTitle, (double)(x + 2.0F), (double)y, (double)headerH, faded(titleColor));
+      int idleTitle = UiTheme.mutedTextColor();
+      int titleColor = UiTheme.lerpArgb(idleTitle, UiTheme.accentSoftGlow(), Math.max(hovT * 0.85F, expT * 0.22F));
+      font.drawStringSpaced(cleanTitle, x + 2.0F, y + (headerH - font.getFontHeight()) * 0.5F, 1.1F, faded(titleColor));
 
-      float cursorX = x + font.getStringWidth(cleanTitle) + 10.0F;
+      float cursorX = x + font.getStringWidthSpaced(cleanTitle, 1.1F) + 12.0F;
       if (childCount > 0) {
          String countStr = String.valueOf(childCount);
-         float badgeW = Math.max(20.0F, FontManager.interSmall.getStringWidth(countStr) + 10.0F);
-         float badgeH = 17.0F;
+         float badgeW = Math.max(19.0F, FontManager.interSmall.getStringWidth(countStr) + 9.0F);
+         float badgeH = 16.0F;
          float badgeY = y + (headerH - badgeH) * 0.5F;
          int badgeBorder = UiTheme.lerpArgb(UiTheme.GLASS_BORDER, UiTheme.withAlpha(UiTheme.accentSoftGlow(), 195), Math.max(hovT, expT * 0.45F));
          // Count badges are small secondary controls: a level veil for the resting state, pulled towards
@@ -389,7 +399,7 @@ public final class ModernSettingsPanel {
             UiTheme.glassControlTintArgb(UiTheme.LEVEL_CONTROL_RAISED, hovT, expT * 0.55F, accent, 0.72F),
             Math.max(hovT, expT * 0.75F)
          );
-         GlassRenderer.drawRoundedBox(cursorX, badgeY, badgeW, badgeH, 5.0F, faded(badgeFill), faded(badgeBorder), 1.05F);
+         GlassRenderer.drawRoundedBox(cursorX, badgeY, badgeW, badgeH, badgeH * 0.5F, faded(badgeFill), faded(badgeBorder), 1.05F);
          FontManager.interSmall.drawCenteredStringInBox(countStr, (double)cursorX, (double)badgeY, (double)badgeW, (double)badgeH, faded(UiTheme.lerpArgb(UiTheme.secondaryTextColor(), UiTheme.TEXT_PRIMARY, hovT)));
          cursorX += badgeW + 10.0F;
       }
@@ -415,7 +425,7 @@ public final class ModernSettingsPanel {
          btnY,
          btnSize,
          btnSize,
-         6.0F,
+         UiTheme.CONTROL_RADIUS,
          faded(chevronFill),
          faded(UiTheme.lerpArgb(chevronFill, UiTheme.glassRecessedDepthRgb(), 0.28F)),
          faded(chevronBorder),

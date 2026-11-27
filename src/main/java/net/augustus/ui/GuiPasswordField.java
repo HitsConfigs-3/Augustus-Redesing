@@ -1,5 +1,7 @@
 package net.augustus.ui;
 
+import net.augustus.font.FontManager;
+import net.augustus.ui.modern.font.InterFontUtil;
 import net.minecraft.client.gui.GuiPageButtonList;
 import com.google.common.base.Predicate;
 import com.google.common.base.Predicates;
@@ -36,6 +38,14 @@ public class GuiPasswordField extends Gui {
    private int cursorPosition;
    public int xPosition;
    private String text = "";
+
+   /**
+    * The client's Inter face, matching {@code GuiTextField}: password dots and caret placement must use
+    * the same metrics the glyphs are painted with.
+    */
+   private static InterFontUtil passwordFont() {
+      return FontManager.body();
+   }
 
    public String getText() {
       return this.text;
@@ -309,15 +319,29 @@ public class GuiPasswordField extends Gui {
          }
 
          int width2 = this.getWidth();
-         int n2 = this.fontRenderer.trimStringToWidth(this.text.substring(this.lineScrollOffset), width2).length() + this.lineScrollOffset;
-         if (selectionPos == this.lineScrollOffset) {
-            this.lineScrollOffset = this.lineScrollOffset - this.fontRenderer.trimStringToWidth(this.text, width2, true).length();
-         }
+         InterFontUtil font = passwordFont();
+         if (font == null) {
+            int n2 = this.fontRenderer.trimStringToWidth(this.text.substring(this.lineScrollOffset), width2).length() + this.lineScrollOffset;
+            if (selectionPos == this.lineScrollOffset) {
+               this.lineScrollOffset = this.lineScrollOffset - this.fontRenderer.trimStringToWidth(this.text, width2, true).length();
+            }
 
-         if (selectionPos > n2) {
-            this.lineScrollOffset += selectionPos - n2;
-         } else if (selectionPos <= this.lineScrollOffset) {
-            this.lineScrollOffset = this.lineScrollOffset - (this.lineScrollOffset - selectionPos);
+            if (selectionPos > n2) {
+               this.lineScrollOffset += selectionPos - n2;
+            } else if (selectionPos <= this.lineScrollOffset) {
+               this.lineScrollOffset = this.lineScrollOffset - (this.lineScrollOffset - selectionPos);
+            }
+         } else {
+            int n2 = font.trimToWidth(this.text.substring(this.lineScrollOffset), (float)width2).length() + this.lineScrollOffset;
+            if (selectionPos == this.lineScrollOffset) {
+               this.lineScrollOffset = this.lineScrollOffset - font.trimToWidthReverse(this.text, (float)width2).length();
+            }
+
+            if (selectionPos > n2) {
+               this.lineScrollOffset += selectionPos - n2;
+            } else if (selectionPos <= this.lineScrollOffset) {
+               this.lineScrollOffset = this.lineScrollOffset - (this.lineScrollOffset - selectionPos);
+            }
          }
 
          this.lineScrollOffset = MathHelper.clamp_int(this.lineScrollOffset, 0, length);
@@ -353,63 +377,93 @@ public class GuiPasswordField extends Gui {
          this.text = this.text + "*";
       }
 
+      InterFontUtil font = passwordFont();
       if (this.isVisible()) {
-         if (this.isEnableBackgroundDrawing()) {
-            drawRect(this.xPosition - 1, this.yPosition - 1, this.xPosition + this.width + 1, this.yPosition + this.height + 1, -6250336);
-            drawRect(this.xPosition, this.yPosition, this.xPosition + this.width, this.yPosition + this.height, -16777216);
-         }
-
-         int n = this.isEnabled ? this.enabledColor : this.disabledColor;
-         int n2 = this.cursorPosition - this.lineScrollOffset;
-         int n3 = this.selectionEnd - this.lineScrollOffset;
-         FontRenderer fontRenderer2 = this.fontRenderer;
-         String str = this.text.substring(this.lineScrollOffset);
-         int n4;
-         String str2 = fontRenderer2.trimStringToWidth(str, this.getWidth());
-         boolean flag = n2 >= 0 && n2 <= str2.length();
-         boolean flag2 = this.isFocused && this.cursorCounter / 6 % 2 == 0 && flag;
-         int n5 = this.enableBackgroundDrawing ? this.xPosition + 4 : this.xPosition;
-         int n6 = this.enableBackgroundDrawing ? this.yPosition + (this.height - 8) / 2 : this.yPosition;
-         int n7 = n5;
-         if (n3 > str2.length()) {
-            n3 = str2.length();
-         }
-
-         if (str2.length() > 0) {
-            String str3 = flag ? str2.substring(0, n2) : str2;
-            n7 = this.fontRenderer.drawStringWithShadow(str3, (float)n5, (float)n6, n);
-         }
-
-         boolean flag3 = this.cursorPosition < this.text.length() || this.text.length() >= this.getMaxStringLength();
-         int n8 = n7;
-         if (!flag) {
-            n8 = n2 > 0 ? n5 + this.width : n5;
-         } else if (flag3) {
-            n8 = n7 - 1;
-            n7--;
-         }
-
-         if (str2.length() > 0 && flag && n2 < str2.length()) {
-            n7 = this.fontRenderer.drawStringWithShadow(str2.substring(n2), (float)n7, (float)n6, n);
-         }
-
-         if (flag2) {
-            if (flag3) {
-               Gui.drawRect(n8, n6 - 1, n8 + 1, n6 + 1 + this.fontRenderer.FONT_HEIGHT, -3092272);
-            } else {
-               this.fontRenderer.drawStringWithShadow("_", (float)n8, (float)n6, n);
+         if (font == null) {
+            this.drawTextBoxFallback();
+         } else {
+            if (this.isEnableBackgroundDrawing()) {
+               drawRect(this.xPosition - 1, this.yPosition - 1, this.xPosition + this.width + 1, this.yPosition + this.height + 1, -6250336);
+               drawRect(this.xPosition, this.yPosition, this.xPosition + this.width, this.yPosition + this.height, -16777216);
             }
-         }
 
-         if (n3 != n2) {
-            int n9 = n5 + this.fontRenderer.getStringWidth(str2.substring(0, n3));
-            int n10 = n6 - 1;
-            n4 = n9 - 1;
-            this.drawCursorVertical(n8, n10, n4, n6 + 1 + this.fontRenderer.FONT_HEIGHT);
+            int color = this.isEnabled ? this.enabledColor : this.disabledColor;
+            int caretPos = this.cursorPosition - this.lineScrollOffset;
+            int selectionPos = this.selectionEnd - this.lineScrollOffset;
+            int scrollStart = Math.min(this.lineScrollOffset, this.text.length());
+            String visibleText = font.trimToWidth(this.text.substring(scrollStart), (float)this.getWidth());
+            boolean caretInside = caretPos >= 0 && caretPos <= visibleText.length();
+            boolean blinkVisible = this.isFocused && this.cursorCounter / 6 % 2 == 0 && caretInside;
+            float textX = this.enableBackgroundDrawing ? (float)(this.xPosition + 4) : (float)this.xPosition;
+            float fontHeight = font.getFontHeight();
+            float textY = this.enableBackgroundDrawing
+               ? (float)this.yPosition + ((float)this.height - fontHeight) * 0.5F
+               : (float)this.yPosition;
+            float penX = textX;
+            if (selectionPos > visibleText.length()) {
+               selectionPos = visibleText.length();
+            }
+
+            if (!visibleText.isEmpty()) {
+               int headEnd = caretInside ? Math.max(0, Math.min(caretPos, visibleText.length())) : visibleText.length();
+               String head = visibleText.substring(0, headEnd);
+               if (!head.isEmpty()) {
+                  font.drawStringWithShadow(head, (double)penX, (double)textY, color);
+                  penX += font.getStringWidth(head);
+               }
+            }
+
+            boolean caretAtEnd = this.cursorPosition < this.text.length() || this.text.length() >= this.getMaxStringLength();
+            float caretX = penX;
+            if (!caretInside) {
+               caretX = caretPos > 0 ? textX + (float)this.width : textX;
+            } else if (caretAtEnd) {
+               caretX = penX - 1.0F;
+               penX -= 1.0F;
+            }
+
+            if (!visibleText.isEmpty() && caretInside && caretPos < visibleText.length()) {
+               font.drawStringWithShadow(visibleText.substring(caretPos), (double)penX, (double)textY, color);
+            }
+
+            int caretHeight = (int)Math.ceil((double)fontHeight);
+            if (blinkVisible) {
+               if (caretAtEnd) {
+                  Gui.drawRect((int)caretX, (int)textY - 1, (int)caretX + 1, (int)textY + 1 + caretHeight, -3092272);
+               } else {
+                  font.drawStringWithShadow("_", (double)caretX, (double)textY, color);
+               }
+            }
+
+            if (selectionPos != caretPos) {
+               String selectionHead = visibleText.substring(0, Math.max(0, Math.min(selectionPos, visibleText.length())));
+               float selectionX = textX + font.getStringWidth(selectionHead);
+               this.drawCursorVertical((int)caretX, (int)textY - 1, (int)selectionX - 1, (int)textY + 1 + caretHeight);
+            }
          }
       }
 
       this.text = this.rawPasswordText;
+   }
+
+   /**
+    * Stock bitmap path, kept only for the window where {@code FontManager.initFonts()} has not run yet, so
+    * a password field can never paint nothing at all.
+    */
+   private void drawTextBoxFallback() {
+      if (this.isEnableBackgroundDrawing()) {
+         drawRect(this.xPosition - 1, this.yPosition - 1, this.xPosition + this.width + 1, this.yPosition + this.height + 1, -6250336);
+         drawRect(this.xPosition, this.yPosition, this.xPosition + this.width, this.yPosition + this.height, -16777216);
+      }
+
+      int color = this.isEnabled ? this.enabledColor : this.disabledColor;
+      int textX = this.enableBackgroundDrawing ? this.xPosition + 4 : this.xPosition;
+      int textY = this.enableBackgroundDrawing ? this.yPosition + (this.height - 8) / 2 : this.yPosition;
+      String visibleText = this.fontRenderer.trimStringToWidth(
+         this.text.substring(Math.min(this.lineScrollOffset, this.text.length())), this.getWidth());
+      if (!visibleText.isEmpty()) {
+         this.fontRenderer.drawStringWithShadow(visibleText, (float)textX, (float)textY, color);
+      }
    }
 
    public int getNthWordFromPos(int n, int n2) {
@@ -462,8 +516,14 @@ public class GuiPasswordField extends Gui {
             n -= 4;
          }
 
-         String str2 = this.fontRenderer.trimStringToWidth(this.text.substring(this.lineScrollOffset), this.getWidth());
-         this.setCursorPosition(this.fontRenderer.trimStringToWidth(str2, n).length() + this.lineScrollOffset);
+         InterFontUtil clickFont = passwordFont();
+         if (clickFont == null) {
+            String str2 = this.fontRenderer.trimStringToWidth(this.text.substring(this.lineScrollOffset), this.getWidth());
+            this.setCursorPosition(this.fontRenderer.trimStringToWidth(str2, n).length() + this.lineScrollOffset);
+         } else {
+            String str2 = clickFont.trimToWidth(this.text.substring(this.lineScrollOffset), (float)this.getWidth());
+            this.setCursorPosition(clickFont.trimToWidth(str2, (float)n).length() + this.lineScrollOffset);
+         }
       }
    }
 

@@ -2,6 +2,7 @@ package net.minecraft.client.gui;
 
 import java.io.IOException;
 import java.util.Random;
+import net.augustus.ui.VanillaScreenText;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.resources.I18n;
 import net.minecraft.util.ChatAllowedCharacters;
@@ -149,7 +150,7 @@ public class GuiCreateWorld extends GuiScreen {
    @Override
    public void drawScreen(int mouseX, int mouseY, float partialTicks) {
       this.drawDefaultBackground();
-      drawCenteredString(this.fontRendererObj, I18n.format("selectWorld.create", new Object[0]), this.width / 2, 20, -1);
+      VanillaScreenText.drawCenteredOnScreen(this.width, I18n.format("selectWorld.create", new Object[0]), 20, -1);
       if (this.inMoreWorldOptionsDisplay) {
          this.drawString(this.fontRendererObj, I18n.format("selectWorld.enterSeed", new Object[0]), this.width / 2 - 100, 47, -6250336);
          this.drawString(this.fontRendererObj, I18n.format("selectWorld.seedInfo", new Object[0]), this.width / 2 - 100, 85, -6250336);

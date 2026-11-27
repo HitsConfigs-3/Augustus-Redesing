@@ -48,6 +48,16 @@ public final class ColorPickerFloatingPopup implements FloatingPopup {
    private final ModernSlider speedSlider = new ModernSlider();
    private final ModernSlider distSlider = new ModernSlider();
    private final ModernSlider clientAlphaSlider = new ModernSlider();
+   /**
+    * Numeric R/G/B tracks, shown only while editing the Client Color glass tint.
+    *
+    * <p>WHY scoped to that one setting: the shared picker is an HSV control (SV square + hue bar). The glass
+    * tint is specified in RGB terms as well, so this setting additionally gets the three channel sliders;
+    * every other colour setting keeps exactly the popup it had before.</p>
+    */
+   private final ModernSlider redSlider = new ModernSlider();
+   private final ModernSlider greenSlider = new ModernSlider();
+   private final ModernSlider blueSlider = new ModernSlider();
    private final ModernButton copyButton = new ModernButton();
    private final ModernButton pasteButton = new ModernButton();
 
@@ -58,6 +68,9 @@ public final class ColorPickerFloatingPopup implements FloatingPopup {
    private boolean draggingSpeed = false;
    private boolean draggingDist = false;
    private boolean draggingClientAlpha = false;
+   private boolean draggingRed = false;
+   private boolean draggingGreen = false;
+   private boolean draggingBlue = false;
    private int sliderClickX = -9999;
    private int sliderClickY = -9999;
 
@@ -85,7 +98,7 @@ public final class ColorPickerFloatingPopup implements FloatingPopup {
 
       boolean hasModes = this.setting.isRainbowEnabled() || this.setting.isFadeEnabled() || this.setting.isAstolfoEnabled() || this.setting.isClientColorEnabled();
       this.width = 278.0F;
-      this.height = 294.0F + (hasFade ? 28.0F : 0.0F) + (hasModes ? 54.0F : 0.0F);
+      this.height = 294.0F + (hasFade ? 28.0F : 0.0F) + (hasModes ? 54.0F : 0.0F) + (showsRgbSliders(this.setting) ? 75.0F : 0.0F);
 
       this.x = Math.max(16.0F, Math.min(anchorX, containerW - this.width - 14.0F));
       if (anchorY + this.height + 6.0F <= containerH - 12.0F) {
@@ -209,6 +222,18 @@ public final class ColorPickerFloatingPopup implements FloatingPopup {
       float alphaKnobX = this.alphaX + MathHelper.clamp_float((float)alphaVal / 255.0F, 0.0F, 1.0F) * this.alphaW;
       GlassRenderer.drawCircle(alphaKnobX, this.alphaY + this.alphaH * 0.5F, 6.5F, 0xFFFFFFFF, UiTheme.withAlpha(accent, 190), 1.5F);
       curY += this.alphaH + 12.0F;
+
+      // RGB channels, for the Client Color glass tint only: HSV above, numeric RGB here. The setters read the
+      // live colour each time, so the three tracks can be dragged in any order without fighting each other.
+      if (showsRgbSliders(this.setting)) {
+         Color live = rgbTargetColor();
+         drawCompactSliderRow(fontMed, "R", this.x + pad, curY, innerW, mouseX, mouseY, this.redSlider, (double)live.getRed(), 0.0, 255.0, this.draggingRed, this.sliderClickX, this.sliderClickY, v -> this.applyRgbChannel(0, v));
+         curY += 25.0F;
+         drawCompactSliderRow(fontMed, "G", this.x + pad, curY, innerW, mouseX, mouseY, this.greenSlider, (double)live.getGreen(), 0.0, 255.0, this.draggingGreen, this.sliderClickX, this.sliderClickY, v -> this.applyRgbChannel(1, v));
+         curY += 25.0F;
+         drawCompactSliderRow(fontMed, "B", this.x + pad, curY, innerW, mouseX, mouseY, this.blueSlider, (double)live.getBlue(), 0.0, 255.0, this.draggingBlue, this.sliderClickX, this.sliderClickY, v -> this.applyRgbChannel(2, v));
+         curY += 25.0F;
+      }
 
       // Mode Toggles grid (2x2)
       boolean hideClientToggle = this.setting.getParentModule() instanceof CustomClientColor;
@@ -428,6 +453,17 @@ public final class ColorPickerFloatingPopup implements FloatingPopup {
       if (this.clientAlphaSlider.isTrackHovered(mouseX, mouseY)) {
          this.draggingClientAlpha = true;
       }
+      if (showsRgbSliders(this.setting)) {
+         if (this.redSlider.isTrackHovered(mouseX, mouseY)) {
+            this.draggingRed = true;
+         }
+         if (this.greenSlider.isTrackHovered(mouseX, mouseY)) {
+            this.draggingGreen = true;
+         }
+         if (this.blueSlider.isTrackHovered(mouseX, mouseY)) {
+            this.draggingBlue = true;
+         }
+      }
 
       return true;
    }
@@ -445,8 +481,43 @@ public final class ColorPickerFloatingPopup implements FloatingPopup {
       this.draggingSpeed = false;
       this.draggingDist = false;
       this.draggingClientAlpha = false;
+      this.draggingRed = false;
+      this.draggingGreen = false;
+      this.draggingBlue = false;
       this.sliderClickX = -9999;
       this.sliderClickY = -9999;
+   }
+
+   /**
+    * Whether this popup carries the numeric RGB tracks. Only the Client Color glass tint does: it is the one
+    * colour in the client that is specified in RGB terms as well as HSV.
+    */
+   private static boolean showsRgbSliders(ColorSetting setting) {
+      return setting != null && setting.getParentModule() instanceof CustomClientColor;
+   }
+
+   /** The colour the RGB tracks edit: the fade end when that tab is active, the primary colour otherwise. */
+   private Color rgbTargetColor() {
+      return this.editingFadeTarget ? this.setting.getFadeColor() : this.setting.getPrimaryColor();
+   }
+
+   /** Writes one RGB channel back into the active target colour, keeping the other two and the alpha. */
+   private void applyRgbChannel(int channel, double value) {
+      Color current = rgbTargetColor();
+      int channelValue = MathHelper.clamp_int((int)Math.round(value), 0, 255);
+      int red = channel == 0 ? channelValue : current.getRed();
+      int green = channel == 1 ? channelValue : current.getGreen();
+      int blue = channel == 2 ? channelValue : current.getBlue();
+      // setPrimaryColor/setFadeColor both refresh the stored HSB array, so the SV square and the hue knob
+      // follow the drag instead of snapping back.
+      Color next = new Color(red, green, blue, current.getAlpha());
+      if (this.editingFadeTarget) {
+         this.setting.setFadeColor(next);
+      } else {
+         this.setting.setPrimaryColor(next);
+      }
+      this.setting.notifyValueChanged();
+      this.setting.notifyUserChanged();
    }
 
    private void applyDrag(int mouseX, int mouseY) {

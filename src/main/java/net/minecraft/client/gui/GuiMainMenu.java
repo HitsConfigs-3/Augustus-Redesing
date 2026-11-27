@@ -13,6 +13,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import net.augustus.modules.Module;
 import net.augustus.ClientManagers;
 import net.augustus.ui.menu.AbstractMainMenuScreen;
+import net.augustus.ui.modern.render.UiAnimation;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.GlStateManager;
 import net.minecraft.client.renderer.OpenGlHelper;
@@ -111,6 +112,10 @@ public class GuiMainMenu extends GuiScreen implements GuiYesNoCallback {
 
    @Override
    public void drawScreen(int mouseX, int mouseY, float partialTicks) {
+      // One clock for the frame: the glass buttons (GuiButton.drawGlassButton) smooth their hover and
+      // press with UiAnimation's frame delta, which only advances here - a screen that never calls this
+      // leaves every control frozen on the delta of whenever the clock last ran.
+      UiAnimation.beginFrame();
       GlStateManager.disableAlpha();
       this.renderSkybox(mouseX, mouseY, partialTicks);
       GlStateManager.enableAlpha();

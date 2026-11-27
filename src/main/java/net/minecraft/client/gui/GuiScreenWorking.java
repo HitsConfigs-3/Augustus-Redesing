@@ -1,5 +1,6 @@
 package net.minecraft.client.gui;
 
+import net.augustus.ui.VanillaScreenText;
 import net.minecraft.util.IProgressUpdate;
 import net.optifine.CustomLoadingScreen;
 import net.optifine.CustomLoadingScreens;
@@ -30,12 +31,12 @@ public class GuiScreenWorking extends GuiScreen implements IProgressUpdate {
          }
 
          if (this.progress > 0) {
-            drawCenteredString(this.fontRendererObj, this.title, this.width / 2, 70, 16777215);
-            drawCenteredString(this.fontRendererObj, this.stage + " " + this.progress + "%", this.width / 2, 90, 16777215);
+            VanillaScreenText.drawCenteredOnScreen(this.width, this.title, 70, 16777215);
+            VanillaScreenText.drawCenteredOnScreen(this.width, this.stage + " " + this.progress + "%", 90, 16777215);
          }
 
-         drawCenteredString(this.fontRendererObj, this.title, this.width / 2, 70, 16777215);
-         drawCenteredString(this.fontRendererObj, this.stage + " " + this.progress + "%", this.width / 2, 90, 16777215);
+         VanillaScreenText.drawCenteredOnScreen(this.width, this.title, 70, 16777215);
+         VanillaScreenText.drawCenteredOnScreen(this.width, this.stage + " " + this.progress + "%", 90, 16777215);
          super.drawScreen(mouseX, mouseY, partialTicks);
       }
    }

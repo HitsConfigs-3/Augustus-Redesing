@@ -3,6 +3,8 @@ package net.augustus.ui.menu;
 import net.augustus.changelog.ChangelogEntry;
 import net.augustus.changelog.ChangelogEntryType;
 import net.augustus.changelog.ChangelogReadException;
+import net.augustus.font.FontManager;
+import net.augustus.ui.modern.font.InterFontUtil;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
@@ -78,13 +80,13 @@ public class ChangeLogLoader {
          for (Object obj2 : ((ChangeLogSection)obj).getEntries()) {
             ChangelogEntry changelogEntry = (ChangelogEntry)obj2;
             String str = changelogEntry.getLines()[0];
-            if ((double)Minecraft.getMinecraft().fontRendererObj.getStringWidth(str) > d) {
+            if ((double)measure(str) > d) {
                StringBuilder sb = new StringBuilder();
                String[] parts = str.split(" ");
                ArrayList list2 = new ArrayList();
 
                for (String str2 : parts) {
-                  if ((double)Minecraft.getMinecraft().fontRendererObj.getStringWidth(sb + str2 + " ") > d) {
+                  if ((double)measure(sb + str2 + " ") > d) {
                      list2.add(sb.toString());
                      sb = new StringBuilder();
                   }
@@ -100,5 +102,14 @@ public class ChangeLogLoader {
       }
 
       return list;
+   }
+
+   /**
+    * Width in the face the changelog lines are actually painted with (Inter). Wrapping with the bitmap
+    * font's narrower advances would have produced lines that overflow the 300 px card once Inter drew them.
+    */
+   private static float measure(String str) {
+      InterFontUtil font = FontManager.body();
+      return font != null ? font.getStringWidth(str) : (float)Minecraft.getMinecraft().fontRendererObj.getStringWidth(str);
    }
 }

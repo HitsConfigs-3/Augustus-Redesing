@@ -7,6 +7,10 @@ uniform vec4 cornerRadius;
 uniform vec4 fillColor;
 uniform vec4 fillColorBottom;
 uniform float gradientMix;
+// 0 = the fill gradient runs down the quad (v_LocalUV.y), 1 = across it (v_LocalUV.x). Set on every
+// primitive draw, so the two directions are the same shape with the axis rotated rather than two
+// different shapes: the SDF, the border, the highlight and the shadow all stay identical.
+uniform float gradientAxis;
 uniform vec4 borderColor;
 uniform vec4 borderColorBottom;
 uniform float borderWidth;
@@ -73,7 +77,8 @@ void main() {
     float aa = max(0.50, smoothness);
 
     float fillCov = 1.0 - smoothstep(-aa, aa, d);
-    vec4 gradFill = mix(fillColor, mix(fillColor, fillColorBottom, clamp(v_LocalUV.y, 0.0, 1.0)), clamp(gradientMix, 0.0, 1.0));
+    float gradT = mix(clamp(v_LocalUV.y, 0.0, 1.0), clamp(v_LocalUV.x, 0.0, 1.0), clamp(gradientAxis, 0.0, 1.0));
+    vec4 gradFill = mix(fillColor, mix(fillColor, fillColorBottom, gradT), clamp(gradientMix, 0.0, 1.0));
     vec4 result = vec4(gradFill.rgb, gradFill.a * fillCov);
 
     // Subtle localized cursor reveal inside glass surfaces

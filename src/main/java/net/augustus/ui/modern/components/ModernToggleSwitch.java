@@ -101,8 +101,12 @@ public class ModernToggleSwitch {
          faded(accent)
       );
 
-      // Smooth sliding pill knob with discrete travel stretch + hover/press micro-physics
-      float pad = 3.0F;
+      // Smooth sliding pill knob with discrete travel stretch + hover/press micro-physics.
+      //
+      // Measured off the target: inside a 42.4 x 23.8 track the knob is a 19.9 circle sitting 2.4 in from
+      // the track's edges, so the pad is 2.4 rather than the 3.0 that used to make the knob look thin in
+      // a wide track.
+      float pad = 2.4F;
       float knobDiameter = Math.max(8.0F, height - pad * 2.0F);
       float easedState = UiAnimation.easeOutCubic(this.stateAnim);
       float travelStretch = 4.0F * easedState * (1.0F - easedState) * 2.4F + this.pressAnim * 1.6F;

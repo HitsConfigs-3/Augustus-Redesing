@@ -1,6 +1,7 @@
 package net.minecraft.client.gui;
 
 import java.util.List;
+import net.augustus.ui.VanillaScreenText;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.Tessellator;
 import net.minecraft.client.resources.ResourcePackListEntry;
@@ -42,7 +43,7 @@ public abstract class GuiResourcePackList extends GuiListExtended {
    @Override
    public void drawListHeader(int n, int n2, Tessellator tessellator) {
       String str = EnumChatFormatting.UNDERLINE + "" + EnumChatFormatting.BOLD + this.getListHeader();
-      this.mc.fontRendererObj.drawString(str, n + this.width / 2 - this.mc.fontRendererObj.getStringWidth(str) / 2, Math.min(this.top + 3, n2), 16777215);
+      VanillaScreenText.drawCenteredString(str, n + this.width / 2, Math.min(this.top + 3, n2), 16777215);
    }
 
    public List getList() {

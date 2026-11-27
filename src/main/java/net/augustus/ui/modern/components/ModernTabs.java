@@ -18,10 +18,27 @@ import net.augustus.ui.modern.render.UiTheme;
  */
 public final class ModernTabs {
    private static final Map<String, float[]> ANIM_STATES = new HashMap<>();
+
+   /**
+    * Category chip label face, derived once. The reference's chip caps are 11.8 tall, which puts the
+    * label at ~14.2 against the shared 16.0 medium face -- and the 14 % difference is not cosmetic:
+    * nine chips at 16.0 overflow the 824-px chip band by ~46 px, which is why our row lost its last
+    * chip behind the trailing view-mode button.
+    */
+   private static CustomFontUtil CHIP_LABEL_FONT;
+
    private static float sidebarIndicatorY = -1.0F;
    private static float sidebarIndicatorH = 18.0F;
 
    private ModernTabs() {
+   }
+
+   /** The chip label face; see {@link #CHIP_LABEL_FONT}. */
+   public static CustomFontUtil chipLabelFont() {
+      if (CHIP_LABEL_FONT == null) {
+         CHIP_LABEL_FONT = FontManager.interMedium.deriveSize(14.2F);
+      }
+      return CHIP_LABEL_FONT;
    }
 
    /**
@@ -86,38 +103,50 @@ public final class ModernTabs {
       float pressT = anim[2];
 
       if (actT > 0.03F) {
-         GlassRenderer.drawSoftShadow(x, y, width, height, UiTheme.PILL_RADIUS, 9.0F, 1.5F, faded(UiTheme.withAlpha(accent, Math.round(64.0F * actT))));
+         // A capsule halo at half the chip's height, so the glow's outline is the chip's own silhouette and
+         // not a larger rounded rectangle with a smaller radius (which is what a fixed radius reads as on a
+         // 34px pill). Blur 9 keeps the halo inside the band the caller scissors to.
+         GlassRenderer.drawSoftShadow(x, y, width, height, height * 0.5F, 9.0F, 1.5F, faded(UiTheme.withAlpha(accent, Math.round(96.0F * actT))));
       } else if (hovT > 0.04F) {
-         GlassRenderer.drawSoftShadow(x, y, width, height, UiTheme.PILL_RADIUS, 6.0F, 1.0F, faded(UiTheme.glassShadowArgb(0.18F * hovT)));
+         GlassRenderer.drawSoftShadow(x, y, width, height, height * 0.5F, 6.0F, 1.0F, faded(UiTheme.glassShadowArgb(0.18F * hovT)));
       }
 
-      // Tab pills are raised inner controls: each one carries LEVEL_CONTROL_RAISED's glass material
-      // (painted inside drawInteractiveSurface) and crossfades from its idle veil to an accent-pulled
-      // veil as it becomes the active tab, so the selected tab is glass that has taken on the accent
-      // rather than an opaque accent slab.
-      int idleTop = UiTheme.glassControlVeilArgb(UiTheme.LEVEL_CONTROL_RAISED, hovT, pressT, accent);
-      int idleBot = UiTheme.lerpArgb(idleTop, UiTheme.glassRecessedDepthRgb(), 0.34F);
-      int activeTop = UiTheme.glassControlTintArgb(UiTheme.LEVEL_CONTROL_RAISED, hovT, Math.max(actT, pressT), UiTheme.lerpArgb(accent, 0xFFE8E2FF, 0.12F + 0.10F * hovT), 0.88F);
-      int activeBot = UiTheme.glassControlTintArgb(UiTheme.LEVEL_CONTROL_RAISED, hovT, Math.max(actT, pressT), UiTheme.lerpArgb(accent, 0xFF171233, 0.32F), 0.88F);
+      // Measured off the reference:
+      //   idle   top rgb(47,50,75) -> bottom rgb(39,39,65), i.e. only a few levels above the page;
+      //   active top rgb(93,46,180) -> bottom rgb(70,34,146), a two-stop vertical purple.
+      //
+      // WHY the fills carry an explicit alpha and are painted through drawInteractiveSurface: a chip is
+      // a tinted pane over the window's own glass, so even the SELECTED one has to let the backdrop
+      // read through it. Painting it as a flat opaque gradient (what this used to do) turned the active
+      // chip into a slab and the whole bar stopped looking like glass. Alpha is now the only thing that
+      // separates the states, and the surface underneath supplies the material.
+      //
+      // There is still no ring: the reference has none at rest, so borderArgb is 0. The accent only
+      // ever appears as fill.
+      int idleTop = UiTheme.withAlpha(UiTheme.lerpArgb(0xFF2F324B, accent, 0.05F + 0.03F * hovT), 46);
+      int idleBot = UiTheme.withAlpha(UiTheme.lerpArgb(0xFF272739, accent, 0.03F + 0.02F * hovT), 38);
+      int activeTop = UiTheme.withAlpha(UiTheme.lerpArgb(accent, 0xFF2C1064, 0.35F), 156);
+      int activeBot = UiTheme.withAlpha(UiTheme.lerpArgb(accent, 0xFF1E0A46, 0.55F), 168);
 
       int topFill = UiTheme.lerpArgb(idleTop, activeTop, actT);
       int bottomFill = UiTheme.lerpArgb(idleBot, activeBot, actT);
-      int idleBorder = UiTheme.glassBorderFocusedOrHover(hovT * 0.72F, accent);
-      int activeBorder = UiTheme.withAlpha(UiTheme.lerpArgb(accent, 0xFFEAE5FF, 0.45F), 218);
-      int borderArgb = UiTheme.lerpArgb(idleBorder, activeBorder, actT);
 
       GlassRenderer.drawInteractiveSurface(
          x,
          y,
          width,
          height,
-         UiTheme.PILL_RADIUS,
+         // The target's chips are full pills: the radius is half the height, not a fixed 6.
+         height * 0.5F,
          faded(topFill),
          faded(bottomFill),
-         faded(borderArgb),
-         UiTheme.BORDER_THICKNESS,
-         UiTheme.glassTopHighlightAlpha(Math.max(hovT, actT * 0.85F)),
-         hovT,
+         0,
+         0.0F,
+         // A one-row sheen along the top edge is all the modelling the reference gives the idle chips.
+         Math.max(0.05F * (1.0F - actT), 0.02F),
+         // The selected chip is treated as "state 1" so the surface keeps the full tint instead of
+         // attenuating it back to 18 %; hover still layers on top.
+         Math.max(hovT, actT),
          pressT,
          true,
          (float)mouseX,
@@ -126,14 +155,18 @@ public final class ModernTabs {
       );
 
       float nudge = pressT * 0.4F;
-      int fg = UiTheme.lerpArgb(UiTheme.secondaryTextColor(), UiTheme.TEXT_PRIMARY, Math.max(actT, hovT));
+      // Every chip label in the reference reads near-white whether the chip is active or not -- the
+      // selection is carried by the fill, not by the type.
+      int fg = 0xFFFFFFFF;
       if (icon != null) {
-         int iconClr = UiTheme.lerpArgb(fg, UiTheme.lerpArgb(0xFFFFFFFF, UiTheme.accentSoftGlow(), 0.25F), actT);
-         icon.drawCentered(x + 14.0F, y + height * 0.5F + nudge, 13.0F, faded(iconClr));
+         int iconClr = UiTheme.lerpArgb(fg, 0xFFFFFFFF, actT * 0.5F);
+         // Measured off the target: the chip icon is ~11.4 content px, its centre sits 16.6 in from the
+         // pill's left edge, and the label follows 16.1 after it.
+         icon.drawCentered(x + 17.2F, y + height * 0.5F + nudge, 12.8F, faded(iconClr));
       }
       if (label != null && !label.isEmpty()) {
-         CustomFontUtil font = FontManager.interMedium;
-         float textX = icon != null ? x + 26.0F : x + 10.0F;
+         CustomFontUtil font = chipLabelFont();
+         float textX = icon != null ? x + 32.7F : x + 10.0F;
          font.drawVerticallyCenteredString(label, (double)textX, (double)(y + nudge), (double)height, faded(fg));
       }
    }
@@ -197,11 +230,16 @@ public final class ModernTabs {
       }
 
       if (actT > 0.02F || hovT > 0.02F) {
-         float surfaceAlpha = Math.max(actT, hovT * 0.72F);
+         float surfaceAlpha = Math.max(actT, hovT);
          // Sidebar rails are level veils too (a hover is the raised veil pulled slightly towards the
          // accent, the active rail the same veil pulled hard), so the sidebar's own glass material stays
          // visible under them instead of being covered by an opaque dark plate.
-         int hoverTop = UiTheme.glassControlTintArgb(UiTheme.LEVEL_CONTROL_RAISED, hovT, 0.0F, accent, 0.14F);
+         //
+         // WHY the hover coverage is 0.30 and not a whisper: at 0.14 the row only gained a faint tint
+         // over the material, which reads as "this row changed colour", not as "a glass surface is
+         // floating under the pointer". 0.30 keeps the backdrop clearly visible while giving the hover
+         // an actual body -- the same relationship the selected plate uses.
+         int hoverTop = UiTheme.glassControlTintArgb(UiTheme.LEVEL_CONTROL_RAISED, hovT, 0.0F, accent, 0.30F);
          int hoverBot = UiTheme.lerpArgb(hoverTop, UiTheme.glassRecessedDepthRgb(), 0.30F);
          int actTop = UiTheme.glassControlTintArgb(UiTheme.LEVEL_CONTROL_RAISED, hovT, actT, UiTheme.lerpArgb(accent, 0xFF261E52, 0.34F), 0.72F);
          int actBot = UiTheme.glassControlTintArgb(UiTheme.LEVEL_CONTROL_RAISED, hovT, actT, UiTheme.lerpArgb(UiTheme.accentDeep(), 0xFF131126, 0.48F), 0.72F);
@@ -214,17 +252,24 @@ public final class ModernTabs {
             actT
          );
 
+         if (hovT > 0.02F && actT < 0.5F) {
+            // The hover is a floating surface, so it gets the same whisper of accent light the selected
+            // plate has -- without it the row reads as a filled rectangle rather than as glass.
+            GlassRenderer.drawSoftShadow(x, y, width, height, 8.9F, 7.0F, 1.0F, faded(UiTheme.withAlpha(accent, Math.round(46.0F * hovT))));
+         }
+
          GlassRenderer.drawInteractiveSurface(
             x,
             y,
             width,
             height,
-            UiTheme.PILL_RADIUS,
+            // 8.9 is the selected plate's radius, so a hover and a selection read as the same object.
+            8.9F,
             faded(UiTheme.scaleAlpha(topFill, surfaceAlpha)),
             faded(UiTheme.scaleAlpha(botFill, surfaceAlpha)),
             faded(border),
             UiTheme.BORDER_THICKNESS,
-            UiTheme.glassTopHighlightAlpha(Math.max(hovT * 0.65F, actT * 0.85F)) * surfaceAlpha,
+            UiTheme.glassTopHighlightAlpha(Math.max(hovT * 0.85F, actT * 0.85F)) * surfaceAlpha,
             Math.max(hovT, actT * 0.45F),
             pressT,
             true,

@@ -206,25 +206,18 @@ public class ProxyManagerScreen extends ClientMenuTab {
    public void drawContent(int n, int n2, float f) {
       ScaledResolution sr = new ScaledResolution(this.mc);
       int n3 = (int)Math.max(100.0F, Math.min((float)sr.getScaledWidth() / 2.0F - 100.0F - 20.0F, 150.0F));
+      // Hints are laid out by the inherited helper so they sit on the fields' own text baseline in Inter,
+      // the same face and geometry the typed text uses.
       if (this.addressField.getText().isEmpty() && !this.addressField.isFocused()) {
-         int rgb = Color.gray.getRGB();
-         float f2 = 60.0F;
-         float f3 = 109.0F;
-         this.drawString("IP-Adress:Port", f3, f2, rgb);
+         this.drawFieldPlaceholder("IP-Adress:Port", this.addressField.xPosition, this.addressField.yPosition, 20, Color.gray.getRGB());
       }
 
       if (this.usernameField.getText().isEmpty() && !this.usernameField.isFocused()) {
-         int rgb2 = Color.gray.getRGB();
-         float f4 = 110.0F;
-         float f5 = 109.0F;
-         this.drawString("Username", f5, f4, rgb2);
+         this.drawFieldPlaceholder("Username", this.usernameField.xPosition, this.usernameField.yPosition, 20, Color.gray.getRGB());
       }
 
       if (this.passwordField.getText().isEmpty() && !this.passwordField.isFocused() && this.selectedProtocolType != ProxyProtocolType.SOCKS4) {
-         int rgb3 = Color.gray.getRGB();
-         float f6 = 135.0F;
-         float f7 = 109.0F;
-         this.drawString("Password", f7, f6, rgb3);
+         this.drawFieldPlaceholder("Password", this.passwordField.xPosition, this.passwordField.yPosition, 20, Color.gray.getRGB());
       }
 
       int n5 = Math.min((sr.getScaledWidth() - 102) - n3 - 20, 300);

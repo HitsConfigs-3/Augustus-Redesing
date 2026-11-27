@@ -2,6 +2,7 @@ package net.augustus.ui.menu;
 
 import net.augustus.changelog.ChangelogEntry;
 import java.util.List;
+import net.augustus.font.FontManager;
 import net.minecraft.client.Minecraft;
 
 public class ChangeLogSection {
@@ -9,7 +10,8 @@ public class ChangeLogSection {
    private final List entries;
 
    public int calculateHeight() {
-      int n = Minecraft.getMinecraft().fontRendererObj.FONT_HEIGHT + 1;
+      // Same Inter body pitch the changelog text is drawn with (see CreditsSection.calculateHeight).
+      int n = Math.round(FontManager.bodyLineHeight());
       int n2 = 0;
       n2 += n;
       n2 += n;

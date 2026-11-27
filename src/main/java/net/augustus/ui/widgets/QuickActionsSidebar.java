@@ -1,9 +1,11 @@
 package net.augustus.ui.widgets;
 
 import net.augustus.Augustus;
+import net.augustus.font.FontManager;
 import net.augustus.render.RenderUtil;
 import net.augustus.ui.menu.ContextMenuItem;
 import net.augustus.ui.menu.QuickMenuBuilder;
+import net.augustus.ui.modern.font.InterFontUtil;
 import net.augustus.ui.sidebar.HeaderSidebarItem;
 import net.augustus.utils.animation.AnimationUtil;
 import net.augustus.utils.animation.EasingType;
@@ -30,16 +32,34 @@ public final class QuickActionsSidebar implements MC {
       this.menuItems = list;
    }
 
+   /**
+    * The quick-actions list is part of the ClickGUI, so it speaks the ClickGUI's face: Inter. Every line
+    * check below (widths, scroll pitch, hover bands) goes through the same face, or the list would be laid
+    * out for glyphs it does not draw.
+    */
+   private static InterFontUtil font() {
+      return FontManager.body();
+   }
+
+   private float itemHeight() {
+      return FontManager.bodyLineHeight();
+   }
+
+   private int textWidth(String str) {
+      InterFontUtil font = font();
+      return font == null ? mc.fontRendererObj.getStringWidth(str) : Math.round(font.getStringWidth(str));
+   }
+
    public void initSidebar() {
       ScaledResolution sr = new ScaledResolution(mc);
-      this.scrollBar = new ScrollBar(mc.fontRendererObj.FONT_HEIGHT + 1);
+      this.scrollBar = new ScrollBar(Math.round(this.itemHeight()));
       this.scrollBar.setBounds(sr.getScaledWidth() - 4, (byte)0, sr.getScaledWidth() - 2, sr.getScaledHeight());
       List list = this.collectDisplayLines();
       this.scrollBar.setItemCount(list.size());
       this.sidebarWidth = 0;
 
       for (String str : (Iterable<String>)(list)) {
-         this.sidebarWidth = 20 + Math.max(this.sidebarWidth - 20, mc.fontRendererObj.getStringWidth(str));
+         this.sidebarWidth = 20 + Math.max(this.sidebarWidth - 20, this.textWidth(str));
       }
 
       this.sidebarWidth += 4;
@@ -115,7 +135,7 @@ public final class QuickActionsSidebar implements MC {
             boolean flag = mouseX >= sr.getScaledWidth() - this.sidebarWidth - 2
                && mouseX < sr.getScaledWidth() - 4
                && mouseY >= clampedScrollOffset - 1
-               && mouseY <= clampedScrollOffset + mc.fontRendererObj.FONT_HEIGHT - 1;
+               && (float)mouseY <= (float)clampedScrollOffset + this.itemHeight() - 1.0F;
             if (flag) {
                ContextMenuItem contextMenuItem = this.findItemByText(str);
                if (contextMenuItem != null) {
@@ -125,7 +145,7 @@ public final class QuickActionsSidebar implements MC {
                }
             }
 
-            clampedScrollOffset += mc.fontRendererObj.FONT_HEIGHT + 1;
+            clampedScrollOffset = Math.round((float)clampedScrollOffset + this.itemHeight());
          }
 
          return false;
@@ -136,11 +156,24 @@ public final class QuickActionsSidebar implements MC {
       this.updateSlideState(n);
       int n3 = (int)this.slideAnimation.updateX();
       ScaledResolution sr = new ScaledResolution(mc);
+      InterFontUtil font = font();
+      float lineHeight = this.itemHeight();
       if (!this.visible) {
-         mc.fontRendererObj
-            .drawStringWithShadow(
-               "§l->", (float)(n3 - mc.fontRendererObj.getStringWidth("§l->")), (float)sr.getScaledHeight() / 2.0F - (float)mc.fontRendererObj.FONT_HEIGHT / 2.0F, -1
+         // Tab handle shown while the list is collapsed: "->" (the '§l' run is applied by the face itself).
+         String handle = "§l->";
+         if (font == null) {
+            mc.fontRendererObj
+               .drawStringWithShadow(
+                  handle, (float)(n3 - mc.fontRendererObj.getStringWidth(handle)), (float)sr.getScaledHeight() / 2.0F - (float)mc.fontRendererObj.FONT_HEIGHT / 2.0F, -1
+               );
+         } else {
+            font.drawStringWithShadow(
+               handle,
+               (double)((float)n3 - font.getStringWidth(handle)),
+               (double)((float)sr.getScaledHeight() / 2.0F - font.getFontHeight() / 2.0F),
+               -1
             );
+         }
       } else {
          int n4 = sr.getScaledWidth() - n3;
          RenderUtil.drawRect(n3, 0, sr.getScaledWidth(), sr.getScaledHeight(), -939524096);
@@ -151,16 +184,27 @@ public final class QuickActionsSidebar implements MC {
             boolean flag = n >= sr.getScaledWidth() - this.sidebarWidth - 2
                && n < sr.getScaledWidth() - 4
                && n2 >= clampedScrollOffset - 1
-               && n2 <= clampedScrollOffset + mc.fontRendererObj.FONT_HEIGHT - 1;
+               && (float)n2 <= (float)clampedScrollOffset + lineHeight - 1.0F;
             int n5 = flag ? -4144960 : -1;
-            if (contextMenuItem != null && contextMenuItem.isCentered()) {
-               int n6 = n3 + this.sidebarWidth / 2 - mc.fontRendererObj.getStringWidth(str) / 2 - 2;
-               mc.fontRendererObj.drawStringWithShadow(str, (float)n6, (float)clampedScrollOffset, contextMenuItem instanceof HeaderSidebarItem ? Augustus.getInstance().getClientColor() : n5);
+            if (font == null) {
+               if (contextMenuItem != null && contextMenuItem.isCentered()) {
+                  int n6 = n3 + this.sidebarWidth / 2 - mc.fontRendererObj.getStringWidth(str) / 2 - 2;
+                  mc.fontRendererObj.drawStringWithShadow(str, (float)n6, (float)clampedScrollOffset, contextMenuItem instanceof HeaderSidebarItem ? Augustus.getInstance().getClientColor() : n5);
+               } else {
+                  mc.fontRendererObj.drawStringWithShadow(str, (float)(n3 + 2), (float)clampedScrollOffset, n5);
+               }
+            } else if (contextMenuItem != null && contextMenuItem.isCentered()) {
+               font.drawStringWithShadow(
+                  str,
+                  (double)((float)n3 + (float)this.sidebarWidth / 2.0F - font.getStringWidth(str) / 2.0F - 2.0F),
+                  (double)((float)clampedScrollOffset),
+                  contextMenuItem instanceof HeaderSidebarItem ? Augustus.getInstance().getClientColor() : n5
+               );
             } else {
-               mc.fontRendererObj.drawStringWithShadow(str, (float)(n3 + 2), (float)clampedScrollOffset, n5);
+               font.drawStringWithShadow(str, (double)((float)(n3 + 2)), (double)((float)clampedScrollOffset), n5);
             }
 
-            clampedScrollOffset += mc.fontRendererObj.FONT_HEIGHT + 1;
+            clampedScrollOffset = Math.round((float)clampedScrollOffset + lineHeight);
          }
 
          if (n4 >= this.sidebarWidth - 2) {
