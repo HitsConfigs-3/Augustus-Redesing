@@ -189,7 +189,7 @@ public class GuiScreenServerList extends GuiScreen {
    public void drawScreen(int mouseX, int mouseY, float partialTicks) {
       this.drawDefaultBackground();
       VanillaScreenText.drawCenteredOnScreen(this.width, I18n.format("selectServer.direct", new Object[0]), 20, 16777215);
-      this.drawString(this.fontRendererObj, I18n.format("addServer.enterIp", new Object[0]), this.width / 2 - 100, 100, 10526880);
+      VanillaScreenText.drawString(I18n.format("addServer.enterIp", new Object[0]), this.width / 2 - 100, 100, 10526880);
       this.ipEdit.drawTextBox();
       super.drawScreen(mouseX, mouseY, partialTicks);
       if (this.getServerPingerModule().isToggled()) {

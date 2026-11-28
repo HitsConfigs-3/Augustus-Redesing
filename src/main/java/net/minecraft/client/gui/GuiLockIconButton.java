@@ -1,10 +1,18 @@
 package net.minecraft.client.gui;
 
+import net.augustus.ClientManagers;
+import net.augustus.modules.Module;
+import net.augustus.ui.modern.render.LucideIcon;
+import net.augustus.ui.modern.render.MenuScreenSkin;
+import net.augustus.ui.modern.render.UiTheme;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.GlStateManager;
+import org.lwjgl.input.Mouse;
 
 public class GuiLockIconButton extends GuiButton {
    private boolean locked = false;
+   private float lockHoverAnim = 0.0F;
+   private float lockPressAnim = 0.0F;
 
    public void setLocked(boolean flag) {
       this.locked = flag;
@@ -17,21 +25,45 @@ public class GuiLockIconButton extends GuiButton {
    @Override
    public void drawButton(Minecraft mc, int n, int n2) {
       if (this.visible) {
+         this.hovered = n >= this.xPosition && n2 >= this.yPosition && n < this.xPosition + this.width && n2 < this.yPosition + this.height;
+         if (!((Module)ClientManagers.moduleManager.invisMode).isToggled() && !this.forceVanillaStyle) {
+            this.lockHoverAnim = UiTheme.smoothState(this.lockHoverAnim, this.enabled && this.hovered ? 1.0F : 0.0F);
+            this.lockPressAnim = UiTheme.smoothPress(this.lockPressAnim, this.enabled && this.hovered && Mouse.isButtonDown(0));
+            float radius = ClientManagers.moduleManager.clientSettings.roundedButtons.getValue()
+               ? MenuScreenSkin.optionRadius((float)this.width, (float)this.height)
+               : 0.0F;
+            MenuScreenSkin.drawOptionSurface(
+               (float)this.xPosition,
+               (float)this.yPosition,
+               (float)this.width,
+               (float)this.height,
+               radius,
+               this.lockHoverAnim,
+               this.lockPressAnim,
+               this.enabled,
+               (float)n,
+               (float)n2,
+               UiTheme.accentColor()
+            );
+            LucideIcon icon = this.locked ? LucideIcon.LOCK : LucideIcon.CHECK;
+            int iconColor = this.locked ? 0xFFF59E0B : (this.enabled ? MenuScreenSkin.LABEL_COLOR : UiTheme.disabledTextColor());
+            icon.drawCentered((float)this.xPosition + (float)this.width * 0.5F, (float)this.yPosition + (float)this.height * 0.5F, 11.0F, iconColor);
+            return;
+         }
          mc.getTextureManager().bindTexture(GuiButton.buttonTextures);
          GlStateManager.color(1.0F, 1.0F, 1.0F, 1.0F);
-         boolean flag = n >= this.xPosition && n2 >= this.yPosition && n < this.xPosition + this.width && n2 < this.yPosition + this.height;
          GuiLockIconButton.Icon icon;
          if (this.locked) {
             if (!this.enabled) {
                icon = GuiLockIconButton.Icon.LOCKED_DISABLED;
-            } else if (flag) {
+            } else if (this.hovered) {
                icon = GuiLockIconButton.Icon.LOCKED_HOVER;
             } else {
                icon = GuiLockIconButton.Icon.LOCKED;
             }
          } else if (!this.enabled) {
             icon = GuiLockIconButton.Icon.UNLOCKED_DISABLED;
-         } else if (flag) {
+         } else if (this.hovered) {
             icon = GuiLockIconButton.Icon.UNLOCKED_HOVER;
          } else {
             icon = GuiLockIconButton.Icon.UNLOCKED;

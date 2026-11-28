@@ -1,12 +1,12 @@
 package net.augustus.ui.widgets;
 
 import net.augustus.Augustus;
+import net.augustus.ui.TabbedMenuScreen;
+import net.augustus.ui.modern.render.GlassRenderer;
+import net.augustus.ui.modern.render.UiAnimation;
+import net.augustus.ui.modern.render.UiTheme;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.ScaledResolution;
-import net.minecraft.client.renderer.GlStateManager;
-import net.minecraft.client.renderer.Tessellator;
-import net.minecraft.client.renderer.WorldRenderer;
-import net.minecraft.client.renderer.vertex.DefaultVertexFormats;
 import net.minecraft.util.MathHelper;
 
 public class ScrollBar {
@@ -26,6 +26,7 @@ public class ScrollBar {
    public int topY;
    public int itemCount;
    public double scrollOffset;
+   private float hoverAnim;
 
    public void clampScrollOffset() {
       this.scrollOffset = MathHelper.clamp_double(this.scrollOffset, Math.min(0.0, -((double)this.itemCount * this.itemHeight - (double)(this.bottomY - this.topY))), 0.0);
@@ -85,39 +86,61 @@ public class ScrollBar {
 
       if (!this.fitsWithoutScrolling()) {
          this.recalculateThumbMetrics();
-         Tessellator instance = Tessellator.getInstance();
-         WorldRenderer worldRenderer = instance.getWorldRenderer();
-         GlStateManager.enableBlend();
-         GlStateManager.tryBlendFuncSeparate(770, 771, 0, 1);
-         GlStateManager.disableAlpha();
-         GlStateManager.shadeModel(7425);
-         GlStateManager.disableTexture2D();
-         worldRenderer.begin(7, DefaultVertexFormats.POSITION_TEX_COLOR);
-         double leftX2 = this.leftX;
-         double rightX2 = this.rightX;
-         double thumbTopY2 = this.thumbTopY;
-         double thumbHeight2 = this.thumbHeight;
-         worldRenderer.pos(leftX2, (double)this.bottomY, 0.0).tex(0.0, 1.0).color(0, 0, 0, 255).endVertex();
-         worldRenderer.pos(rightX2, (double)this.bottomY, 0.0).tex(1.0, 1.0).color(0, 0, 0, 255).endVertex();
-         worldRenderer.pos(rightX2, (double)this.topY, 0.0).tex(1.0, 0.0).color(0, 0, 0, 255).endVertex();
-         worldRenderer.pos(leftX2, (double)this.topY, 0.0).tex(0.0, 0.0).color(0, 0, 0, 255).endVertex();
-         instance.draw();
-         worldRenderer.begin(7, DefaultVertexFormats.POSITION_TEX_COLOR);
-         worldRenderer.pos(leftX2, thumbTopY2 + thumbHeight2, 0.0).tex(0.0, 1.0).color(128, 128, 128, 255).endVertex();
-         worldRenderer.pos(rightX2, thumbTopY2 + thumbHeight2, 0.0).tex(1.0, 1.0).color(128, 128, 128, 255).endVertex();
-         worldRenderer.pos(rightX2, thumbTopY2, 0.0).tex(1.0, 0.0).color(128, 128, 128, 255).endVertex();
-         worldRenderer.pos(leftX2, thumbTopY2, 0.0).tex(0.0, 0.0).color(128, 128, 128, 255).endVertex();
-         instance.draw();
-         worldRenderer.begin(7, DefaultVertexFormats.POSITION_TEX_COLOR);
-         worldRenderer.pos(leftX2, thumbTopY2 + thumbHeight2 - 1.0, 0.0).tex(0.0, 1.0).color(192, 192, 192, 255).endVertex();
-         worldRenderer.pos(rightX2 - 1.0, thumbTopY2 + thumbHeight2 - 1.0, 0.0).tex(1.0, 1.0).color(192, 192, 192, 255).endVertex();
-         worldRenderer.pos(rightX2 - 1.0, thumbTopY2, 0.0).tex(1.0, 0.0).color(192, 192, 192, 255).endVertex();
-         worldRenderer.pos(leftX2, thumbTopY2, 0.0).tex(0.0, 0.0).color(192, 192, 192, 255).endVertex();
-         instance.draw();
-         GlStateManager.enableTexture2D();
-         GlStateManager.shadeModel(7424);
-         GlStateManager.enableAlpha();
-         GlStateManager.disableBlend();
+         float trackL = (float)this.leftX;
+         float trackR = (float)this.rightX;
+         float trackT = (float)this.topY;
+         float trackB = (float)this.bottomY;
+         float trackH = Math.max(1.0F, trackB - trackT);
+         float thumbT = Math.max(trackT, (float)this.thumbTopY);
+         float thumbH = Math.max(18.0F, Math.min(trackB - thumbT, (float)this.thumbHeight));
+
+         float mx = TabbedMenuScreen.mouseX();
+         float my = TabbedMenuScreen.mouseY();
+         boolean hovered = this.dragging || (mx >= trackL - 4.0F && mx <= trackR + 4.0F && my >= trackT && my <= trackB);
+         this.hoverAnim = UiTheme.smoothState(this.hoverAnim, hovered ? 1.0F : 0.0F);
+
+         float maxW = Math.max(3.5F, trackR - trackL);
+         float w = UiAnimation.lerp(Math.min(3.5F, maxW), Math.min(5.5F, maxW), this.hoverAnim);
+         float barX = trackR - w;
+         float r = w * 0.5F;
+         int accent = UiTheme.accentColor();
+
+         GlassRenderer.drawRoundedBox(
+            barX,
+            trackT,
+            w,
+            trackH,
+            r,
+            UiTheme.withAlpha(0xFF0A0814, Math.round(72.0F + 56.0F * this.hoverAnim)),
+            UiTheme.withAlpha(UiTheme.GLASS_BORDER, 90),
+            0.75F
+         );
+         if (this.hoverAnim > 0.04F) {
+            GlassRenderer.drawSoftShadow(
+               barX,
+               thumbT,
+               w,
+               thumbH,
+               r,
+               5.5F,
+               0.0F,
+               UiTheme.withAlpha(accent, Math.round(105.0F * this.hoverAnim))
+            );
+         }
+         int topC = UiTheme.withAlpha(UiTheme.lerpArgb(accent, UiTheme.accentSoftGlow(), 0.30F), Math.round(180.0F + 70.0F * this.hoverAnim));
+         int botC = UiTheme.withAlpha(UiTheme.accentDeep(), Math.round(170.0F + 75.0F * this.hoverAnim));
+         GlassRenderer.drawRoundedGradientBox(
+            barX,
+            thumbT,
+            w,
+            thumbH,
+            r,
+            topC,
+            botC,
+            UiTheme.withAlpha(UiTheme.accentSoftGlow(), Math.round(145.0F + 95.0F * this.hoverAnim)),
+            0.85F,
+            0.0F
+         );
       }
    }
 

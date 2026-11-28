@@ -172,20 +172,35 @@ public class ClientSettings extends Module implements TickListener, PacketListen
    public static void renderMainMenuAccountInfo() {
       if (!ClientManagers.moduleManager.clientSettings.hideMainMenuAccountInfos.getValue()) {
          ProxyEntry proxy = Augustus.getInstance().getProxy();
-         String statusColor = mc.session.getToken().length() < 5 ? "§c" : "§a";
-         String accountLine = "Account: " + statusColor + mc.getSession().getUsername();
-         String proxyLine = "Proxy: " + (proxy == null ? "§cNot connected!" : "§7" + proxy.getHost() + ":" + proxy.getPort());
-         // Inter, like the rest of the menu's chrome: these two corner lines sit on every tab, so leaving
-         // them in the bitmap font made the whole client menu look like it had two type systems.
-         InterFontUtil font = FontManager.body();
+         boolean premium = mc.session.getToken().length() >= 5;
+         String accName = mc.getSession().getUsername();
+         String proxyLabel = proxy == null ? "Direct" : (proxy.getHost() + ":" + proxy.getPort());
+
+         InterFontUtil font = FontManager.uiSmall();
          if (font == null) {
-            mc.fontRendererObj.drawStringWithShadow(accountLine, 2.0F, 2.0F, -1);
-            mc.fontRendererObj.drawStringWithShadow(proxyLine, 2.0F, 12.0F, -1);
+            String accountLine = "Account: " + (premium ? "§a" : "§c") + accName;
+            String proxyLine = "Proxy: " + (proxy == null ? "§cNot connected!" : "§7" + proxyLabel);
+            mc.fontRendererObj.drawStringWithShadow(accountLine, 4.0F, 4.0F, -1);
+            mc.fontRendererObj.drawStringWithShadow(proxyLine, 4.0F, 14.0F, -1);
             return;
          }
-         float lineStep = Math.max(font.getFontHeight() + 1.0F, 12.0F);
-         font.drawStringWithShadow(accountLine, 2.0, 2.0, -1);
-         font.drawStringWithShadow(proxyLine, 2.0, 2.0 + (double)lineStep, -1);
+
+         float pillX = 8.0F;
+         float pillY = 7.0F;
+         float pillH = 26.0F;
+         float accW = font.getStringWidth(accName);
+         float prxW = font.getStringWidth(proxyLabel);
+         float pillW = Math.max(accW, prxW) + 28.0F;
+
+         net.augustus.ui.modern.render.MenuScreenSkin.drawGlassContainer(pillX, pillY, pillW, pillH, 6.0F);
+         int accDot = premium ? 0xFF4ADE80 : 0xFFF87171;
+         int prxDot = proxy != null ? 0xFFA855F7 : 0xCC94A3B8;
+
+         net.augustus.ui.modern.render.LucideIcon.USER.draw(pillX + 7.0F, pillY + 4.5F, 8.5F, accDot, false);
+         font.drawStringWithShadow(accName, (double)(pillX + 19.0F), (double)(pillY + 4.0F), 0xFFF8FAFC);
+
+         net.augustus.ui.modern.render.LucideIcon.SHIELD.draw(pillX + 7.0F, pillY + 14.5F, 8.5F, prxDot, false);
+         font.drawStringWithShadow(proxyLabel, (double)(pillX + 19.0F), (double)(pillY + 14.0F), proxy != null ? 0xFFE2E8F0 : 0xCCB8B0D0);
       }
    }
 

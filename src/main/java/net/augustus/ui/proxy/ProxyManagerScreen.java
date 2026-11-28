@@ -1,16 +1,5 @@
 package net.augustus.ui.proxy;
 
-import net.augustus.Augustus;
-import net.augustus.proxy.ProxyProtocolType;
-import net.augustus.render.RenderUtil;
-import net.augustus.ui.GuiButtonClickHandler;
-import net.augustus.ui.GuiPasswordField;
-import net.augustus.ui.account.AccountAuthenticator;
-import net.augustus.ui.menu.ClientMenuTab;
-import net.augustus.ui.widgets.ScrollBar;
-import net.augustus.utils.TuplePair;
-import net.augustus.utils.network.ProxyEntry;
-import net.augustus.utils.render.ColorUtil;
 import java.awt.Color;
 import java.io.BufferedReader;
 import java.io.File;
@@ -22,11 +11,32 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutionException;
 import javax.swing.JFileChooser;
 import javax.swing.filechooser.FileNameExtensionFilter;
+import net.augustus.Augustus;
+import net.augustus.proxy.ProxyProtocolType;
+import net.augustus.render.RenderUtil;
+import net.augustus.ui.AugustusGuiScreen;
+import net.augustus.ui.GuiButtonClickHandler;
+import net.augustus.ui.GuiPasswordField;
+import net.augustus.ui.TabbedMenuScreen;
+import net.augustus.ui.account.AccountAuthenticator;
+import net.augustus.ui.menu.ClientMenuTab;
+import net.augustus.ui.modern.components.GlassMenuButton;
+import net.augustus.ui.modern.font.InterFontUtil;
+import net.augustus.ui.modern.render.GlassRenderer;
+import net.augustus.ui.modern.render.LucideIcon;
+import net.augustus.ui.modern.render.UiTheme;
+import net.augustus.ui.widgets.ScrollBar;
+import net.augustus.utils.TuplePair;
+import net.augustus.utils.network.ProxyEntry;
+import net.augustus.utils.render.ColorUtil;
 import net.minecraft.client.gui.GuiButton;
 import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.client.gui.GuiTextField;
-import net.minecraft.client.gui.ScaledResolution;
 
+/**
+ * Proxy Manager view: unified left frosted glass form card with recessed wells and icon buttons,
+ * paired with a full-height right frosted glass proxy list container.
+ */
 public class ProxyManagerScreen extends ClientMenuTab {
    private boolean reinitPending;
    private CompletableFuture activePingTask;
@@ -42,24 +52,338 @@ public class ProxyManagerScreen extends ClientMenuTab {
    private GuiTextField addressField;
    private ProxyProtocolType selectedProtocolType = ProxyProtocolType.SOCKS5;
 
+   private float leftX;
+   private float leftW;
+   private float rightX;
+   private float rightW;
+   private float cardPad;
+   private float rowGap;
+   private float colGap;
+   private float labelH;
+   private float formY;
+   private float formH;
+   private float addressLabelY;
+   private float addressFieldY;
+   private float userLabelY;
+   private float userFieldY;
+   private float switchRowY;
+   private float connectButtonY;
+   private float toolsRow1Y;
+   private float toolsRow2Y;
+   private float dividerY;
+   private float dangerRowY;
+   private float listX;
+   private float listW;
+   private float listTop;
+   private float listHeadingY;
+   private float rowsTop;
+   private float rowsBottom;
+
+   @Override
+   public LucideIcon getTabIcon() {
+      return LucideIcon.SHIELD;
+   }
+
+   private boolean hasPasswordRow() {
+      return this.selectedProtocolType == ProxyProtocolType.SOCKS5;
+   }
+
+   private void layoutCards() {
+      float pageX = TabbedMenuScreen.contentX();
+      float pageW = TabbedMenuScreen.contentW();
+      float gap = TabbedMenuScreen.gap();
+      float row = TabbedMenuScreen.rowH();
+      float top = TabbedMenuScreen.bodyTop();
+
+      this.cardPad = clamp(Math.round(row * 0.48F), 10.0F, 13.0F);
+      this.rowGap = clamp(Math.round(row * 0.25F), 5.0F, 7.0F);
+      this.colGap = clamp(Math.round(gap * 0.65F), 6.0F, 8.0F);
+      this.labelH = menuCaptionHeight();
+
+      this.leftX = pageX;
+      this.leftW = clamp(Math.round(pageW * 0.455F), 150.0F, 375.0F);
+      if (this.leftW > pageW - 148.0F) {
+         this.leftW = Math.max(140.0F, pageW - 148.0F);
+      }
+      this.rightX = this.leftX + this.leftW + gap;
+      this.rightW = Math.max(130.0F, TabbedMenuScreen.contentX() + pageW - this.rightX);
+
+      // Unified Left Form Card
+      this.formY = top;
+      this.addressLabelY = this.formY + this.cardPad;
+      this.addressFieldY = this.addressLabelY + this.labelH + 4.0F;
+      this.userLabelY = this.addressFieldY + row + this.rowGap + 2.0F;
+      this.userFieldY = this.userLabelY + this.labelH + 4.0F;
+      this.switchRowY = this.userFieldY + row + this.rowGap + 2.0F;
+      this.connectButtonY = this.switchRowY + row + this.rowGap;
+      this.toolsRow1Y = this.connectButtonY + row + this.rowGap;
+      this.toolsRow2Y = this.toolsRow1Y + row + this.rowGap;
+      this.dividerY = this.toolsRow2Y + row + this.rowGap + 2.0F;
+      this.dangerRowY = this.dividerY + this.rowGap + 2.0F;
+      this.formH = this.dangerRowY + row + this.cardPad - this.formY;
+
+      // Right List Container
+      this.listX = this.rightX;
+      this.listW = this.rightW;
+      this.listTop = top;
+      this.listHeadingY = top + this.cardPad;
+      this.rowsTop = this.listHeadingY + this.labelH + 8.0F;
+      this.rowsBottom = TabbedMenuScreen.bodyBottom();
+   }
+
+   @Override
+   public void drawChromeBehind() {
+      this.layoutCards();
+      this.menuGlassPanel(this.leftX, this.formY, this.leftW, this.formH, 0.0F, 1.0F);
+
+      float innerX = this.leftX + this.cardPad;
+      float innerW = this.leftW - this.cardPad * 2.0F;
+      float columnW = (innerW - this.colGap) * 0.5F;
+
+      menuSectionLabel("PROXY ADDRESS", innerX, this.addressLabelY, 1.0F);
+      menuSectionLabel("USERNAME", innerX, this.userLabelY, 1.0F);
+      if (this.hasPasswordRow()) {
+         menuSectionLabel("PASSWORD", innerX + columnW + this.colGap, this.userLabelY, 1.0F);
+      }
+
+      GlassRenderer.drawSeparator(
+         innerX,
+         this.dividerY,
+         innerX + innerW,
+         this.dividerY,
+         UiTheme.SEPARATOR_THICKNESS,
+         UiTheme.GLASS_DIVIDER
+      );
+
+      // Right full-height glass container
+      this.menuGlassPanel(this.listX, this.listTop, this.listW, Math.max(0.0F, this.rowsBottom - this.listTop), 0.0F, 1.0F);
+
+      menuSectionLabel("PROXIES", this.listX + this.cardPad, this.listHeadingY, 1.0F);
+      String count = String.valueOf(proxies.size());
+      InterFontUtil capFace = menuCaptionFont();
+      if (capFace != null) {
+         float cw = capFace.getStringWidth(count);
+         capFace.drawStringWithShadow(count, (double)(this.listX + this.listW - this.cardPad - cw),
+               (double)this.listHeadingY, UiTheme.scaleAlpha(TEXT_SUB, 0.80F));
+      }
+
+      if (proxies.isEmpty()) {
+         this.menuEmptyState(
+            this.listX,
+            this.rowsTop,
+            this.listW,
+            Math.max(0.0F, this.rowsBottom - this.rowsTop - 8.0F),
+            LucideIcon.GLOBE,
+            "No proxies yet",
+            "Import a .txt list, or type host:port above and press Connect.",
+            false
+         );
+      }
+   }
+
+   @Override
+   public void initContent() {
+      this.reinitPending = false;
+      super.initContent();
+      this.layoutCards();
+
+      float row = TabbedMenuScreen.rowH();
+      float innerX = this.leftX + this.cardPad;
+      float innerW = this.leftW - this.cardPad * 2.0F;
+      float columnW = (innerW - this.colGap) * 0.5F;
+
+      this.addressField = this.addTextField(Math.round(innerX), Math.round(this.addressFieldY),
+            Math.round(innerW), Math.round(row));
+      this.addressField.setCustomFont(menuBodyFont());
+
+      float userW = this.hasPasswordRow() ? columnW : innerW;
+      this.usernameField = this.addTextField(Math.round(innerX), Math.round(this.userFieldY),
+            Math.round(userW), Math.round(row));
+      this.usernameField.setCustomFont(menuBodyFont());
+
+      if (this.hasPasswordRow()) {
+         this.passwordField = this.addPasswordField(Math.round(innerX + columnW + this.colGap),
+               Math.round(this.userFieldY), Math.round(columnW), Math.round(row));
+         this.passwordField.setCustomFont(menuBodyFont());
+         this.passwordField.setVisible(true);
+      } else if (this.passwordField != null) {
+         this.passwordField.setVisible(false);
+      }
+
+      this.populateFieldsFromPendingProxy();
+
+      String protoLabel = "Type: " + this.selectedProtocolType.getDisplayName();
+      this.addGlassButton(Math.round(innerX), Math.round(this.switchRowY), Math.round(columnW), Math.round(row),
+            protoLabel, button -> this.onToggleProtocolTypeClick(button))
+            .withTrailingIcon(LucideIcon.CHEVRON_DOWN);
+
+      String checkLabel = "MC Check: " + (this.mcServerCheckEnabled ? "§aTrue" : "§cFalse");
+      this.addGlassButton(Math.round(innerX + columnW + this.colGap), Math.round(this.switchRowY),
+            Math.round(columnW), Math.round(row), checkLabel, button7 -> {
+               this.mcServerCheckEnabled = !this.mcServerCheckEnabled;
+               button7.displayString = "MC Check: " + (this.mcServerCheckEnabled ? "§aTrue" : "§cFalse");
+               if (button7 instanceof GlassMenuButton) {
+                  ((GlassMenuButton)button7).setToggleState(this.mcServerCheckEnabled);
+               }
+            })
+            .withTrailingIcon(LucideIcon.CHEVRON_DOWN);
+
+      this.addGlassButton(Math.round(innerX), Math.round(this.connectButtonY), Math.round(columnW),
+            Math.round(row), "Connect", button2 -> this.connectToProxy(this.addressField.getText(), false))
+            .withIcon(LucideIcon.LINK)
+            .withVariant(GlassMenuButton.Variant.PRIMARY);
+      this.addGlassButton(Math.round(innerX + columnW + this.colGap), Math.round(this.connectButtonY),
+            Math.round(columnW), Math.round(row), "Clear", button3 -> this.onClearFieldsClick(button3))
+            .withIcon(LucideIcon.TRASH_2);
+
+      this.addGlassButton(Math.round(innerX), Math.round(this.toolsRow1Y), Math.round(columnW), Math.round(row),
+            "Disconnect", button4 -> this.onDisconnectClick(button4))
+            .withIcon(LucideIcon.CLOSE);
+      this.addGlassButton(Math.round(innerX + columnW + this.colGap), Math.round(this.toolsRow1Y),
+            Math.round(columnW), Math.round(row), "Clipboard Login", button5 -> this.connectFromClipboard())
+            .withIcon(LucideIcon.CLIPBOARD);
+
+      this.addGlassButton(Math.round(innerX), Math.round(this.toolsRow2Y), Math.round(innerW), Math.round(row),
+            "Import Proxies", button6 -> this.onImportProxiesClick(button6))
+            .withIcon(LucideIcon.UPLOAD);
+
+      this.addGlassButton(Math.round(innerX), Math.round(this.dangerRowY), Math.round(innerW), Math.round(row),
+            "Delete selected Proxy", button8 -> this.onDeleteSelectedProxyClick(button8))
+            .withIcon(LucideIcon.TRASH_2)
+            .withVariant(GlassMenuButton.Variant.DANGER);
+
+      scrollBar.setBounds(
+         Math.round(this.listX + this.listW - 10.0F),
+         Math.round(this.rowsTop),
+         Math.round(this.listX + this.listW - 5.0F),
+         Math.round(this.rowsBottom - 10.0F)
+      );
+      scrollBar.setItemCount(proxies.size());
+   }
+
+   @Override
+   public void drawContent(int n, int n2, float f) {
+      this.layoutCards();
+      float row = TabbedMenuScreen.rowH();
+      int hintColor = UiTheme.scaleAlpha(TEXT_SUB, 0.62F);
+
+      if (this.addressField != null && this.addressField.getText().isEmpty() && !this.addressField.isFocused()) {
+         this.drawFieldPlaceholder("IP-Adress:Port", this.addressField.xPosition, this.addressField.yPosition,
+               Math.round(row), hintColor, menuBodyFont(), 8.0F);
+      }
+
+      if (this.usernameField != null && this.usernameField.getText().isEmpty() && !this.usernameField.isFocused()) {
+         this.drawFieldPlaceholder("Username", this.usernameField.xPosition, this.usernameField.yPosition,
+               Math.round(row), hintColor, menuBodyFont(), 8.0F);
+      }
+
+      if (this.passwordField != null && this.passwordField.getText().isEmpty() && !this.passwordField.isFocused()
+            && this.selectedProtocolType != ProxyProtocolType.SOCKS4) {
+         this.drawFieldPlaceholder("Password", this.passwordField.xPosition, this.passwordField.yPosition,
+               Math.round(row), hintColor, menuBodyFont(), 8.0F);
+      }
+
+      this.drawProxyRows(n, n2);
+      scrollBar.updateAndDraw();
+
+      if (this.activePingTask != null && this.activePingTask.isDone()) {
+         try {
+            TuplePair tuplePair = (TuplePair)this.activePingTask.get();
+            String first = (String)tuplePair.getFirst();
+            Color green = Color.green;
+            Color color = Color.red.darker();
+            double d = Math.min(1.0, (double)((Integer)tuplePair.getSecond()).intValue() / 1000.0);
+            this.setStatus(first, new Color(ColorUtil.blendColors(green, color, d)));
+            this.activePingTask = null;
+            ProxyEntry proxy = Augustus.getInstance().getProxy();
+            if (proxy != null && getPendingProxy() != null) {
+               if (proxy.matches(getPendingProxy())) {
+                  this.addressField.setText(proxy.getHost() + ":" + proxy.getPort());
+                  this.usernameField.setText(proxy.getUsername());
+                  if (this.passwordField != null) {
+                     this.passwordField.setText(proxy.getPassword());
+                  }
+               }
+            }
+         } catch (ExecutionException | InterruptedException e) {
+            throw new RuntimeException(e);
+         }
+      }
+   }
+
+   private void drawProxyRows(int mouseX, int mouseY) {
+      if (proxies.isEmpty()) {
+         return;
+      }
+      float rowH = 34.0F;
+      float pitch = 38.0F;
+      float innerPad = 10.0F;
+      float barReserve = scrollBar.fitsWithoutScrolling() ? innerPad : 16.0F;
+      float rowX = this.listX + innerPad;
+      float rowW = Math.max(40.0F, this.listW - innerPad - barReserve);
+      int clampedScrollOffset = (int)scrollBar.getClampedScrollOffset();
+
+      AugustusGuiScreen.enableScissor(
+         Math.round(this.listX + 2.0F),
+         Math.round(this.rowsTop),
+         Math.round(this.listX + this.listW - 2.0F),
+         Math.round(this.rowsBottom - 8.0F)
+      );
+      for (int pass = 0; pass < 2; pass++) {
+         float y = this.rowsTop + (float)clampedScrollOffset;
+         for (ProxyEntry proxyEntry : (Iterable<ProxyEntry>)(proxies)) {
+            ProxyListEntry proxyListEntry = (ProxyListEntry)proxyListEntries.get(proxyEntry);
+            if (proxyListEntry == null || proxyListEntry.isFavorite() != (pass == 0)) {
+               continue;
+            }
+            proxyListEntry.drawEntry(mouseX, mouseY, Math.round(rowX), Math.round(y), Math.round(rowW),
+                  Math.round(rowH), proxyEntry == this.selectedProxy, this);
+            y += pitch;
+         }
+      }
+      AugustusGuiScreen.disableScissor();
+   }
+
+   // ---------------------------------------------------------------------------------------------
+   // Behaviour - unchanged
+   // ---------------------------------------------------------------------------------------------
+
    public static synchronized void setPendingProxy(ProxyEntry proxyEntry) {
       pendingProxy = proxyEntry;
+   }
+
+   public static synchronized ProxyEntry getPendingProxy() {
+      return pendingProxy;
+   }
+
+   public static Integer parsePortOrDefault(String str) {
+      try {
+         return Integer.parseInt(str);
+      } catch (Exception e) {
+         return -1;
+      }
+   }
+
+   static {
+      scrollBar = new ScrollBar(38);
    }
 
    @Override
    public void keyTyped(char typedChar, int keyCode) throws IOException {
       super.keyTyped(typedChar, keyCode);
-      if (this.selectedProxy != null && (keyCode == 211 || keyCode == 14 && !this.addressField.isFocused() && !this.usernameField.isFocused() && !this.passwordField.isFocused())) {
+      boolean passFocused = this.passwordField != null && this.passwordField.isFocused();
+      if (this.selectedProxy != null && (keyCode == 211
+            || keyCode == 14 && !this.addressField.isFocused() && !this.usernameField.isFocused() && !passFocused)) {
          proxies.remove(this.selectedProxy);
          proxyListEntries.remove(this.selectedProxy);
+         scrollBar.setItemCount(proxies.size());
          this.selectedProxy = null;
       }
    }
 
    public void connectToProxy(String str, boolean flag) {
       if (str.isEmpty()) {
-         Color color = Color.red.darker();
-         this.setStatus("IP is empty!", color);
+         this.setStatus("IP is empty!", Color.red.darker());
       } else {
          String[] parts = str.split(":");
          if (parts.length >= 2 && parts.length <= 4) {
@@ -70,15 +394,14 @@ public class ProxyManagerScreen extends ClientMenuTab {
                   strings2[2] = this.usernameField.getText();
                }
 
-               if (!this.passwordField.getText().isEmpty()) {
+               if (this.passwordField != null && !this.passwordField.getText().isEmpty()) {
                   strings2[3] = this.passwordField.getText();
                }
             }
 
             int n = parsePortOrDefault(strings2[1]);
             if (n == -1) {
-               Color color2 = Color.red.darker();
-               this.setStatus("Port is not numeric!", color2);
+               this.setStatus("Port is not numeric!", Color.red.darker());
             } else {
                String str4 = strings2[0];
                String str5 = strings2[2] == null ? "" : strings2[2];
@@ -86,25 +409,20 @@ public class ProxyManagerScreen extends ClientMenuTab {
                ProxyProtocolType selectedProtocolType2 = this.selectedProtocolType;
                pendingProxy = new ProxyEntry(str4, n, str5, str6, selectedProtocolType2);
                if (pendingProxy.getSocketAddress() == null) {
-                  Color color3 = Color.red.darker();
-                  this.setStatus("No valid proxy format!", color3);
+                  this.setStatus("No valid proxy format!", Color.red.darker());
                   pendingProxy = null;
-               } else {
-                  if (this.activePingTask == null) {
-                     Color yellow = Color.yellow;
-                     this.setStatus("Pinging...", yellow);
-                     this.previousProxy = Augustus.getInstance().getProxy();
-                     this.activePingTask = CompletableFuture.supplyAsync(() -> {
-                        boolean mcServerCheckEnabled2 = this.mcServerCheckEnabled;
-                        ProxyEntry previousProxy2 = this.previousProxy;
-                        return ProxyChecker.testAndApplyProxy(pendingProxy, previousProxy2, mcServerCheckEnabled2);
-                     });
-                  }
+               } else if (this.activePingTask == null) {
+                  this.setStatus("Pinging...", Color.yellow);
+                  this.previousProxy = Augustus.getInstance().getProxy();
+                  this.activePingTask = CompletableFuture.supplyAsync(() -> {
+                     boolean mcServerCheckEnabled2 = this.mcServerCheckEnabled;
+                     ProxyEntry previousProxy2 = this.previousProxy;
+                     return ProxyChecker.testAndApplyProxy(pendingProxy, previousProxy2, mcServerCheckEnabled2);
+                  });
                }
             }
          } else {
-            Color color4 = Color.red.darker();
-            this.setStatus("Wrong proxy format! [Ip:Port] / [Ip:Port:Username] / [Ip:Port:Username:Password]", color4);
+            this.setStatus("Wrong proxy format! [Ip:Port] / [Ip:Port:Username] / [Ip:Port:Username:Password]", Color.red.darker());
          }
       }
    }
@@ -112,22 +430,13 @@ public class ProxyManagerScreen extends ClientMenuTab {
    @Override
    public void mouseClickMove(int mouseX, int mouseY, int clickedMouseButton, long timeSinceLastClick) {
       super.mouseClickMove(mouseX, mouseY, clickedMouseButton, timeSinceLastClick);
-      double d = (double)mouseY;
-      scrollBar.handleMouseDrag(d);
-   }
-
-   public static synchronized ProxyEntry getPendingProxy() {
-      return pendingProxy;
+      scrollBar.handleMouseDrag((double)mouseY);
    }
 
    @Override
    public void handleMouseInput() throws IOException {
       super.handleMouseInput();
       scrollBar.handleMouseWheel();
-   }
-
-   private void onDisconnectClick(GuiButton button) {
-      this.disconnectProxy();
    }
 
    public ProxyManagerScreen() {
@@ -137,8 +446,7 @@ public class ProxyManagerScreen extends ClientMenuTab {
       this.previousProxy = null;
       this.activePingTask = null;
       this.reinitPending = false;
-      Color green = Color.green;
-      this.setStatus("Waiting...", green);
+      this.setStatus("Waiting...", Color.green);
    }
 
    private void importProxiesAsync() {
@@ -151,7 +459,6 @@ public class ProxyManagerScreen extends ClientMenuTab {
       jFileChooser.setFileFilter(new FileNameExtensionFilter("Text Files", "txt"));
       if (jFileChooser.showOpenDialog(null) == 0) {
          File selectedFile = jFileChooser.getSelectedFile();
-
          try (BufferedReader reader = new BufferedReader(new FileReader(selectedFile))) {
             String str;
             while ((str = reader.readLine()) != null) {
@@ -186,7 +493,6 @@ public class ProxyManagerScreen extends ClientMenuTab {
                   System.err.println("Failed to parse proxy line: " + str);
                }
             }
-
             scrollBar.setItemCount(proxies.size());
          } catch (Exception e2) {
             e2.printStackTrace();
@@ -198,82 +504,26 @@ public class ProxyManagerScreen extends ClientMenuTab {
       this.importProxiesAsync();
    }
 
-   static {
-      scrollBar = new ScrollBar(32);
-   }
-
-   @Override
-   public void drawContent(int n, int n2, float f) {
-      ScaledResolution sr = new ScaledResolution(this.mc);
-      int n3 = (int)Math.max(100.0F, Math.min((float)sr.getScaledWidth() / 2.0F - 100.0F - 20.0F, 150.0F));
-      // Hints are laid out by the inherited helper so they sit on the fields' own text baseline in Inter,
-      // the same face and geometry the typed text uses.
-      if (this.addressField.getText().isEmpty() && !this.addressField.isFocused()) {
-         this.drawFieldPlaceholder("IP-Adress:Port", this.addressField.xPosition, this.addressField.yPosition, 20, Color.gray.getRGB());
-      }
-
-      if (this.usernameField.getText().isEmpty() && !this.usernameField.isFocused()) {
-         this.drawFieldPlaceholder("Username", this.usernameField.xPosition, this.usernameField.yPosition, 20, Color.gray.getRGB());
-      }
-
-      if (this.passwordField.getText().isEmpty() && !this.passwordField.isFocused() && this.selectedProtocolType != ProxyProtocolType.SOCKS4) {
-         this.drawFieldPlaceholder("Password", this.passwordField.xPosition, this.passwordField.yPosition, 20, Color.gray.getRGB());
-      }
-
-      int n5 = Math.min((sr.getScaledWidth() - 102) - n3 - 20, 300);
-      int n6 = sr.getScaledWidth() - 10 - n5;
-      int clampedScrollOffset = (int)scrollBar.getClampedScrollOffset();
-
-      for (ProxyEntry proxyEntry : (Iterable<ProxyEntry>)(proxies)) {
-         ProxyListEntry proxyListEntry = (ProxyListEntry)proxyListEntries.get(proxyEntry);
-         if (proxyListEntry != null && proxyListEntry.isFavorite()) {
-            proxyListEntry.drawEntry(n, n2, n6, 57 + clampedScrollOffset, n5, (byte)30, proxyEntry == this.selectedProxy);
-            clampedScrollOffset += 32;
-         }
-      }
-
-      for (ProxyEntry proxyEntry2 : (Iterable<ProxyEntry>)(proxies)) {
-         ProxyListEntry proxyListEntry2 = (ProxyListEntry)proxyListEntries.get(proxyEntry2);
-         if (proxyListEntry2 != null && !proxyListEntry2.isFavorite()) {
-            proxyListEntry2.drawEntry(n, n2, n6, 57 + clampedScrollOffset, n5, (byte)30, proxyEntry2 == this.selectedProxy);
-            clampedScrollOffset += 32;
-         }
-      }
-
-      scrollBar.updateAndDraw();
-      if (this.activePingTask != null && this.activePingTask.isDone()) {
-         try {
-            TuplePair tuplePair = (TuplePair)this.activePingTask.get();
-            String first = (String)tuplePair.getFirst();
-            Color green = Color.green;
-            Color color = Color.red.darker();
-            double d = Math.min(1.0, (double)((Integer)tuplePair.getSecond()).intValue() / 1000.0);
-            this.setStatus(first, new Color(ColorUtil.blendColors(green, color, d)));
-            this.activePingTask = null;
-            ProxyEntry proxy = Augustus.getInstance().getProxy();
-            if (proxy != null && getPendingProxy() != null) {
-               if (proxy.matches(getPendingProxy())) {
-                  this.addressField.setText(proxy.getHost() + ":" + proxy.getPort());
-                  this.usernameField.setText(proxy.getUsername());
-                  if (this.passwordField != null) {
-                     this.passwordField.setText(proxy.getPassword());
-                  }
-               }
-            }
-         } catch (ExecutionException | InterruptedException e) {
-            throw new RuntimeException(e);
-         }
-      }
+   private void onDisconnectClick(GuiButton button) {
+      this.disconnectProxy();
    }
 
    private void disconnectProxy() {
       Augustus.getInstance().setProxy((ProxyEntry)null);
-      Color green = Color.green;
-      this.setStatus("Waiting...", green);
+      this.setStatus("Waiting...", Color.green);
    }
 
    private void onClearFieldsClick(GuiButton button) {
       this.clearInputFields();
+   }
+
+   private void clearInputFields() {
+      this.addressField.setText("");
+      if (this.passwordField != null) {
+         this.passwordField.setText("");
+      }
+      this.usernameField.setText("");
+      pendingProxy = null;
    }
 
    private void connectFromClipboard() {
@@ -298,28 +548,22 @@ public class ProxyManagerScreen extends ClientMenuTab {
       if (this.reinitPending) {
          this.initGui();
       }
+      this.layoutCards();
 
       for (ProxyEntry proxyEntry : (Iterable<ProxyEntry>)(proxies)) {
          ProxyListEntry proxyListEntry = (ProxyListEntry)proxyListEntries.get(proxyEntry);
+         if (proxyListEntry == null) {
+            continue;
+         }
          proxyListEntry.mouseClicked(mouseX, mouseY, mouseButton, this);
-         if ((mouseButton == 1 || mouseButton == 0) && RenderUtil.isHovered((float)proxyListEntry.getRenderX(), (float)proxyListEntry.getRenderY(), (float)proxyListEntry.getRenderWidth(), (float)proxyListEntry.getRenderHeight(), mouseX, mouseY)
-            )
-          {
+         if ((mouseButton == 1 || mouseButton == 0)
+               && RenderUtil.isHovered((float)proxyListEntry.getRenderX(), (float)proxyListEntry.getRenderY(),
+                     (float)proxyListEntry.getRenderWidth(), (float)proxyListEntry.getRenderHeight(), mouseX, mouseY)) {
             this.selectedProxy = proxyEntry;
          }
       }
 
-      double d = (double)mouseX;
-      double d3 = (double)mouseY;
-      scrollBar.handleMouseClick(d, d3);
-   }
-
-   public static Integer parsePortOrDefault(String str) {
-      try {
-         return Integer.parseInt(str);
-      } catch (Exception e) {
-         return -1;
-      }
+      scrollBar.handleMouseClick((double)mouseX, (double)mouseY);
    }
 
    private void onToggleProtocolTypeClick(GuiButton button) {
@@ -344,97 +588,4 @@ public class ProxyManagerScreen extends ClientMenuTab {
          }
       }
    }
-
-   @Override
-   public void initContent() {
-      this.reinitPending = false;
-      super.initContent();
-      ScaledResolution sr = new ScaledResolution(this.mc);
-      byte b = 104;
-      byte b2 = 54;
-      byte b3 = 25;
-      int n = (int)Math.max(100.0F, Math.min((float)sr.getScaledWidth() / 2.0F - 100.0F - 20.0F, 150.0F));
-      int n2 = 1;
-      this.addressField = this.addTextField(b, b2, n, (byte)20);
-      int n3 = b2 + b3 * n2;
-      String str = "Type: " + this.selectedProtocolType.getDisplayName();
-      GuiButtonClickHandler guiButtonClickHandler = button -> {
-         this.onToggleProtocolTypeClick(button);
-      };
-      this.addButton(b, n3, n, (byte)20, str, guiButtonClickHandler);
-      int n5 = b2 + b3 * ++n2;
-      this.usernameField = this.addTextField(b, n5, n, (byte)20);
-      n2++;
-      if (this.selectedProtocolType == ProxyProtocolType.SOCKS5) {
-         n5 = b2 + b3 * n2;
-         this.passwordField = this.addPasswordField(b, n5, n, (byte)20);
-         this.passwordField.setVisible(true);
-         n2++;
-      } else {
-         this.passwordField.setVisible(false);
-      }
-
-      this.populateFieldsFromPendingProxy();
-      n3 = b2 + b3 * n2;
-      GuiButtonClickHandler guiButtonClickHandler2 = button2 -> {
-         this.connectToProxy(this.addressField.getText(), false);
-      };
-      this.addButton(b, n3, n, (byte)20, "Connect", guiButtonClickHandler2);
-      n3 = b2 + b3 * ++n2;
-      GuiButtonClickHandler guiButtonClickHandler3 = button3 -> this.onClearFieldsClick(button3);
-      this.addButton(b, n3, n, (byte)20, "Clear", guiButtonClickHandler3);
-      n3 = b2 + b3 * ++n2;
-      GuiButtonClickHandler guiButtonClickHandler4 = button4 -> this.onDisconnectClick(button4);
-      this.addButton(b, n3, n, (byte)20, "Disconnect", guiButtonClickHandler4);
-      n3 = b2 + b3 * ++n2;
-      GuiButtonClickHandler guiButtonClickHandler5 = button5 -> {
-         this.connectFromClipboard();
-      };
-      this.addButton(b, n3, n, (byte)20, "Clipboard Login", guiButtonClickHandler5);
-      n3 = b2 + b3 * ++n2;
-      GuiButtonClickHandler guiButtonClickHandler6 = button6 -> this.onImportProxiesClick(button6);
-      this.addButton(b, n3, n, (byte)20, "Import Proxies", guiButtonClickHandler6);
-      n3 = b2 + b3 * ++n2;
-      StringBuilder sb2 = new StringBuilder().append("MC Check: ");
-      String str9;
-      if (this.mcServerCheckEnabled) {
-         str9 = "True";
-      } else {
-         str9 = "False";
-      }
-
-      str = sb2.append(str9).toString();
-      GuiButtonClickHandler guiButtonClickHandler7 = button7 -> {
-         this.mcServerCheckEnabled = !this.mcServerCheckEnabled;
-         StringBuilder sb3 = new StringBuilder();
-         sb3 = sb3.append("MC Check: ");
-         String str10;
-         if (this.mcServerCheckEnabled) {
-            str10 = "True";
-         } else {
-            str10 = "False";
-         }
-
-         button7.displayString = sb3.append(str10).toString();
-      };
-      this.addButton(b, n3, n, (byte)20, str, guiButtonClickHandler7);
-      n3 = b2 + b3 * ++n2;
-      GuiButtonClickHandler guiButtonClickHandler8 = button8 -> this.onDeleteSelectedProxyClick(button8);
-      this.addButton(b, n3, n, (byte)20, "Delete selected Proxy", guiButtonClickHandler8);
-      n3 = this.width - 5;
-      int height2 = this.height;
-      int width2 = this.width;
-      int n15 = n3;
-      scrollBar.setBounds(n15, (byte)52, width2, height2);
-      scrollBar.setItemCount(proxies.size());
-   }
-
-   private void clearInputFields() {
-      this.addressField.setText("");
-      String str = "";
-      this.passwordField.setText(str);
-      this.usernameField.setText("");
-      pendingProxy = null;
-   }
-
 }

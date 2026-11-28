@@ -463,6 +463,56 @@ public final class GlassRenderer {
    }
 
    /**
+    * Draws a single-pass rounded glass surface with a uniform single-weight border, no inner
+    * catchlight/bottom lines, and localized cursor-proximity lighting on both fill and rim.
+    */
+   public static void drawMenuGlassBox(
+      float x,
+      float y,
+      float width,
+      float height,
+      float radius,
+      int topFillArgb,
+      int bottomFillArgb,
+      int borderArgb,
+      float borderWidth,
+      float mouseX,
+      float mouseY,
+      float hoverLightAlpha,
+      float hoverLightRadius,
+      int hoverLightArgb
+   ) {
+      drawPrimitiveInternal(
+         x,
+         y,
+         width,
+         height,
+         radius,
+         radius,
+         radius,
+         radius,
+         topFillArgb,
+         bottomFillArgb,
+         1.0F,
+         borderArgb,
+         borderArgb,
+         borderWidth,
+         0.0F,
+         0.0F,
+         mouseX - x,
+         mouseY - y,
+         hoverLightAlpha,
+         hoverLightRadius,
+         hoverLightArgb,
+         0.0F,
+         0.0F,
+         0.0F,
+         0.0F,
+         0.0F
+      );
+   }
+
+   /**
     * The same primitive as {@link #drawRoundedGradientBox}, with its fill gradient rotated: the shape
     * interpolates from {@code leadingFillArgb} on its own left edge to {@code trailingFillArgb} on its
     * right edge instead of from top to bottom. Everything else - the SDF, the anti-aliasing, the corner
@@ -617,6 +667,10 @@ public final class GlassRenderer {
     * @return true when the pane was drawn; the caller then only adds interaction feedback on top.
     */
    private static boolean drawNestedGlassPane(float x, float y, float width, float height, float radius, int level) {
+      return drawNestedGlassPane(x, y, width, height, radius, level, UiTheme.LIQUID_FRESNEL_ALPHA, UiTheme.SHEEN_STRENGTH_DEFAULT * 0.85F);
+   }
+
+   private static boolean drawNestedGlassPane(float x, float y, float width, float height, float radius, int level, float fresnelAlpha, float sheenStrength) {
       if (width <= 0.0F || height <= 0.0F || radius < 0.0F || !glassBackdropWanted()) {
          return false;
       }
@@ -645,11 +699,11 @@ public final class GlassRenderer {
          blurRadius,
          0.0F,
          0,
-         UiTheme.LIQUID_FRESNEL_ALPHA,
+         fresnelAlpha,
          UiTheme.LIQUID_DISTORT_STRENGTH,
          UiTheme.glassTintMixArgb(level, 0.0F, 0.0F, UiTheme.accentColor()),
          UiTheme.FROST_GRAIN_DEFAULT,
-         UiTheme.SHEEN_STRENGTH_DEFAULT * 0.85F,
+         sheenStrength,
          UiTheme.SATURATION_BOOST_DEFAULT,
          coverage
       );
@@ -679,7 +733,27 @@ public final class GlassRenderer {
     * @return true when the material was drawn, so the caller can emit interaction feedback alone
     */
    public static boolean drawGlassMaterialPane(float x, float y, float width, float height, float radius, int level) {
-      return drawNestedGlassPane(x, y, width, height, radius, level);
+      return drawNestedGlassPane(x, y, width, height, radius, level, UiTheme.LIQUID_FRESNEL_ALPHA, UiTheme.SHEEN_STRENGTH_DEFAULT * 0.85F);
+   }
+
+   /**
+    * The same material pane with the two <em>edge</em> weights of the liquid-glass shader exposed.
+    *
+    * <p>WHY a caller would need them: the shader emits a top bevel/sheen band and a Fresnel rim from uniforms of
+    * its own, and those are independent of the primitive's {@code topHighlightAlpha} /
+    * {@code innerBottomAlpha} that {@link #drawRoundedGradientBox} zeroes. On a ClickGUI control both belong to
+    * the material and are wanted. On a menu option they are a second edge treatment sitting just inside the
+    * option's single accent ring - a light line hugging the top edge, the very artefact the redesign removes - so
+    * a caller that wants one ring and nothing else passes {@code 0, 0} here and keeps the blur, the tint and the
+    * level coverage.</p>
+    *
+    * @param fresnelAlpha  shader Fresnel rim weight: {@link UiTheme#LIQUID_FRESNEL_ALPHA} for the standard
+    *                      material, {@code 0} for a surface whose only edge is its own ring
+    * @param sheenStrength shader top sheen weight: {@code UiTheme.SHEEN_STRENGTH_DEFAULT * 0.85F} for the
+    *                      standard material, {@code 0} for a surface that must not carry a top bevel
+    */
+   public static boolean drawGlassMaterialPane(float x, float y, float width, float height, float radius, int level, float fresnelAlpha, float sheenStrength) {
+      return drawNestedGlassPane(x, y, width, height, radius, level, fresnelAlpha, sheenStrength);
    }
 
    /**

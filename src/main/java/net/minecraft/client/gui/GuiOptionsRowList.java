@@ -83,6 +83,14 @@ public class GuiOptionsRowList extends GuiListExtended {
          }
       }
 
+      /**
+       * A row of this list is one or two option plates and nothing else: {@code buttonA}/{@code buttonB} are
+       * the 150x20 controls the row exists to carry, already painted with the menu material by
+       * {@code GuiButton}, and they span the row's full height. That is WHY no row surface is drawn here -
+       * a plate behind them would double the veil over two plates that are already the option material, and
+       * its ring would be the third one on a line whose two controls are the options. Left untouched on
+       * purpose, not by omission.
+       */
       @Override
       public void drawEntry(int n, int n2, int n3, int n4, int n5, int n6, int n7, boolean flag) {
          if (this.buttonA != null) {

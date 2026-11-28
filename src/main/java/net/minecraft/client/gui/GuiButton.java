@@ -1,6 +1,7 @@
 package net.minecraft.client.gui;
 
 import java.awt.Color;
+import java.util.Locale;
 import net.augustus.font.FontManager;
 import net.augustus.modules.Module;
 import net.augustus.modules.misc.ClientSettings;
@@ -8,6 +9,8 @@ import net.augustus.ClientManagers;
 import net.augustus.render.RenderUtil;
 import net.augustus.ui.modern.font.InterFontUtil;
 import net.augustus.ui.modern.render.GlassRenderer;
+import net.augustus.ui.modern.render.LucideIcon;
+import net.augustus.ui.modern.render.MenuScreenSkin;
 import net.augustus.ui.modern.render.UiAnimation;
 import net.augustus.ui.modern.render.UiTheme;
 import net.minecraft.client.Minecraft;
@@ -29,9 +32,21 @@ public class GuiButton extends Gui {
    public boolean visible;
    public boolean hovered;
    public boolean forceVanillaStyle;
+   private LucideIcon buttonIcon;
+   private boolean primaryAccent;
    /** Owned hover/press envelopes for the glass rendering (per button: no shared-key collisions). */
    private float glassHoverAnim = 0.0F;
    private float glassPressAnim = 0.0F;
+
+   public GuiButton withIcon(LucideIcon icon) {
+      this.buttonIcon = icon;
+      return this;
+   }
+
+   public GuiButton withPrimaryAccent(boolean primary) {
+      this.primaryAccent = primary;
+      return this;
+   }
 
    public int darkenColor(int n, double d) {
       return RenderUtil.adjustColorBrightness(n, d);
@@ -81,28 +96,35 @@ public class GuiButton extends Gui {
    }
 
    /**
-    * Draws this button as a ClickGUI glass control instead of the flat client-coloured plate.
+    * Draws this button with the redesigned menu's option material instead of a flat client-coloured plate.
     *
-    * <p>What it draws, and why every piece comes from the ClickGUI's own pipeline:</p>
+    * <p>What it draws, and why every piece is the menu's own:</p>
     * <ul>
-    *   <li>{@code GlassRenderer.drawInteractiveSurface} paints the shared glass <em>material</em>
-    *       (the frame's blurred backdrop capture + the level's tint mix), then the control's state
-    *       layer, the overhead sheen, the cursor-following light and the press detent - the exact call
-    *       the ClickGUI uses for its buttons, pills, tabs and segmented controls. So a menu button and a
-    *       ClickGUI button are literally the same object, not two look-alikes.</li>
-    *   <li>The accent comes from {@link UiTheme#accentColor()}, i.e. the client colour, so hover glow,
-    *       rim and label all follow whatever the user set - the old flat fill did this too, but now it is
-    *       the accent <em>inside</em> the glass rather than an opaque blue slab over it.</li>
+    *   <li>{@link MenuScreenSkin#drawOptionSurface} paints the shared glass <em>material</em> (the ClickGUI's
+    *       per-frame backdrop capture, clipped to the silhouette), then the menu's dark veil, then the
+    *       cursor-following light, then <b>one</b> accent ring - the same three passes, in the same order,
+    *       that {@code HomeMainMenuScreen.drawPillBox} makes for a home-screen pill.</li>
+    *   <li>Both inner-line weights of the underlying primitive ({@code topHighlightAlpha},
+    *       {@code innerBottomAlpha}) are passed as {@code 0}, so this surface cannot carry the lit top edge
+    *       or the inner bottom glow that used to hug the top and bottom of every option. That call is the
+    *       whole reason this no longer goes through {@code GlassRenderer.drawInteractiveSurface}, which
+    *       hard-codes {@code innerBottomAlpha = 0.06F} and therefore could never drop the bottom line.</li>
+    *   <li>The accent comes from {@link UiTheme#accentColor()}, i.e. the client colour, and reaches only the
+    *       ring and the cursor light.</li>
     *   <li>Motion uses {@link UiTheme#smoothState(float, float)} / {@link UiTheme#smoothPress(float,
     *       boolean)}: the one hover curve and press detent every other control obeys, so the menus settle
     *       at the same rhythm as the ClickGUI instead of the old 100 ms scale pop.</li>
     *   <li>The label is drawn with the client's Inter face (the bitmap font was the last stock-looking
     *       thing in these menus) and scaled down when a stock label is wider than the button, so no label
-    *       is ever truncated.</li>
+    *       is ever truncated. It rests on the menu's label colour and <b>does not react to hover</b>: the
+    *       ring and the light are the button's only answers to the pointer.</li>
     * </ul>
     *
     * <p>Screens that contain these buttons must advance {@link UiAnimation#beginFrame()} once per frame
-    * (the ClickGUI does it in its own {@code drawScreen}); the menus call it at the top of their
+    * (the ClickGUI does it in its own {@code drawScreen}, and {@code GuiScreen.drawBackground} now does it
+    * for every stock screen that draws the menu backdrop - {@code GuiScreen.drawMenuScreenBackground}, which
+     * {@link GuiScreen#usesMenuBackdrop()} gates, so a screen outside that list and without a menu ancestor
+     * still has no clock and its glass samples a capture that never invalidates; the menus call it at the top of their
     * {@code drawScreen} for exactly that reason.</p>
     */
    private void drawGlassButton(Minecraft mc, int mouseX, int mouseY) {
@@ -121,30 +143,19 @@ public class GuiButton extends Gui {
       // RoundFactor no longer shapes these buttons - the shape is a design-system decision now, and the
       // old 1..20 px knob produced corners that belonged to neither the cards nor the pills.
       float radius = ClientManagers.moduleManager.clientSettings.roundedButtons.getValue()
-         ? Math.min(h * 0.5F, UiTheme.CARD_RADIUS)
+         ? MenuScreenSkin.optionRadius(w, h)
          : 0.0F;
 
-      if (this.enabled && hovT > 0.02F) {
-         // The accent halo the ClickGUI casts under a hovered pill or card.
-         GlassRenderer.drawSoftShadow(x, y, w, h, radius, 8.0F + 2.0F * hovT, 1.0F, UiTheme.withAlpha(accent, Math.round(70.0F * hovT)));
-      }
-
-      int fill = this.enabled ? UiTheme.glassControlFillArgb(hovT, 0.0F, accent) : UiTheme.glassDisabledFillArgb();
-      int bottomFill = this.enabled ? UiTheme.lerpArgb(fill, 0xFF0A0C12, 0.20F) : fill;
-      int border = this.enabled
-         ? UiTheme.lerpArgb(0x1AFFFFFF, UiTheme.withAlpha(UiTheme.accentSoftGlow(), 175), hovT * 0.7F)
-         : UiTheme.scaleAlpha(UiTheme.GLASS_BORDER, 0.55F);
-      GlassRenderer.drawInteractiveSurface(
+      // The option surface, in three passes and three only: the shared glass material inside the silhouette,
+      // the menu veil plus the cursor light (both inner-line weights at zero - no catchlight, no bottom glow),
+      // and one accent hairline around the same outline. No hover halo is drawn: the menu's own pill has none,
+      // and the ring plus the light are the option's whole answer to the pointer.
+      MenuScreenSkin.drawOptionSurface(
          x,
          y,
          w,
          h,
          radius,
-         fill,
-         bottomFill,
-         border,
-         UiTheme.BORDER_THICKNESS,
-         UiTheme.glassTopHighlightAlpha(Math.max(0.30F, hovT)),
          hovT,
          prsT,
          this.enabled,
@@ -153,36 +164,69 @@ public class GuiButton extends Gui {
          accent
       );
 
+      if (this.primaryAccent && this.enabled) {
+         GlassRenderer.drawRoundedGradientBoxHorizontal(
+            x + 1.0F,
+            y + 1.0F,
+            w - 2.0F,
+            h - 2.0F,
+            Math.max(0.0F, radius - 1.0F),
+            UiTheme.withAlpha(accent, Math.round(52.0F + 28.0F * hovT)),
+            UiTheme.withAlpha(accent, Math.round(16.0F + 18.0F * hovT)),
+            1.0F
+         );
+         GlassRenderer.drawRoundedOutline(x, y, w, h, radius, 1.0F, UiTheme.withAlpha(accent, Math.round(160.0F + 75.0F * hovT)));
+      }
+
       this.mouseDragged(mc, mouseX, mouseY);
 
-      // Label: the client's Inter face, centred in the box exactly as the bitmap-font call it replaces.
-      // WHY it is scaled instead of trimmed: the stock labels are authored for an 8 px bitmap font, so
-      // "Can't download in single player" would lose its meaning at full size inside a 98 px button.
-      // Scaling about the box centre keeps the original glyphs (no ellipsis, no clipping) and keeps one
-      // type size across a menu - a shrunken label reads as intentional, a truncated one reads as a bug.
-      //
-      // WHY the '§' branch is gone: labels such as "Difficulty: §cHard", "Remove invalid: §cFalse" or
-      // "§cFernan's Altshop" used to be bounced back to the bitmap FontRenderer (the SDF atlas has no
-      // section-sign glyph), which is precisely why a few buttons on an otherwise Inter-only screen still
-      // looked pixelated. drawStringFormatted() parses the codes and paints every run with Inter, so the
-      // face is uniform and the colours the strings asked for survive.
-      InterFontUtil font = FontManager.body();
+      InterFontUtil font = FontManager.uiBody();
       String label = this.displayString == null ? "" : this.displayString;
-      int fg = this.enabled
-         ? UiTheme.lerpArgb(UiTheme.primaryTextColor(), 0xFFFFFFFF, UiAnimation.clamp01(Math.max(hovT, prsT)))
-         : UiTheme.disabledTextColor();
+      int fg = this.enabled ? (this.primaryAccent ? 0xFFF8FAFC : MenuScreenSkin.LABEL_COLOR) : UiTheme.disabledTextColor();
       if (font == null) {
-         // Only reachable before FontManager.initFonts() has run (e.g. a screen built during startup).
          drawCenteredString(mc.fontRendererObj, label, this.xPosition + this.width / 2, this.yPosition + (this.height - 8) / 2, fg);
          return;
       }
+
+      LucideIcon icon = this.resolveEffectiveIcon(label);
+      boolean showIcon = icon != null && icon.isAvailable() && (w >= 48.0F || label.isEmpty());
+      float iconSize = 10.5F;
+      float iconGap = 5.0F;
       float textW = font.getStringWidthFormatted(label);
-      // Padding is a share of the height so a 20 px row and a 26 px row keep the same optical inset.
-      float availableW = Math.max(24.0F, w - Math.max(12.0F, h * 0.7F));
-      float labelScale = textW > availableW ? availableW / textW : 1.0F;
+      float padSide = Math.max(8.0F, h * 0.45F);
+      float contentW = textW + (showIcon ? (label.isEmpty() ? iconSize : iconSize + iconGap) : 0.0F);
+      float availableW = Math.max(20.0F, w - padSide * 2.0F);
+      float labelScale = contentW > availableW ? availableW / contentW : 1.0F;
+      float textY = y + (h - font.getFontHeight()) * 0.5F + prsT * 0.4F;
+      float cx = x + w * 0.5F;
+      float cy = y + h * 0.5F + prsT * 0.4F;
+
+      if (showIcon) {
+         float scaledW = contentW * labelScale;
+         float startX = cx - scaledW * 0.5F;
+         int iconColor = this.enabled
+            ? (this.primaryAccent ? UiTheme.lerpArgb(accent, 0xFFFFFFFF, 0.45F) : UiTheme.lerpArgb(0xFFB8B0D0, 0xFFF3E8FF, hovT))
+            : UiTheme.disabledTextColor();
+         float iconY = y + (h - iconSize) * 0.5F + prsT * 0.4F;
+         icon.draw(startX, iconY, iconSize, iconColor, false);
+
+         if (!label.isEmpty()) {
+            float textStartX = startX + iconSize * labelScale + iconGap * labelScale;
+            if (labelScale < 1.0F) {
+               GL11.glPushMatrix();
+               GL11.glTranslatef(textStartX, cy, 0.0F);
+               GL11.glScalef(labelScale, labelScale, 1.0F);
+               GL11.glTranslatef(-textStartX, -cy, 0.0F);
+               font.drawStringFormatted(label, (double)textStartX, (double)textY, fg, false);
+               GL11.glPopMatrix();
+            } else {
+               font.drawStringFormatted(label, (double)textStartX, (double)textY, fg, false);
+            }
+         }
+         return;
+      }
+
       if (labelScale < 1.0F) {
-         float cx = x + w * 0.5F;
-         float cy = y + h * 0.5F + prsT * 0.4F;
          GL11.glPushMatrix();
          GL11.glTranslatef(cx, cy, 0.0F);
          GL11.glScalef(labelScale, labelScale, 1.0F);
@@ -192,6 +236,98 @@ public class GuiButton extends Gui {
       } else {
          font.drawCenteredStringFormattedInBox(label, (double)x, (double)(y + prsT * 0.4F), (double)w, (double)h, fg);
       }
+   }
+
+   private LucideIcon resolveEffectiveIcon(String label) {
+      if (this.buttonIcon != null) {
+         return this.buttonIcon;
+      }
+      if (this instanceof GuiOptionSlider || this instanceof GuiSlider || label == null || label.isEmpty()) {
+         return null;
+      }
+      String lower = label.toLowerCase(Locale.ROOT);
+      if (lower.equals("done") || lower.equals("apply") || lower.contains("save and quit")) {
+         return lower.contains("quit") ? LucideIcon.LOGOUT : LucideIcon.CHECK;
+      }
+      if (lower.equals("cancel") || lower.equals("back")) {
+         return LucideIcon.ARROW_LEFT;
+      }
+      if (lower.contains("back to game") || lower.contains("play selected")) {
+         return LucideIcon.PLAYER_PLAY;
+      }
+      if (lower.contains("disconnect")) {
+         return LucideIcon.LOGOUT;
+      }
+      if (lower.contains("options") || lower.contains("other")) {
+         return LucideIcon.SETTINGS;
+      }
+      if (lower.contains("video")) {
+         return LucideIcon.DEVICE_DESKTOP;
+      }
+      if (lower.contains("shader")) {
+         return LucideIcon.SPARKLES;
+      }
+      if (lower.contains("quality")) {
+         return LucideIcon.SLIDERS_HORIZONTAL;
+      }
+      if (lower.contains("detail")) {
+         return LucideIcon.LIST;
+      }
+      if (lower.contains("performance")) {
+         return LucideIcon.ZAP;
+      }
+      if (lower.contains("animation")) {
+         return LucideIcon.WIND;
+      }
+      if (lower.contains("control")) {
+         return LucideIcon.KEYBOARD;
+      }
+      if (lower.contains("language") || lower.contains("unicode")) {
+         return LucideIcon.GLOBE;
+      }
+      if (lower.contains("sound") || lower.contains("music") || lower.contains("lan")) {
+         return LucideIcon.BROADCAST;
+      }
+      if (lower.contains("chat")) {
+         return LucideIcon.USERS_GROUP;
+      }
+      if (lower.contains("resource pack")) {
+         return lower.contains("folder") ? LucideIcon.FOLDER : LucideIcon.BOXES;
+      }
+      if (lower.contains("skin")) {
+         return LucideIcon.SHIRT;
+      }
+      if (lower.contains("super secret")) {
+         return LucideIcon.EYE;
+      }
+      if (lower.contains("achievement")) {
+         return LucideIcon.SPARKLES;
+      }
+      if (lower.contains("statistic")) {
+         return LucideIcon.ACTIVITY;
+      }
+      if (lower.contains("direct connect")) {
+         return LucideIcon.LINK;
+      }
+      if (lower.contains("join server")) {
+         return LucideIcon.LOGIN;
+      }
+      if (lower.contains("create new") || lower.contains("add server")) {
+         return LucideIcon.PLUS;
+      }
+      if (lower.contains("rename") || lower.equals("edit")) {
+         return LucideIcon.FILE_TEXT;
+      }
+      if (lower.equals("delete")) {
+         return LucideIcon.TRASH_2;
+      }
+      if (lower.contains("re-create") || lower.equals("refresh")) {
+         return LucideIcon.REFRESH_CW;
+      }
+      if (lower.contains("mark banned")) {
+         return LucideIcon.ALERT_TRIANGLE;
+      }
+      return null;
    }
 
    static {

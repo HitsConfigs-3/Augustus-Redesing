@@ -152,14 +152,14 @@ public class GuiCreateWorld extends GuiScreen {
       this.drawDefaultBackground();
       VanillaScreenText.drawCenteredOnScreen(this.width, I18n.format("selectWorld.create", new Object[0]), 20, -1);
       if (this.inMoreWorldOptionsDisplay) {
-         this.drawString(this.fontRendererObj, I18n.format("selectWorld.enterSeed", new Object[0]), this.width / 2 - 100, 47, -6250336);
-         this.drawString(this.fontRendererObj, I18n.format("selectWorld.seedInfo", new Object[0]), this.width / 2 - 100, 85, -6250336);
+         VanillaScreenText.drawString(I18n.format("selectWorld.enterSeed", new Object[0]), this.width / 2 - 100, 47, -6250336);
+         VanillaScreenText.drawString(I18n.format("selectWorld.seedInfo", new Object[0]), this.width / 2 - 100, 85, -6250336);
          if (this.btnMapFeatures.visible) {
-            this.drawString(this.fontRendererObj, I18n.format("selectWorld.mapFeatures.info", new Object[0]), this.width / 2 - 150, 122, -6250336);
+            VanillaScreenText.drawString(I18n.format("selectWorld.mapFeatures.info", new Object[0]), this.width / 2 - 150, 122, -6250336);
          }
 
          if (this.btnAllowCommands.visible) {
-            this.drawString(this.fontRendererObj, I18n.format("selectWorld.allowCommands.info", new Object[0]), this.width / 2 - 150, 172, -6250336);
+            VanillaScreenText.drawString(I18n.format("selectWorld.allowCommands.info", new Object[0]), this.width / 2 - 150, 172, -6250336);
          }
 
          this.worldSeedField.drawTextBox();
@@ -174,11 +174,13 @@ public class GuiCreateWorld extends GuiScreen {
                );
          }
       } else {
-         this.drawString(this.fontRendererObj, I18n.format("selectWorld.enterName", new Object[0]), this.width / 2 - 100, 47, -6250336);
-         this.drawString(this.fontRendererObj, I18n.format("selectWorld.resultFolder", new Object[0]) + " " + this.saveDirName, this.width / 2 - 100, 85, -6250336);
+         // Field captions and the game-mode description in the client face, at their own anchors and with
+         // their own grey (-6250336): the helper only remaps pure white, so the hint colour is untouched.
+         VanillaScreenText.drawString(I18n.format("selectWorld.enterName", new Object[0]), this.width / 2 - 100, 47, -6250336);
+         VanillaScreenText.drawString(I18n.format("selectWorld.resultFolder", new Object[0]) + " " + this.saveDirName, this.width / 2 - 100, 85, -6250336);
          this.worldNameField.drawTextBox();
-         this.drawString(this.fontRendererObj, this.gameModeDescLine1, this.width / 2 - 100, 137, -6250336);
-         this.drawString(this.fontRendererObj, this.gameModeDescLine2, this.width / 2 - 100, 149, -6250336);
+         VanillaScreenText.drawString(this.gameModeDescLine1, this.width / 2 - 100, 137, -6250336);
+         VanillaScreenText.drawString(this.gameModeDescLine2, this.width / 2 - 100, 149, -6250336);
       }
 
       super.drawScreen(mouseX, mouseY, partialTicks);

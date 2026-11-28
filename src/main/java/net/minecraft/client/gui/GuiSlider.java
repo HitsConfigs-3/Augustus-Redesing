@@ -5,6 +5,8 @@ import net.augustus.modules.Module;
 import net.augustus.ClientManagers;
 import net.augustus.render.RenderUtil;
 import net.augustus.Augustus;
+import net.augustus.ui.modern.render.MenuScreenSkin;
+import net.augustus.ui.modern.render.UiTheme;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.GlStateManager;
 import net.minecraft.client.resources.I18n;
@@ -100,25 +102,15 @@ public class GuiSlider extends GuiButton {
          }
 
          if (!((Module)ClientManagers.moduleManager.invisMode).isToggled() && !this.forceVanillaStyle) {
-            int n3 = this.xPosition + (int)(this.sliderPosition * (float)(this.width - 8));
-            int yPosition2 = this.yPosition;
-            byte b = 8;
-            byte b2 = 20;
-            int n4 = this.darkenColor(Augustus.getInstance().getClientColor(), -0.3);
-            if (ClientManagers.moduleManager.clientSettings.roundedButtons.getValue()) {
-               RenderUtil.drawRoundedRect(
-                  (float)n3,
-                  (float)yPosition2,
-                  (float)(n3 + b),
-                  (float)(yPosition2 + b2),
-                  (float)ClientManagers.moduleManager.clientSettings.roundFactor.getValue(),
-                  1,
-                  new Color(n4)
-               );
-               GlStateManager.enableBlend();
-            } else {
-               RenderUtil.drawRect(n3, yPosition2, n3 + b, yPosition2 + b2, n4);
-            }
+            MenuScreenSkin.drawSliderTrack(
+               (float)this.xPosition,
+               (float)this.yPosition,
+               (float)this.width,
+               (float)this.height,
+               this.sliderPosition,
+               ClientManagers.moduleManager.clientSettings.roundedButtons.getValue(),
+               UiTheme.accentColor()
+            );
          } else {
             GlStateManager.color(1.0F, 1.0F, 1.0F, 1.0F);
             this.drawTexturedModalRect(this.xPosition + (int)(this.sliderPosition * (float)(this.width - 8)), this.yPosition, 0, 66, 4, 20);

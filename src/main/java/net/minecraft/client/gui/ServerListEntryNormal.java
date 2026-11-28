@@ -13,6 +13,13 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.function.Consumer;
+import java.awt.image.BufferedImage;
+import net.augustus.font.FontManager;
+import net.augustus.ui.VanillaScreenText;
+import net.augustus.ui.modern.font.InterFontUtil;
+import net.augustus.ui.modern.render.MenuScreenSkin;
+import net.augustus.ui.modern.render.UiAnimation;
+import net.augustus.ui.modern.render.UiTheme;
 import net.augustus.ui.multiplayer.ServerListHost;
 import net.augustus.Augustus;
 import net.minecraft.client.Minecraft;
@@ -147,19 +154,63 @@ public class ServerListEntryNormal implements GuiListExtended.IGuiListEntry {
          }
       }
 
+      // The server is an option of this screen, so it wears the option material: one plate, one accent
+      // ring, the cursor light under the pointer. The row's box is the list box (GuiListExtended hit-tests
+      // it at [left + (width - getListWidth())/2, +getListWidth()]), while the x this entry receives is
+      // inset by the 2 px the legacy slot padding used; hence n2 - 2 with the full list width, so the plate
+      // ends exactly on the list edge instead of overhanging it by 2 px.
+      float rowX = (float)(n2 - 2);
+      float rowY = (float)n3;
+      float rowW = (float)n4;
+      float rowH = (float)n5;
+      String hoverKey = "augustus.multiplayer.server." + n;
+      MenuScreenSkin.drawOptionSurface(
+         rowX,
+         rowY,
+         rowW,
+         rowH,
+         MenuScreenSkin.optionRadius(rowW, rowH),
+         UiTheme.smoothState(hoverKey, flag ? 1.0F : 0.0F),
+         UiTheme.smoothPress(hoverKey + ".press", 0.0F, flag && UiAnimation.isPrimaryMouseDown()),
+         true,
+         (float)n6,
+         (float)n7,
+         UiTheme.accentColor()
+      );
+      // Selection is the row's own business now that GuiSlot no longer paints the stock grey/black
+      // rectangles: the selected server wears the same accent ring plus rail the client's account list uses
+      // (AccountEntry). WHY it is asked of the screen rather than read from `flag`: the boolean this entry
+      // receives is the HOVER state ("is the pointer over me"), not the selection - the selection index
+      // lives on ServerSelectionList, and GuiMultiplayer.getSelectedSlotIndex() is the read-only bridge.
+      boolean selected = this.owner instanceof GuiMultiplayer && ((GuiMultiplayer)this.owner).getSelectedSlotIndex() == n;
+      if (selected) {
+         MenuScreenSkin.drawSelectionRing(rowX, rowY, rowW, rowH, MenuScreenSkin.optionRadius(rowW, rowH));
+      }
+
       boolean flag2 = this.serverData.version > 47;
       boolean flag3 = this.serverData.version < 47;
       boolean flag4 = flag2 || flag3;
-      this.mc.fontRendererObj.drawString(this.serverData.serverName, n2 + 32 + 3, n3 + 1, 16777215);
-      List list = this.mc.fontRendererObj.listFormattedStringToWidth(this.serverData.serverMOTD, n4 - 32 - 2);
 
-      for (int i = 0; i < Math.min(list.size(), 2); i++) {
-         this.mc.fontRendererObj.drawString((String)list.get(i), n2 + 32 + 3, n3 + 12 + this.mc.fontRendererObj.FONT_HEIGHT * i, 8421504);
-      }
-
-      String str = flag4 ? EnumChatFormatting.DARK_RED + (this.serverData.gameVersion == null ? "1.8.8" : this.serverData.gameVersion) : this.serverData.populationInfo;
+      String str = flag4
+         ? EnumChatFormatting.DARK_RED + (this.serverData.gameVersion == null ? "1.8.8" : this.serverData.gameVersion)
+         : (this.serverData.populationInfo == null ? "" : this.serverData.populationInfo);
       int stringWidth = this.mc.fontRendererObj.getStringWidth(str);
-      this.mc.fontRendererObj.drawString(str, n2 + n4 - stringWidth - 15 - 2, n3 + 1, 8421504);
+      int rightBadgeX = n2 + n4 - stringWidth - 18;
+      this.mc.fontRendererObj.drawString(str, rightBadgeX, n3 + 3, 8421504);
+
+      int textLeft = n2 + 36;
+      int nameMaxW = Math.max(40, rightBadgeX - textLeft - 6);
+      String serverName = this.serverData.serverName == null ? "" : this.serverData.serverName;
+      if (this.mc.fontRendererObj.getStringWidth(serverName) > nameMaxW) {
+         serverName = this.mc.fontRendererObj.trimStringToWidth(serverName, nameMaxW - this.mc.fontRendererObj.getStringWidth("...")) + "...";
+      }
+      this.mc.fontRendererObj.drawString(serverName, textLeft, n3 + 3, 16777215);
+
+      int motdMaxW = Math.max(60, n4 - 44);
+      List list = this.mc.fontRendererObj.listFormattedStringToWidth(this.serverData.serverMOTD == null ? "" : this.serverData.serverMOTD, motdMaxW);
+      for (int i = 0; i < Math.min(list.size(), 2); i++) {
+         this.mc.fontRendererObj.drawString((String)list.get(i), textLeft, n3 + 14 + this.mc.fontRendererObj.FONT_HEIGHT * i, 8421504);
+      }
       byte b = 0;
       String str2 = null;
       int n8;

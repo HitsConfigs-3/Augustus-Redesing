@@ -1,5 +1,7 @@
 package net.minecraft.client.gui;
 
+import net.augustus.ui.VanillaScreenText;
+
 import net.minecraft.block.BlockTallGrass;
 import net.minecraft.client.renderer.GlStateManager;
 import net.minecraft.client.renderer.RenderHelper;
@@ -71,9 +73,12 @@ public class GuiFlatPresets extends GuiScreen {
    public void drawScreen(int mouseX, int mouseY, float partialTicks) {
       this.drawDefaultBackground();
       this.presetListSlot.drawScreen(mouseX, mouseY, partialTicks);
-      drawCenteredString(this.fontRendererObj, this.presetsTitle, this.width / 2, 8, 16777215);
-      this.drawString(this.fontRendererObj, this.presetsShare, 50, 30, 10526880);
-      this.drawString(this.fontRendererObj, this.presetsListText, 50, 70, 10526880);
+      // Inter, same resting colour as the menu, same anchor: y stays 8, only the face and colour change.
+      VanillaScreenText.drawCenteredOnScreen(this.width, this.presetsTitle, 8, 16777215);
+      // Share caption and list caption in the client face; anchors and the 10526880 grey are unchanged (the
+      // helper passes non-white colours straight through).
+      VanillaScreenText.drawString(this.presetsShare, 50, 30, 10526880);
+      VanillaScreenText.drawString(this.presetsListText, 50, 70, 10526880);
       this.exportTextField.drawTextBox();
       super.drawScreen(mouseX, mouseY, partialTicks);
    }
@@ -264,7 +269,8 @@ public class GuiFlatPresets extends GuiScreen {
       public void drawSlot(int n, int n2, int n3, int n4, int n5, int n6) {
          GuiFlatPresets.LayerItem layerItem = (GuiFlatPresets.LayerItem)GuiFlatPresets.accessFLAT_WORLD_PRESETS().get(n);
          this.drawPresetIcon(n2, n3, layerItem.icon, layerItem.iconMetadata);
-         this.parentScreen.fontRendererObj.drawString(layerItem.name, n2 + 18 + 5, n3 + 6, 16777215);
+         // Preset name in the client face, same anchor beside the 18 px icon.
+         VanillaScreenText.drawString(layerItem.name, n2 + 18 + 5, n3 + 6, 16777215);
       }
 
       private void drawIconTexture(int n, int n2, int n3, int n4) {

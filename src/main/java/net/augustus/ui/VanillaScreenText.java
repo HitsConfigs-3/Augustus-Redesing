@@ -2,62 +2,124 @@ package net.augustus.ui;
 
 import net.augustus.font.FontManager;
 import net.augustus.ui.modern.font.InterFontUtil;
+import net.augustus.ui.modern.render.LucideIcon;
+import net.augustus.ui.modern.render.MenuScreenSkin;
+import net.augustus.ui.modern.render.UiTheme;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.FontRenderer;
 
 /**
- * Title and message text for the stock screens the client still shows around the redesigned menus: the
- * pause menu, options, world and server selectors, achievements, the share-to-LAN and disconnect screens.
- *
- * <p>WHY this exists: those screens keep their vanilla layout, but their buttons are painted as ClickGUI
- * glass, so a title still rendered in the 8 px bitmap font read as a screenshot glued onto another
- * application. Only the typeface changes here - the anchor stays the top edge, exactly like
- * {@code GuiScreen.drawCenteredString}, so no layout moves; Inter's line box is about 3 px taller and every
- * one of these titles has room for that.</p>
- *
- * <p>Deliberately NOT applied to inventory, sign, book, beacon or achievement-tree text: those are placed
- * pixel-exactly around vanilla 9 px rows and a taller face would collide with their slots and icons.</p>
+ * Compact typography helpers for vanilla-derived screens, aligned with the
+ * Augustus Redesing visual hierarchy (13.5F titles, 10.5F body, 9.0F small metadata).
  */
 public final class VanillaScreenText {
    private VanillaScreenText() {
    }
 
    private static InterFontUtil font() {
-      return FontManager.body();
+      return FontManager.uiBody();
+   }
+
+   private static InterFontUtil titleFont() {
+      return FontManager.uiTitle();
+   }
+
+   private static InterFontUtil smallFont() {
+      return FontManager.uiSmall();
    }
 
    private static FontRenderer bitmap() {
       return Minecraft.getMinecraft().fontRendererObj;
    }
 
-   /** Replacement for {@code GuiScreen.drawCenteredString(fontRendererObj, text, x, y, color)}. */
-   public static void drawCenteredString(String text, int x, int y, int color) {
-      InterFontUtil font = font();
-      if (font == null) {
-         FontRenderer legacy = bitmap();
-         legacy.drawStringWithShadow(text, (float)x - (float)legacy.getStringWidth(text) / 2.0F, (float)y, color);
-         return;
-      }
-      font.drawStringWithShadow(text, (double)((float)x - font.getStringWidth(text) / 2.0F), (double)y, color);
+   private static int restingColor(int color) {
+      return (color & 0x00FFFFFF) == 0x00FFFFFF ? MenuScreenSkin.LABEL_COLOR : color;
    }
 
-   /** Horizontally centred on the screen width, {@code y} still meaning the top edge. */
+   public static void drawCenteredString(String text, int x, int y, int color) {
+      InterFontUtil font = font();
+      int resting = restingColor(color);
+      if (font == null) {
+         FontRenderer legacy = bitmap();
+         legacy.drawStringWithShadow(text, (float)x - (float)legacy.getStringWidth(text) / 2.0F, (float)y, resting);
+         return;
+      }
+      font.drawStringWithShadow(text, (double)((float)x - font.getStringWidthFormatted(text) / 2.0F), (double)y, resting);
+   }
+
    public static void drawCenteredOnScreen(int screenWidth, String text, int y, int color) {
       drawCenteredString(text, screenWidth / 2, y, color);
    }
 
-   /** Replacement for {@code GuiScreen.drawString(fontRendererObj, text, x, y, color)}. */
-   public static void drawString(String text, int x, int y, int color) {
-      InterFontUtil font = font();
-      if (font == null) {
-         bitmap().drawStringWithShadow(text, (float)x, (float)y, color);
+   /** Renders a modern screen title with an optional centered Tabler icon beside the title. */
+   public static void drawHeader(int screenWidth, String title, LucideIcon icon, int y) {
+      InterFontUtil tf = titleFont();
+      if (tf == null) {
+         drawCenteredOnScreen(screenWidth, title, y, 0xFFF8FAFC);
          return;
       }
-      font.drawStringWithShadow(text, (double)x, (double)y, color);
+      String safeTitle = title == null ? "" : title;
+      float textW = tf.getStringWidthFormatted(safeTitle);
+      float iconSize = icon != null && icon.isAvailable() ? 12.5F : 0.0F;
+      float gap = iconSize > 0.0F ? 6.0F : 0.0F;
+      float totalW = iconSize + gap + textW;
+      float startX = (float)screenWidth * 0.5F - totalW * 0.5F;
+      if (iconSize > 0.0F) {
+         float iconY = (float)y + (tf.getFontHeight() - iconSize) * 0.5F;
+         icon.draw(startX, iconY, iconSize, UiTheme.lerpArgb(UiTheme.accentColor(), 0xFFFFFFFF, 0.35F), false);
+      }
+      tf.drawStringWithShadow(safeTitle, (double)(startX + iconSize + gap), (double)y, 0xFFF8FAFC);
    }
 
-   /** Height of the text {@link #drawString} paints, for the callers that stack lines themselves. */
+   public static void drawString(String text, int x, int y, int color) {
+      InterFontUtil font = font();
+      int resting = restingColor(color);
+      if (font == null) {
+         bitmap().drawStringWithShadow(text, (float)x, (float)y, resting);
+         return;
+      }
+      font.drawStringWithShadow(text, (double)x, (double)y, resting);
+   }
+
+   public static void drawSmallString(String text, float x, float y, int color) {
+      InterFontUtil sf = smallFont();
+      int resting = restingColor(color);
+      if (sf == null) {
+         bitmap().drawStringWithShadow(text, x, y, resting);
+         return;
+      }
+      sf.drawStringWithShadow(text, (double)x, (double)y, resting);
+   }
+
+   public static void drawSmallCenteredString(String text, float centerX, float y, int color) {
+      InterFontUtil sf = smallFont();
+      int resting = restingColor(color);
+      if (sf == null) {
+         FontRenderer legacy = bitmap();
+         legacy.drawStringWithShadow(text, centerX - (float)legacy.getStringWidth(text) / 2.0F, y, resting);
+         return;
+      }
+      sf.drawStringWithShadow(text, (double)(centerX - sf.getStringWidthFormatted(text) / 2.0F), (double)y, resting);
+   }
+
    public static int getFontHeight() {
-      return Math.round(FontManager.bodyHeight());
+      InterFontUtil f = font();
+      return Math.round(f != null ? f.getFontHeight() : 9.0F);
+   }
+
+   public static int getStringWidth(String text) {
+      if (text == null) {
+         return 0;
+      }
+      InterFontUtil font = font();
+      return font == null ? bitmap().getStringWidth(text) : Math.round(font.getStringWidthFormatted(text));
+   }
+
+   public static int getSmallStringWidth(String text) {
+      if (text == null) {
+         return 0;
+      }
+      InterFontUtil sf = smallFont();
+      return sf == null ? bitmap().getStringWidth(text) : Math.round(sf.getStringWidthFormatted(text));
    }
 }

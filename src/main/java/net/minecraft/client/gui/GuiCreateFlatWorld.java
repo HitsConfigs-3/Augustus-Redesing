@@ -1,5 +1,7 @@
 package net.minecraft.client.gui;
 
+import net.augustus.ui.VanillaScreenText;
+
 import net.minecraft.block.Block;
 import net.minecraft.block.state.IBlockState;
 import net.minecraft.client.renderer.GlStateManager;
@@ -71,10 +73,14 @@ public class GuiCreateFlatWorld extends GuiScreen {
    public void drawScreen(int mouseX, int mouseY, float partialTicks) {
       this.drawDefaultBackground();
       this.createFlatWorldListSlotGui.drawScreen(mouseX, mouseY, partialTicks);
-      drawCenteredString(this.fontRendererObj, this.flatWorldTitle, this.width / 2, 8, 16777215);
+      // Inter, same resting colour as the menu, same anchor: y stays 8, only the face and colour change.
+      VanillaScreenText.drawCenteredOnScreen(this.width, this.flatWorldTitle, 8, 16777215);
       int n = this.width / 2 - 92 - 16;
-      this.drawString(this.fontRendererObj, this.materialText, n, 32, 16777215);
-      this.drawString(this.fontRendererObj, this.heightText, n + 2 + 213 - this.fontRendererObj.getStringWidth(this.heightText), 32, 16777215);
+      // The two column captions in the client face. The height caption's x is still the bitmap width it has
+      // always been derived from (this is the header's anchor, not its paint), so its right edge can sit a
+      // pixel or two off the column edge in exchange for both captions sharing one typeface.
+      VanillaScreenText.drawString(this.materialText, n, 32, 16777215);
+      VanillaScreenText.drawString(this.heightText, n + 2 + 213 - this.fontRendererObj.getStringWidth(this.heightText), 32, 16777215);
       super.drawScreen(mouseX, mouseY, partialTicks);
    }
 
@@ -199,7 +205,9 @@ public class GuiCreateFlatWorld extends GuiScreen {
          }
 
          this.drawLayerIcon(n2, n3, stack);
-         this.parentScreen.fontRendererObj.drawString(str, n2 + 18 + 5, n3 + 3, 16777215);
+         // Row labels in the client face; anchors unchanged (the right-aligned one is still measured with the
+         // bitmap width, so it can drift a pixel - the alternative is a row that mixes two typefaces).
+         VanillaScreenText.drawString(str, n2 + 18 + 5, n3 + 3, 16777215);
          String str2;
          if (n == 0) {
             str2 = I18n.format("createWorld.customize.flat.layer.top", new Object[]{flatLayerInfo.getLayerCount()});
@@ -209,7 +217,7 @@ public class GuiCreateFlatWorld extends GuiScreen {
             str2 = I18n.format("createWorld.customize.flat.layer", new Object[]{flatLayerInfo.getLayerCount()});
          }
 
-         this.parentScreen.fontRendererObj.drawString(str2, n2 + 2 + 213 - this.parentScreen.fontRendererObj.getStringWidth(str2), n3 + 3, 16777215);
+         VanillaScreenText.drawString(str2, n2 + 2 + 213 - this.parentScreen.fontRendererObj.getStringWidth(str2), n3 + 3, 16777215);
       }
 
       @Override

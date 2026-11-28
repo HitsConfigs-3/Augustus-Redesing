@@ -1,6 +1,10 @@
 package net.minecraft.client.gui;
 
+import net.augustus.ClientManagers;
+import net.augustus.modules.Module;
 import net.augustus.ui.VanillaScreenText;
+import net.augustus.ui.modern.render.MenuScreenSkin;
+import net.augustus.ui.modern.render.UiTheme;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.audio.PositionedSoundRecord;
 import net.minecraft.client.audio.SoundHandler;
@@ -127,9 +131,24 @@ public class GuiScreenOptionsSounds extends GuiScreen {
                this.displayString = this.categoryName + ": " + this.soundsScreen.getSoundVolume(this.category);
             }
 
-            GlStateManager.color(1.0F, 1.0F, 1.0F, 1.0F);
-            this.drawTexturedModalRect(this.xPosition + (int)(this.volume * (float)(this.width - 8)), this.yPosition, 0, 66, 4, 20);
-            this.drawTexturedModalRect(this.xPosition + (int)(this.volume * (float)(this.width - 8)) + 4, this.yPosition, 196, 66, 4, 20);
+            // The handle is painted with the ClickGUI slider's own accent fill (see MenuScreenSkin), the
+            // same way GuiSlider and GuiOptionSlider paint theirs, instead of the old flat textured bar that
+            // belonged to no surface of the current system. The 8x20 rectangle is unchanged - it is placed
+            // by the same volume * (width - 8) expression as before - so this is drawing only.
+            if (!((Module)ClientManagers.moduleManager.invisMode).isToggled() && !this.forceVanillaStyle) {
+               MenuScreenSkin.drawSliderKnob(
+                  (float)(this.xPosition + (int)(this.volume * (float)(this.width - 8))),
+                  (float)this.yPosition,
+                  8.0F,
+                  20.0F,
+                  ClientManagers.moduleManager.clientSettings.roundedButtons.getValue(),
+                  UiTheme.accentColor()
+               );
+            } else {
+               GlStateManager.color(1.0F, 1.0F, 1.0F, 1.0F);
+               this.drawTexturedModalRect(this.xPosition + (int)(this.volume * (float)(this.width - 8)), this.yPosition, 0, 66, 4, 20);
+               this.drawTexturedModalRect(this.xPosition + (int)(this.volume * (float)(this.width - 8)) + 4, this.yPosition, 196, 66, 4, 20);
+            }
          }
       }
 

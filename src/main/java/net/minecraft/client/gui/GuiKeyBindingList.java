@@ -1,5 +1,6 @@
 package net.minecraft.client.gui;
 
+import net.augustus.ui.VanillaScreenText;
 import net.minecraft.client.settings.GameSettings;
 import net.minecraft.util.EnumChatFormatting;
 import java.util.Arrays;
@@ -90,8 +91,17 @@ public class GuiKeyBindingList extends GuiListExtended {
       @Override
       public void drawEntry(int n, int n2, int n3, int n4, int n5, int n6, int n7, boolean flag) {
          boolean flag2 = GuiKeyBindingList.accessControlsScreen(this.keyBindingList).buttonId == this.keybinding;
-         GuiKeyBindingList.accessMc(this.keyBindingList)
-            .fontRendererObj
+         // The key's name rests on the menu ink and on the client face, like every other label of this round.
+         //
+         // WHY this row gets no plate of its own: the row's whole box is 16 px tall (slotHeight - 4, what
+         // GuiListExtended hands an entry) while the two option plates that fill it - the key button and the
+         // Reset button, both 20 px tall in a 20 px slot - are exactly the height of the row itself. A plate
+         // drawn behind them would be shorter than the controls it is meant to carry (its ring would be
+         // crossed by their bottom corners) or, at their height, would touch the ring of the row above. The
+         // label's own box starts left of the list on the widest binding (it is right-aligned at n2 + 90), so
+         // a plate around the label alone would hang outside the list. The two buttons already are the
+         // option material; this row is the one list whose content is controls rather than text.
+         VanillaScreenText
             .drawString(
                this.keyDesc,
                n2 + 90 - GuiKeyBindingList.accessMaxListLabelWidth(this.keyBindingList),
@@ -173,14 +183,14 @@ public class GuiKeyBindingList extends GuiListExtended {
 
       @Override
       public void drawEntry(int n, int n2, int n3, int n4, int n5, int n6, int n7, boolean flag) {
-         GuiKeyBindingList.accessMc(this.keyBindingList)
-            .fontRendererObj
-            .drawString(
-               this.labelText,
-               GuiKeyBindingList.accessMc(this.keyBindingList).currentScreen.width / 2 - this.labelWidth / 2,
-               n3 + n5 - GuiKeyBindingList.accessMc(this.keyBindingList).fontRendererObj.FONT_HEIGHT - 1,
-               16777215
-            );
+         // The category label is a heading, so it is set in the face the client's own pages use (Inter through
+         // VanillaScreenText), measured with that same face so the centring still lands on the screen centre.
+         VanillaScreenText.drawCenteredOnScreen(
+            GuiKeyBindingList.accessMc(this.keyBindingList).currentScreen.width,
+            this.labelText,
+            n3 + n5 - VanillaScreenText.getFontHeight() - 1,
+            16777215
+         );
       }
 
       @Override
@@ -195,7 +205,7 @@ public class GuiKeyBindingList extends GuiListExtended {
       public CategoryEntry(GuiKeyBindingList guiKeyBindingList, String str) {
          this.keyBindingList = guiKeyBindingList;
          this.labelText = I18n.format(str, new Object[0]);
-         this.labelWidth = GuiKeyBindingList.accessMc(guiKeyBindingList).fontRendererObj.getStringWidth(this.labelText);
+         this.labelWidth = VanillaScreenText.getStringWidth(this.labelText);
       }
    }
 }

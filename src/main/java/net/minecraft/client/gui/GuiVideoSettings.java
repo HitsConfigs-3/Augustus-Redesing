@@ -5,6 +5,10 @@ import net.augustus.modules.Module;
 import net.augustus.Augustus;
 import net.augustus.events.listeners.GuiScaleListener;
 import net.augustus.ui.VanillaScreenText;
+import net.augustus.ui.modern.render.GlassRenderer;
+import net.augustus.ui.modern.render.LucideIcon;
+import net.augustus.ui.modern.render.MenuScreenSkin;
+import net.augustus.ui.modern.render.UiTheme;
 import net.minecraft.client.resources.I18n;
 import net.minecraft.client.settings.GameSettings;
 import net.optifine.Lang;
@@ -38,21 +42,34 @@ public class GuiVideoSettings extends GuiScreen {
       GameSettings.Options.DYNAMIC_FOV
    };
    private TooltipManager tooltipManager = new TooltipManager(this, new TooltipProviderOptions());
+   private int cardX;
+   private int cardY;
+   private int cardW;
+   private int cardH;
+   private int headerY;
+   private int dividerY;
 
    @Override
    public void drawScreen(int mouseX, int mouseY, float partialTicks) {
       this.drawDefaultBackground();
-      VanillaScreenText.drawCenteredOnScreen(this.width, this.screenTitle, 15, 16777215);
-      this.drawString(
-         this.fontRendererObj,
-         ((Module)Augustus.getInstance().getModuleManager().invisMode).isToggled() ? "OptiFine HD M5 Ultra" : "OptiFine HD M5 Ultra (Hard-forked by EnZaXD & DasNeueUpdate)",
-         2,
-         this.height - 10,
-         8421504
+      MenuScreenSkin.drawGlassContainer((float)this.cardX, (float)this.cardY, (float)this.cardW, (float)this.cardH, 10.0F);
+      VanillaScreenText.drawHeader(this.width, this.screenTitle, LucideIcon.DEVICE_DESKTOP, this.headerY);
+      GlassRenderer.drawSeparator(
+         (float)(this.cardX + 14),
+         (float)this.dividerY,
+         (float)(this.cardX + this.cardW - 14),
+         (float)this.dividerY,
+         1.0F,
+         UiTheme.GLASS_DIVIDER
       );
-      String str = "Minecraft 1.8.9";
-      int stringWidth = this.fontRendererObj.getStringWidth(str);
-      this.drawString(this.fontRendererObj, str, this.width - stringWidth - 2, this.height - 10, 8421504);
+
+      String ofFooter = ((Module)Augustus.getInstance().getModuleManager().invisMode).isToggled()
+         ? "OptiFine HD M5 Ultra"
+         : "OptiFine HD M5 Ultra (Hard-forked by EnZaXD & DasNeueUpdate)";
+      VanillaScreenText.drawSmallString(ofFooter, 8.0F, (float)(this.height - 13), 0x99CBD5E1);
+      String mcVersion = "Minecraft 1.8.9";
+      VanillaScreenText.drawSmallString(mcVersion, (float)(this.width - VanillaScreenText.getSmallStringWidth(mcVersion) - 8), (float)(this.height - 13), 0x99CBD5E1);
+
       super.drawScreen(mouseX, mouseY, partialTicks);
       this.tooltipManager.drawTooltips(mouseX, mouseY, this.buttonList);
    }
@@ -161,37 +178,58 @@ public class GuiVideoSettings extends GuiScreen {
       this.screenTitle = I18n.format("options.videoTitle", new Object[0]);
       this.buttonList.clear();
 
+      this.cardW = Math.min(358, Math.max(300, this.width - 32));
+      int padX = 14;
+      int padTop = 14;
+      int padBottom = 14;
+      int colGap = 10;
+      int btnH = 21;
+      int rowStep = 26;
+      int fullW = this.cardW - padX * 2;
+      int colW = (fullW - colGap) / 2;
+
+      int optionRows = (videoOptions.length + 1) / 2;
+      int categoryRows = 3;
+      this.cardH = padTop + 26 + (optionRows + categoryRows) * rowStep + 6 + btnH + padBottom;
+      this.cardX = (this.width - this.cardW) / 2;
+      this.cardY = Math.max(10, (this.height - this.cardH) / 2 - 4);
+      this.headerY = this.cardY + padTop;
+      this.dividerY = this.headerY + 18;
+
+      int leftX = this.cardX + padX;
+      int rightX = leftX + colW + colGap;
+      int startY = this.dividerY + 8;
+
       for (int i = 0; i < videoOptions.length; i++) {
          GameSettings.Options options = videoOptions[i];
          if (options != null) {
-            int n = this.width / 2 - 155 + i % 2 * 160;
-            int n2 = this.height / 6 + 21 * (i / 2) - 12;
+            int n = i % 2 == 0 ? leftX : rightX;
+            int n2 = startY + rowStep * (i / 2);
             if (options.getEnumFloat()) {
-               this.buttonList.add(new GuiOptionSliderOF(options.returnEnumOrdinal(), n, n2, options));
+               GuiOptionSliderOF slider = new GuiOptionSliderOF(options.returnEnumOrdinal(), n, n2, options);
+               slider.width = colW;
+               slider.height = btnH;
+               this.buttonList.add(slider);
             } else {
-               this.buttonList.add(new GuiOptionButtonOF(options.returnEnumOrdinal(), n, n2, options, this.guiGameSettings.getKeyBinding(options)));
+               GuiOptionButtonOF optBtn = new GuiOptionButtonOF(options.returnEnumOrdinal(), n, n2, options, this.guiGameSettings.getKeyBinding(options));
+               optBtn.width = colW;
+               optBtn.height = btnH;
+               this.buttonList.add(optBtn);
             }
          }
       }
 
-      int n3 = this.height / 6 + 21 * (videoOptions.length / 2) - 12;
-      int n4 = 0;
-      n4 = this.width / 2 - 155 + 0;
-      this.buttonList.add(new GuiOptionButton(231, n4, n3, Lang.get("of.options.shaders")));
-      n4 = this.width / 2 - 155 + 160;
-      this.buttonList.add(new GuiOptionButton(202, n4, n3, Lang.get("of.options.quality")));
-      n3 += 21;
-      n4 = this.width / 2 - 155 + 0;
-      this.buttonList.add(new GuiOptionButton(201, n4, n3, Lang.get("of.options.details")));
-      n4 = this.width / 2 - 155 + 160;
-      this.buttonList.add(new GuiOptionButton(212, n4, n3, Lang.get("of.options.performance")));
-      n3 += 21;
-      n4 = this.width / 2 - 155 + 0;
-      this.buttonList.add(new GuiOptionButton(211, n4, n3, Lang.get("of.options.animations")));
-      n4 = this.width / 2 - 155 + 160;
-      this.buttonList.add(new GuiOptionButton(222, n4, n3, Lang.get("of.options.other")));
-      n3 += 21;
-      this.buttonList.add(new GuiButton(200, this.width / 2 - 100, this.height / 6 + 168 + 11, I18n.format("gui.done", new Object[0])));
+      int catY = startY + rowStep * optionRows + 2;
+      this.buttonList.add(new GuiOptionButton(231, leftX, catY, colW, btnH, Lang.get("of.options.shaders")).withIcon(LucideIcon.SPARKLES));
+      this.buttonList.add(new GuiOptionButton(202, rightX, catY, colW, btnH, Lang.get("of.options.quality")).withIcon(LucideIcon.SLIDERS_HORIZONTAL));
+      catY += rowStep;
+      this.buttonList.add(new GuiOptionButton(201, leftX, catY, colW, btnH, Lang.get("of.options.details")).withIcon(LucideIcon.LIST));
+      this.buttonList.add(new GuiOptionButton(212, rightX, catY, colW, btnH, Lang.get("of.options.performance")).withIcon(LucideIcon.ZAP));
+      catY += rowStep;
+      this.buttonList.add(new GuiOptionButton(211, leftX, catY, colW, btnH, Lang.get("of.options.animations")).withIcon(LucideIcon.WIND));
+      this.buttonList.add(new GuiOptionButton(222, rightX, catY, colW, btnH, Lang.get("of.options.other")).withIcon(LucideIcon.SETTINGS));
+      catY += rowStep + 4;
+      this.buttonList.add(new GuiButton(200, leftX, catY, fullW, btnH, I18n.format("gui.done", new Object[0])).withIcon(LucideIcon.CHECK).withPrimaryAccent(true));
    }
 
    public static int getButtonHeight(GuiButton button) {

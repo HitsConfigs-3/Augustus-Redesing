@@ -4,6 +4,9 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import java.util.Map;
 import net.augustus.ui.VanillaScreenText;
+import net.augustus.ui.modern.render.MenuScreenSkin;
+import net.augustus.ui.modern.render.UiAnimation;
+import net.augustus.ui.modern.render.UiTheme;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.resources.Language;
 import java.io.IOException;
@@ -134,9 +137,40 @@ public class GuiLanguage extends GuiScreen {
 
       @Override
       public void drawSlot(int n, int n2, int n3, int n4, int n5, int n6) {
+         // A language is an option of this screen: the row wears the same plate, ring and cursor light as
+         // the Done button under it. The plate sits on the row's box (n2 - 2 with the full list width - see
+         // GuiSelectWorld.List.drawSlot for the hit-test/x-inset WHY); the 18 px slot leaves a 4 px gap
+         // between consecutive plates, so the rings never touch.
+         float rowX = (float)(n2 - 2);
+         float rowY = (float)n3;
+         float rowW = (float)this.getListWidth();
+         float rowH = (float)n4;
+         boolean hovered = (float)n5 >= rowX && (float)n5 <= rowX + rowW && (float)n6 >= rowY && (float)n6 <= rowY + rowH;
+         String hoverKey = "augustus.language.row." + n;
+         MenuScreenSkin.drawOptionSurface(
+            rowX,
+            rowY,
+            rowW,
+            rowH,
+            MenuScreenSkin.optionRadius(rowW, rowH),
+            UiTheme.smoothState(hoverKey, hovered ? 1.0F : 0.0F),
+            UiTheme.smoothPress(hoverKey + ".press", 0.0F, hovered && UiAnimation.isPrimaryMouseDown()),
+            true,
+            (float)n5,
+            (float)n6,
+            UiTheme.accentColor()
+         );
+         // The language in use is the selected row, and it is marked the client's way - one accent ring plus
+         // the rail - now that the stock grey/black selection rectangles are gone. The rail sits at the row's
+         // left edge and this row's label is centred, so the two never meet.
+         if (this.isSelected(n)) {
+            MenuScreenSkin.drawSelectionRing(rowX, rowY, rowW, rowH, MenuScreenSkin.optionRadius(rowW, rowH));
+         }
+         // The bidi flags stay where they were: the Inter face hands a script its atlas cannot draw (and any
+         // right-to-left locale) back to the bitmap renderer, which is the one that honours them.
          this.languageScreen.fontRendererObj.setBidiFlag(true);
-         GuiLanguage.drawCenteredString(
-            this.languageScreen.fontRendererObj, ((Language)this.languageMap.get(this.langCodeList.get(n))).toString(), this.width / 2, n3 + 1, 16777215
+         VanillaScreenText.drawCenteredString(
+            ((Language)this.languageMap.get(this.langCodeList.get(n))).toString(), this.width / 2, n3 + 1, 16777215
          );
          this.languageScreen.fontRendererObj.setBidiFlag(GuiLanguage.accessLanguageManager(this.languageScreen).getCurrentLanguage().isBidirectional());
       }

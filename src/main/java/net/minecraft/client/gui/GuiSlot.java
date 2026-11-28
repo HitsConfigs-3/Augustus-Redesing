@@ -3,6 +3,9 @@ package net.minecraft.client.gui;
 import net.augustus.utils.render.ShaderRenderPass;
 import net.augustus.utils.input.MouseInputUtil;
 import net.augustus.ui.AugustusGuiScreen;
+import net.augustus.ui.modern.render.GlassRenderer;
+import net.augustus.ui.modern.render.MenuScreenSkin;
+import net.augustus.ui.modern.render.UiTheme;
 import net.augustus.render.RenderUtil;
 import net.augustus.utils.render.BlurShadowManager;
 import net.augustus.Augustus;
@@ -47,10 +50,27 @@ public abstract class GuiSlot {
       }
    }
 
+   /**
+    * Paints and places the list's rows, and marks the selected row with the menu's own ring - on the ROW's rectangle, never on the stock one 2 px taller, whose top and bottom strokes would sit proud of a row plate as two horizontal lines.
+    *
+    * <p>WHY the selection is no longer this method's job. The rectangle this method knows is the stock one -
+    * {@code y = n5 - 2}, {@code height = n6 + 4}, i.e. 2 px larger on every side than the row it frames - while
+    * a row's own plate is drawn at {@code y = n5} with {@code height = n6}. A ring drawn on the outer rectangle
+    * therefore covers the row's vertical strokes and leaves its top and bottom strokes 2 px proud of the plate:
+    * two horizontal violet lines above and below the selected row, which is exactly the artefact the user keeps
+    * reporting. This method draws that ring on the row's own rect; a row that paints a plate draws the same ring
+    * {@link MenuScreenSkin#drawSelectionRing(float, float, float, float, float)} on its own rectangle right
+    * after its plate (the read {@code AccountEntry.drawEntry} already uses: one accent ring plus the rail).
+    *
+    * <p>The old chrome was two nested rectangles - a grey 128,128,128 plate and a black one inside it - which
+    * drew two more horizontal rules across the row; that is gone with it.
+    *
+    * <p>{@link #showSelectionBox} and {@link #isSelected(int)} are untouched and remain the row's cue to paint
+    * itself selected. The row loop below is still this method's real work: it is what places every row and what
+    * keeps {@link #updateItemPos(int, int, int)} informed about the ones scrolled out of view.</p>
+    */
    public void drawSelectionBox(int n, int n2, int n3, int n4) {
       int size = this.getSize();
-      Tessellator instance = Tessellator.getInstance();
-      WorldRenderer worldRenderer = instance.getWorldRenderer();
 
       for (int i = 0; i < size; i++) {
          int n5 = n2 + i * this.slotHeight + this.headerPadding;
@@ -60,24 +80,13 @@ public abstract class GuiSlot {
          }
 
          if (this.showSelectionBox && this.isSelected(i)) {
-            int n7 = this.left + (this.width / 2 - this.getListWidth() / 2);
-            int n8 = this.left + this.width / 2 + this.getListWidth() / 2;
-            GlStateManager.color(1.0F, 1.0F, 1.0F, 1.0F);
-            GlStateManager.disableTexture2D();
-            worldRenderer.begin(7, DefaultVertexFormats.POSITION_TEX_COLOR);
-            worldRenderer.pos((double)n7, (double)(n5 + n6 + 2), 0.0).tex(0.0, 1.0).color(128, 128, 128, 255).endVertex();
-            worldRenderer.pos((double)n8, (double)(n5 + n6 + 2), 0.0).tex(1.0, 1.0).color(128, 128, 128, 255).endVertex();
-            worldRenderer.pos((double)n8, (double)(n5 - 2), 0.0).tex(1.0, 0.0).color(128, 128, 128, 255).endVertex();
-            worldRenderer.pos((double)n7, (double)(n5 - 2), 0.0).tex(0.0, 0.0).color(128, 128, 128, 255).endVertex();
-            worldRenderer.pos((double)(n7 + 1), (double)(n5 + n6 + 1), 0.0).tex(0.0, 1.0).color(0, 0, 0, 255).endVertex();
-            worldRenderer.pos((double)(n8 - 1), (double)(n5 + n6 + 1), 0.0).tex(1.0, 1.0).color(0, 0, 0, 255).endVertex();
-            worldRenderer.pos((double)(n8 - 1), (double)(n5 - 1), 0.0).tex(1.0, 0.0).color(0, 0, 0, 255).endVertex();
-            worldRenderer.pos((double)(n7 + 1), (double)(n5 - 1), 0.0).tex(0.0, 0.0).color(0, 0, 0, 255).endVertex();
-            instance.draw();
-            GlStateManager.enableTexture2D();
-         }
+             float rowX = (float)(this.left + (this.width / 2 - this.getListWidth() / 2));
+             float rowW = (float)this.getListWidth();
+             float rowH = (float)n6;
+             MenuScreenSkin.drawSelectionRing(rowX, (float)n5, rowW, rowH, MenuScreenSkin.optionRadius(rowW, rowH));
+          }
 
-         if (!(this instanceof GuiResourcePackList) || n5 >= this.top - this.slotHeight && n5 <= this.bottom) {
+          if (!(this instanceof GuiResourcePackList) || n5 >= this.top - this.slotHeight && n5 <= this.bottom) {
             this.drawSlot(i, n, n5, n6, n3, n4);
          }
       }
@@ -238,10 +247,6 @@ public abstract class GuiSlot {
 
    public void drawScreen(int mouseX2, int mouseY2, float partialTicks) {
       if (this.visible) {
-         if (Minecraft.getMinecraft().currentScreen instanceof GuiMultiplayer) {
-            RenderUtil.drawRect((this.left + (this.width / 2 - this.getListWidth() / 2)) - 2, 0, (this.left + this.width / 2 + this.getListWidth() / 2) + 2, this.height, Integer.MIN_VALUE);
-         }
-
          this.mouseX = mouseX2;
          this.mouseY = mouseY2;
          this.drawBackground();
@@ -252,56 +257,28 @@ public abstract class GuiSlot {
          GlStateManager.disableFog();
          Tessellator instance = Tessellator.getInstance();
          WorldRenderer worldRenderer = instance.getWorldRenderer();
-         float f = 32.0F;
-         if (this.mc.inGameHasFocus) {
-            worldRenderer.begin(7, DefaultVertexFormats.POSITION_TEX_COLOR);
-            worldRenderer.pos((double)this.left, (double)this.bottom, 0.0)
-               .tex((double)((float)this.left / f), (double)((float)(this.bottom + (int)this.amountScrolled) / f))
-               .color(32, 32, 32, 255)
-               .endVertex();
-            worldRenderer.pos((double)this.right, (double)this.bottom, 0.0)
-               .tex((double)((float)this.right / f), (double)((float)(this.bottom + (int)this.amountScrolled) / f))
-               .color(32, 32, 32, 255)
-               .endVertex();
-            worldRenderer.pos((double)this.right, (double)this.top, 0.0)
-               .tex((double)((float)this.right / f), (double)((float)(this.top + (int)this.amountScrolled) / f))
-               .color(32, 32, 32, 255)
-               .endVertex();
-            worldRenderer.pos((double)this.left, (double)this.top, 0.0)
-               .tex((double)((float)this.left / f), (double)((float)(this.top + (int)this.amountScrolled) / f))
-               .color(32, 32, 32, 255)
-               .endVertex();
-            instance.draw();
-         }
 
-         int n4 = this.left + this.width / 2 - this.getListWidth() / 2 + 2;
+         int rowBoxLeft = this.left + this.width / 2 - this.getListWidth() / 2;
+         int panelLeft = Math.min(rowBoxLeft, scrollBarX) - 8;
+         int panelRight = Math.max(rowBoxLeft + this.getListWidth(), n3) + 8;
+         MenuScreenSkin.drawGlassContainer(
+            (float)panelLeft,
+            (float)(this.top - 5),
+            (float)(panelRight - panelLeft),
+            (float)(this.bottom - this.top + 10),
+            9.0F
+         );
+
+         int n4 = rowBoxLeft + 2;
          int n5 = this.top + 4 - (int)this.amountScrolled;
          if (this.hasListHeader) {
             this.drawListHeader(n4, n5, instance);
          }
 
-         AugustusGuiScreen.enableScissor(this.left, this.top, this.right, this.bottom);
+         AugustusGuiScreen.enableScissor(panelLeft + 2, this.top, panelRight - 2, this.bottom);
          this.drawSelectionBox(n4, n5, mouseX2, mouseY2);
          AugustusGuiScreen.disableScissor();
          GlStateManager.disableDepth();
-         byte b = 4;
-         GlStateManager.enableBlend();
-         GlStateManager.tryBlendFuncSeparate(770, 771, 0, 1);
-         GlStateManager.disableAlpha();
-         GlStateManager.shadeModel(7425);
-         GlStateManager.disableTexture2D();
-         worldRenderer.begin(7, DefaultVertexFormats.POSITION_TEX_COLOR);
-         worldRenderer.pos((double)this.left, (double)(this.top + b), 0.0).tex(0.0, 1.0).color(0, 0, 0, 0).endVertex();
-         worldRenderer.pos((double)this.right, (double)(this.top + b), 0.0).tex(1.0, 1.0).color(0, 0, 0, 0).endVertex();
-         worldRenderer.pos((double)this.right, (double)this.top, 0.0).tex(1.0, 0.0).color(0, 0, 0, 255).endVertex();
-         worldRenderer.pos((double)this.left, (double)this.top, 0.0).tex(0.0, 0.0).color(0, 0, 0, 255).endVertex();
-         instance.draw();
-         worldRenderer.begin(7, DefaultVertexFormats.POSITION_TEX_COLOR);
-         worldRenderer.pos((double)this.left, (double)this.bottom, 0.0).tex(0.0, 1.0).color(0, 0, 0, 255).endVertex();
-         worldRenderer.pos((double)this.right, (double)this.bottom, 0.0).tex(1.0, 1.0).color(0, 0, 0, 255).endVertex();
-         worldRenderer.pos((double)this.right, (double)(this.bottom - b), 0.0).tex(1.0, 0.0).color(0, 0, 0, 0).endVertex();
-         worldRenderer.pos((double)this.left, (double)(this.bottom - b), 0.0).tex(0.0, 0.0).color(0, 0, 0, 0).endVertex();
-         instance.draw();
          int maxScroll = this.getMaxScroll();
          if (maxScroll > 0) {
             int n6 = (this.bottom - this.top) * (this.bottom - this.top) / this.getContentHeight();
@@ -311,32 +288,48 @@ public abstract class GuiSlot {
                n7 = this.top;
             }
 
-            worldRenderer.begin(7, DefaultVertexFormats.POSITION_TEX_COLOR);
-            worldRenderer.pos((double)scrollBarX, (double)this.bottom, 0.0).tex(0.0, 1.0).color(0, 0, 0, 255).endVertex();
-            worldRenderer.pos((double)n3, (double)this.bottom, 0.0).tex(1.0, 1.0).color(0, 0, 0, 255).endVertex();
-            worldRenderer.pos((double)n3, (double)this.top, 0.0).tex(1.0, 0.0).color(0, 0, 0, 255).endVertex();
-            worldRenderer.pos((double)scrollBarX, (double)this.top, 0.0).tex(0.0, 0.0).color(0, 0, 0, 255).endVertex();
-            instance.draw();
-            worldRenderer.begin(7, DefaultVertexFormats.POSITION_TEX_COLOR);
-            worldRenderer.pos((double)scrollBarX, (double)(n7 + n6), 0.0).tex(0.0, 1.0).color(128, 128, 128, 255).endVertex();
-            worldRenderer.pos((double)n3, (double)(n7 + n6), 0.0).tex(1.0, 1.0).color(128, 128, 128, 255).endVertex();
-            worldRenderer.pos((double)n3, (double)n7, 0.0).tex(1.0, 0.0).color(128, 128, 128, 255).endVertex();
-            worldRenderer.pos((double)scrollBarX, (double)n7, 0.0).tex(0.0, 0.0).color(128, 128, 128, 255).endVertex();
-            instance.draw();
-            worldRenderer.begin(7, DefaultVertexFormats.POSITION_TEX_COLOR);
-            worldRenderer.pos((double)scrollBarX, (double)(n7 + n6 - 1), 0.0).tex(0.0, 1.0).color(192, 192, 192, 255).endVertex();
-            worldRenderer.pos((double)(n3 - 1), (double)(n7 + n6 - 1), 0.0).tex(1.0, 1.0).color(192, 192, 192, 255).endVertex();
-            worldRenderer.pos((double)(n3 - 1), (double)n7, 0.0).tex(1.0, 0.0).color(192, 192, 192, 255).endVertex();
-            worldRenderer.pos((double)scrollBarX, (double)n7, 0.0).tex(0.0, 0.0).color(192, 192, 192, 255).endVertex();
-            instance.draw();
+            // The rail and the thumb, in the menu's own material.
+            //
+            // WHY the geometry is byte-for-byte the stock one: the rail covers exactly the 6 px band from
+            // getScrollBarX() to getScrollBarX()+6 that handleMouseInput() treats as the grab zone, and the
+            // thumb covers the same n7..n7+n6 span the stock grey band covered, so the visible thumb can never
+            // disagree with the invisible zone the pointer has to hit. The n6/n7 maths and its clamp above are
+            // untouched.
+            //
+            // WHY the stock banding is gone: the vanilla bar is a black track, a mid-grey thumb and a lighter
+            // 192,192,192 highlight - three stacked rectangles with three built-in horizontal edges, which is
+            // the same "lineas" family the user reports. One recessed well plus one accent capsule is the whole
+            // scrollbar, and both are drawn with their inner-line weights at zero (see MenuScreenSkin).
+            float railX = (float)scrollBarX;
+            float railW = (float)(n3 - scrollBarX);
+            float railH = (float)(this.bottom - this.top);
+            if (railW > 0.0F && railH > 0.0F) {
+               MenuScreenSkin.drawWellSurface(railX, (float)this.top, railW, railH, railW * 0.5F, 0.0F, UiTheme.accentColor());
+            }
+
+            float thumbH = (float)n6;
+            if (railW > 0.0F && thumbH > 0.0F) {
+               // The accent capsule: the ClickGUI slider's filled-rail colours (ModernSlider), so the list's
+               // thumb and the ClickGUI's rail are the same violet. No ring on the thumb itself - the rail's
+               // outline already frames it, and a capsule with a ring would be a second line.
+               int thumbTop = UiTheme.lerpArgb(UiTheme.accentColor(), UiTheme.accentSoftGlow(), 0.12F);
+               GlassRenderer.drawRoundedGradientBox(
+                  railX,
+                  (float)n7,
+                  railW,
+                  thumbH,
+                  railW * 0.5F,
+                  UiTheme.withAlpha(thumbTop, 214),
+                  UiTheme.withAlpha(UiTheme.accentSoftGlow(), 226),
+                  0,
+                  0.0F,
+                  0.0F
+               );
+            }
          }
 
          BlurShadowManager.enableBlurOnce();
          BlurShadowManager.enableNormalPassOnce();
-         BlurShadowManager.submitRenderTask(false, shaderRenderPass -> {
-            RenderUtil.drawRect(this.left, this.bottom, this.right, this.bottom + this.height, Integer.MIN_VALUE);
-            RenderUtil.drawRect(this.left, 0, this.right, this.top, Integer.MIN_VALUE);
-         });
          GlStateManager.enableBlend();
          GlStateManager.tryBlendFuncSeparate(770, 771, 0, 1);
          GlStateManager.disableAlpha();

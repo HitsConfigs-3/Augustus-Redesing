@@ -4,12 +4,11 @@ import com.google.common.base.Predicate;
 import com.google.common.base.Predicates;
 import java.util.function.Consumer;
 import net.augustus.font.FontManager;
+import net.augustus.ui.TabbedMenuScreen;
 import net.augustus.ui.modern.font.InterFontUtil;
+import net.augustus.ui.modern.render.MenuScreenSkin;
+import net.augustus.ui.modern.render.UiTheme;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.renderer.GlStateManager;
-import net.minecraft.client.renderer.Tessellator;
-import net.minecraft.client.renderer.WorldRenderer;
-import net.minecraft.client.renderer.vertex.DefaultVertexFormats;
 import net.minecraft.util.ChatAllowedCharacters;
 import net.minecraft.util.MathHelper;
 
@@ -36,9 +35,34 @@ public class GuiTextField extends Gui {
    private GuiPageButtonList.GuiResponder guiResponder;
    private Predicate validator = Predicates.alwaysTrue();
    private Consumer textChangeListener;
+   private InterFontUtil customFont;
+   private float wellHoverAnim = 0.0F;
+   private float wellFocusAnim = 0.0F;
+
+   /**
+    * Alpha of the text-selection tint: high enough that the selected run is unmistakable over the dark well,
+    * low enough that the glyphs underneath stay readable - a selection marks text, it must not hide it.
+    */
+   private static final int SELECTION_ALPHA = 110;
 
    public int getMaxStringLength() {
       return this.maxStringLength;
+   }
+
+   public void setCustomFont(InterFontUtil font) {
+      this.customFont = font;
+   }
+
+   public InterFontUtil getCustomFont() {
+      return this.customFont;
+   }
+
+   private InterFontUtil resolveFont() {
+      return this.customFont != null ? this.customFont : textFieldFont();
+   }
+
+   private int horizontalPadding() {
+      return this.customFont != null ? 8 : 4;
    }
 
    /**
@@ -86,7 +110,7 @@ public class GuiTextField extends Gui {
    }
 
    public int getWidth() {
-      return this.getEnableBackgroundDrawing() ? this.width - 8 : this.width;
+      return this.getEnableBackgroundDrawing() ? this.width - this.horizontalPadding() * 2 : this.width;
    }
 
    public String getText() {
@@ -159,10 +183,10 @@ public class GuiTextField extends Gui {
       if (this.isFocused && flag && mouseButton == 0) {
          int n = mouseX - this.xPosition;
          if (this.enableBackgroundDrawing) {
-            n -= 4;
+            n -= this.horizontalPadding();
          }
 
-         InterFontUtil font = textFieldFont();
+         InterFontUtil font = this.resolveFont();
          if (font == null) {
             String str = this.fontRendererInstance.trimStringToWidth(this.text.substring(this.lineScrollOffset), this.getWidth());
             this.setCursorPosition(this.fontRendererInstance.trimStringToWidth(str, n).length() + this.lineScrollOffset);
@@ -226,7 +250,7 @@ public class GuiTextField extends Gui {
          }
 
          int width2 = this.getWidth();
-         InterFontUtil font = textFieldFont();
+         InterFontUtil font = this.resolveFont();
          if (font == null) {
             int n2 = this.fontRendererInstance.trimStringToWidth(this.text.substring(this.lineScrollOffset), width2).length() + this.lineScrollOffset;
             if (n == this.lineScrollOffset) {
@@ -425,14 +449,33 @@ public class GuiTextField extends Gui {
       if (!this.getVisible()) {
          return;
       }
-      InterFontUtil font = textFieldFont();
+      InterFontUtil font = this.resolveFont();
       if (font == null) {
          this.drawTextBoxFallback(flag);
          return;
       }
       if (this.getEnableBackgroundDrawing()) {
-         drawRect(this.xPosition - 1, this.yPosition - 1, this.xPosition + this.width + 1, this.yPosition + this.height + 1, -6250336);
-         drawRect(this.xPosition, this.yPosition, this.xPosition + this.width, this.yPosition + this.height, -16777216);
+         float mx = TabbedMenuScreen.mouseX();
+         float my = TabbedMenuScreen.mouseY();
+         boolean hovered = this.isEnabled
+            && mx >= (float)this.xPosition
+            && mx <= (float)(this.xPosition + this.width)
+            && my >= (float)this.yPosition
+            && my <= (float)(this.yPosition + this.height);
+         this.wellHoverAnim = UiTheme.smoothState(this.wellHoverAnim, hovered ? 1.0F : 0.0F);
+         this.wellFocusAnim = UiTheme.smoothState(this.wellFocusAnim, this.isFocused ? 1.0F : 0.0F);
+         MenuScreenSkin.drawWellSurface(
+            (float)this.xPosition,
+            (float)this.yPosition,
+            (float)this.width,
+            (float)this.height,
+            MenuScreenSkin.optionRadius((float)this.width, (float)this.height),
+            this.wellHoverAnim,
+            this.wellFocusAnim,
+            mx,
+            my,
+            UiTheme.accentColor()
+         );
       }
 
       int textArgb = this.isEnabled ? this.textColor : this.disabledTextColour;
@@ -442,7 +485,7 @@ public class GuiTextField extends Gui {
       String visibleText = font.trimToWidth(this.text.substring(scrollStart), (float)this.getWidth());
       boolean caretInside = caretPos >= 0 && caretPos <= visibleText.length();
       boolean blinkVisible = this.isFocused && this.cursorCounter / 6 % 2 == 0 && caretInside;
-      float textX = this.enableBackgroundDrawing ? (float)(this.xPosition + 4) : (float)this.xPosition;
+      float textX = this.enableBackgroundDrawing ? (float)(this.xPosition + this.horizontalPadding()) : (float)this.xPosition;
       float fontHeight = font.getFontHeight();
       float textY = this.enableBackgroundDrawing
          ? (float)this.yPosition + ((float)this.height - fontHeight) * 0.5F
@@ -485,12 +528,16 @@ public class GuiTextField extends Gui {
 
       int caretHeight = (int)Math.ceil((double)fontHeight);
       if (blinkVisible) {
+         // The caret is the accent at full alpha, not the stock pale blue: the caret is the one piece of a
+         // field that says "the keyboard is here", and the accent is this UI's marker for exactly that (the
+         // focused ring uses the same colour at the same alpha).
+         int caretArgb = UiTheme.withAlpha(UiTheme.accentColor(), 255);
          if (caretAtEnd) {
-            drawRect((int)caretX, (int)textY - 1, (int)caretX + 1, (int)textY + 1 + caretHeight, -3092272);
+            drawRect((int)caretX, (int)textY - 1, (int)caretX + 1, (int)textY + 1 + caretHeight, caretArgb);
          } else if (flag) {
-            font.drawStringWithShadow("_", (double)caretX, (double)textY, textArgb);
+            font.drawStringWithShadow("_", (double)caretX, (double)textY, caretArgb);
          } else {
-            font.drawString("_", (double)caretX, (double)textY, textArgb);
+            font.drawString("_", (double)caretX, (double)textY, caretArgb);
          }
       }
 
@@ -507,8 +554,20 @@ public class GuiTextField extends Gui {
     */
    private void drawTextBoxFallback(boolean flag) {
       if (this.getEnableBackgroundDrawing()) {
-         drawRect(this.xPosition - 1, this.yPosition - 1, this.xPosition + this.width + 1, this.yPosition + this.height + 1, -6250336);
-         drawRect(this.xPosition, this.yPosition, this.xPosition + this.width, this.yPosition + this.height, -16777216);
+         // The field's own material, on the field's own rect. WHY it is not the stock 1 px-larger box: the
+         // vanilla border was painted at (x-1, y-1)..(x+w+1, y+h+1), i.e. one pixel OUTSIDE the rectangle this
+         // field is clicked and measured in (mouseClicked accepts xPosition..xPosition+width), so the drawn box
+         // and the live box disagreed by a pixel on every side. The well now sits on xPosition/yPosition/
+         // width/height, so what is drawn is what is clickable.
+         MenuScreenSkin.drawWellSurface(
+            (float)this.xPosition,
+            (float)this.yPosition,
+            (float)this.width,
+            (float)this.height,
+            MenuScreenSkin.optionRadius((float)this.width, (float)this.height),
+            this.isFocused ? 1.0F : 0.0F,
+            UiTheme.accentColor()
+         );
       }
 
       int n = this.isEnabled ? this.textColor : this.disabledTextColour;
@@ -565,6 +624,19 @@ public class GuiTextField extends Gui {
       return n3;
    }
 
+   /**
+    * The text-selection highlight: one translucent accent rectangle over the selected run.
+    *
+    * <p>WHY this replaced the colour-logic fill. The stock implementation enabled {@code GL_COLOR_LOGIC_OP}
+    * with {@code GL_XOR} and painted the run with a flat blue, which inverts whatever is under it: over this
+    * field's dark well that read as a hard blue block with blacked-out glyphs, and an XOR pass cares about
+    * whatever was in the framebuffer rather than about the theme. A translucent accent tint does the same job
+    * - the run is obvious, the glyphs stay readable through it - with one colour from the theme and ordinary
+    * alpha blending, which is what every other surface in this UI uses.</p>
+    *
+    * <p>The clamping and the corner normalisation below are the stock ones, unchanged: the rectangle is still
+    * cut at the field's right edge and still ordered before it is filled.</p>
+    */
    private void drawCursorVertical(int n, int n2, int n3, int n4) {
       if (n < n3) {
          int n5 = n;
@@ -586,20 +658,9 @@ public class GuiTextField extends Gui {
          n = this.xPosition + this.width;
       }
 
-      Tessellator instance = Tessellator.getInstance();
-      WorldRenderer worldRenderer = instance.getWorldRenderer();
-      GlStateManager.color(0.0F, 0.0F, 255.0F, 255.0F);
-      GlStateManager.disableTexture2D();
-      GlStateManager.enableColorLogic();
-      GlStateManager.colorLogicOp(5387);
-      worldRenderer.begin(7, DefaultVertexFormats.POSITION);
-      worldRenderer.pos((double)n, (double)n4, 0.0).endVertex();
-      worldRenderer.pos((double)n3, (double)n4, 0.0).endVertex();
-      worldRenderer.pos((double)n3, (double)n2, 0.0).endVertex();
-      worldRenderer.pos((double)n, (double)n2, 0.0).endVertex();
-      instance.draw();
-      GlStateManager.disableColorLogic();
-      GlStateManager.enableTexture2D();
+      // drawRect() is the vanilla fill (normal alpha blending, its own texture/blend state), so the selection
+      // needs no hand-rolled GL state at all.
+      drawRect(n, n2, n3, n4, UiTheme.withAlpha(UiTheme.accentColor(), SELECTION_ALPHA));
    }
 
    public void moveCursorBy(int n) {

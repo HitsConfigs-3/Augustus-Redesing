@@ -6,6 +6,10 @@ import net.augustus.render.RenderUtil;
 import net.augustus.ui.menu.ContextMenuItem;
 import net.augustus.ui.menu.QuickMenuBuilder;
 import net.augustus.ui.modern.font.InterFontUtil;
+import net.augustus.ui.modern.render.GlassRenderer;
+import net.augustus.ui.modern.render.LucideIcon;
+import net.augustus.ui.modern.render.MenuScreenSkin;
+import net.augustus.ui.modern.render.UiTheme;
 import net.augustus.ui.sidebar.HeaderSidebarItem;
 import net.augustus.utils.animation.AnimationUtil;
 import net.augustus.utils.animation.EasingType;
@@ -38,11 +42,11 @@ public final class QuickActionsSidebar implements MC {
     * out for glyphs it does not draw.
     */
    private static InterFontUtil font() {
-      return FontManager.body();
+      return FontManager.uiSmall();
    }
 
    private float itemHeight() {
-      return FontManager.bodyLineHeight();
+      return 14.0F;
    }
 
    private int textWidth(String str) {
@@ -129,7 +133,7 @@ public final class QuickActionsSidebar implements MC {
          double d3 = (double)mouseY;
          this.scrollBar.handleMouseClick(d, d3);
          ScaledResolution sr = new ScaledResolution(mc);
-         int clampedScrollOffset = (int)this.scrollBar.getClampedScrollOffset();
+         int clampedScrollOffset = Math.round(10.0F + (float)this.scrollBar.getClampedScrollOffset());
 
          for (String str : (Iterable<String>)(this.collectDisplayLines())) {
             boolean flag = mouseX >= sr.getScaledWidth() - this.sidebarWidth - 2
@@ -159,49 +163,50 @@ public final class QuickActionsSidebar implements MC {
       InterFontUtil font = font();
       float lineHeight = this.itemHeight();
       if (!this.visible) {
-         // Tab handle shown while the list is collapsed: "->" (the '§l' run is applied by the face itself).
-         String handle = "§l->";
-         if (font == null) {
-            mc.fontRendererObj
-               .drawStringWithShadow(
-                  handle, (float)(n3 - mc.fontRendererObj.getStringWidth(handle)), (float)sr.getScaledHeight() / 2.0F - (float)mc.fontRendererObj.FONT_HEIGHT / 2.0F, -1
-               );
-         } else {
-            font.drawStringWithShadow(
-               handle,
-               (double)((float)n3 - font.getStringWidth(handle)),
-               (double)((float)sr.getScaledHeight() / 2.0F - font.getFontHeight() / 2.0F),
-               -1
-            );
-         }
+         float pillW = 18.0F;
+         float pillH = 42.0F;
+         float pillX = (float)n3 - pillW - 4.0F;
+         float pillY = (float)sr.getScaledHeight() * 0.5F - pillH * 0.5F;
+         boolean pillHovered = (float)n >= pillX && (float)n <= pillX + pillW && (float)n2 >= pillY && (float)n2 <= pillY + pillH;
+         MenuScreenSkin.drawOptionSurface(
+            pillX, pillY, pillW, pillH, 6.0F,
+            pillHovered ? 1.0F : 0.0F, 0.0F, true,
+            (float)n, (float)n2, UiTheme.accentColor()
+         );
+         LucideIcon.ARROW_LEFT.drawCentered(pillX + pillW * 0.5F, pillY + pillH * 0.5F, 10.5F, pillHovered ? 0xFFF8FAFC : 0xCCA78BFA);
       } else {
          int n4 = sr.getScaledWidth() - n3;
-         RenderUtil.drawRect(n3, 0, sr.getScaledWidth(), sr.getScaledHeight(), -939524096);
-         int clampedScrollOffset = (int)this.scrollBar.getClampedScrollOffset();
+         MenuScreenSkin.drawGlassContainer((float)(n3 - 4), 6.0F, (float)(n4), (float)(sr.getScaledHeight() - 12), 8.0F);
+         int clampedScrollOffset = Math.round(10.0F + (float)this.scrollBar.getClampedScrollOffset());
 
          for (String str : (Iterable<String>)(this.collectDisplayLines())) {
             ContextMenuItem contextMenuItem = this.findItemByText(str);
             boolean flag = n >= sr.getScaledWidth() - this.sidebarWidth - 2
-               && n < sr.getScaledWidth() - 4
+               && n < sr.getScaledWidth() - 6
                && n2 >= clampedScrollOffset - 1
                && (float)n2 <= (float)clampedScrollOffset + lineHeight - 1.0F;
-            int n5 = flag ? -4144960 : -1;
+            boolean isHeader = contextMenuItem instanceof HeaderSidebarItem;
+            if (flag && !isHeader && !str.trim().isEmpty()) {
+               GlassRenderer.drawRoundedBox((float)n3, (float)clampedScrollOffset - 1.0F, (float)(this.sidebarWidth - 4), lineHeight, 4.0F,
+                  UiTheme.withAlpha(UiTheme.accentColor(), 64), 0, 0.0F);
+            }
+            int textColor = isHeader ? UiTheme.lerpArgb(UiTheme.accentColor(), 0xFFFFFFFF, 0.35F) : (flag ? 0xFFF8FAFC : 0xFFE2E8F0);
             if (font == null) {
                if (contextMenuItem != null && contextMenuItem.isCentered()) {
                   int n6 = n3 + this.sidebarWidth / 2 - mc.fontRendererObj.getStringWidth(str) / 2 - 2;
-                  mc.fontRendererObj.drawStringWithShadow(str, (float)n6, (float)clampedScrollOffset, contextMenuItem instanceof HeaderSidebarItem ? Augustus.getInstance().getClientColor() : n5);
+                  mc.fontRendererObj.drawStringWithShadow(str, (float)n6, (float)clampedScrollOffset, textColor);
                } else {
-                  mc.fontRendererObj.drawStringWithShadow(str, (float)(n3 + 2), (float)clampedScrollOffset, n5);
+                  mc.fontRendererObj.drawStringWithShadow(str, (float)(n3 + 6), (float)clampedScrollOffset, textColor);
                }
             } else if (contextMenuItem != null && contextMenuItem.isCentered()) {
                font.drawStringWithShadow(
                   str,
                   (double)((float)n3 + (float)this.sidebarWidth / 2.0F - font.getStringWidth(str) / 2.0F - 2.0F),
-                  (double)((float)clampedScrollOffset),
-                  contextMenuItem instanceof HeaderSidebarItem ? Augustus.getInstance().getClientColor() : n5
+                  (double)((float)clampedScrollOffset + 1.5F),
+                  textColor
                );
             } else {
-               font.drawStringWithShadow(str, (double)((float)(n3 + 2)), (double)((float)clampedScrollOffset), n5);
+               font.drawStringWithShadow(str, (double)((float)(n3 + 6)), (double)((float)clampedScrollOffset + 1.5F), textColor);
             }
 
             clampedScrollOffset = Math.round((float)clampedScrollOffset + lineHeight);

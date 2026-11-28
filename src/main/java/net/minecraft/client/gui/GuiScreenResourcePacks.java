@@ -1,5 +1,8 @@
 package net.minecraft.client.gui;
 
+import net.augustus.ui.VanillaScreenText;
+import net.augustus.ui.modern.render.LucideIcon;
+
 import com.google.common.collect.Lists;
 import java.io.File;
 import java.io.IOException;
@@ -39,8 +42,20 @@ public class GuiScreenResourcePacks extends GuiScreen {
 
    @Override
    public void initGui() {
-      this.buttonList.add(new GuiOptionButton(2, this.width / 2 - 154, this.height - 48, I18n.format("resourcePack.openFolder", new Object[0])));
-      this.buttonList.add(new GuiOptionButton(1, this.width / 2 + 4, this.height - 48, I18n.format("gui.done", new Object[0])));
+      int colW = Math.min(242, Math.max(186, (this.width - 56) / 2));
+      int colGap = 20;
+      int leftColX = this.width / 2 - colGap / 2 - colW;
+      int rightColX = this.width / 2 + colGap / 2;
+
+      this.buttonList.add(
+         new GuiOptionButton(2, leftColX, this.height - 50, colW, 21, I18n.format("resourcePack.openFolder", new Object[0]))
+            .withIcon(LucideIcon.FOLDER)
+      );
+      this.buttonList.add(
+         new GuiOptionButton(1, rightColX, this.height - 50, colW, 21, I18n.format("gui.done", new Object[0]))
+            .withIcon(LucideIcon.CHECK)
+            .withPrimaryAccent(true)
+      );
       if (!this.changed) {
          this.availableResourcePacks = Lists.newArrayList();
          this.selectedResourcePacks = Lists.newArrayList();
@@ -60,21 +75,23 @@ public class GuiScreenResourcePacks extends GuiScreen {
          this.selectedResourcePacks.add(new ResourcePackListEntryDefault(this));
       }
 
-      this.availableResourcePacksList = new GuiResourcePackAvailable(this.mc, 200, this.height, this.availableResourcePacks);
-      this.availableResourcePacksList.setSlotXBoundsFromLeft(this.width / 2 - 4 - 200);
+      this.availableResourcePacksList = new GuiResourcePackAvailable(this.mc, colW, this.height, this.availableResourcePacks);
+      this.availableResourcePacksList.setSlotXBoundsFromLeft(leftColX);
       this.availableResourcePacksList.registerScrollButtons(7, 8);
-      this.selectedResourcePacksList = new GuiResourcePackSelected(this.mc, 200, this.height, this.selectedResourcePacks);
-      this.selectedResourcePacksList.setSlotXBoundsFromLeft(this.width / 2 + 4);
+      this.selectedResourcePacksList = new GuiResourcePackSelected(this.mc, colW, this.height, this.selectedResourcePacks);
+      this.selectedResourcePacksList.setSlotXBoundsFromLeft(rightColX);
       this.selectedResourcePacksList.registerScrollButtons(7, 8);
    }
 
    @Override
    public void drawScreen(int mouseX, int mouseY, float partialTicks) {
-      this.drawBackground(0);
+      this.drawDefaultBackground();
       this.availableResourcePacksList.drawScreen(mouseX, mouseY, partialTicks);
       this.selectedResourcePacksList.drawScreen(mouseX, mouseY, partialTicks);
-      drawCenteredStringRaw(this.fontRendererObj, I18n.format("resourcePack.title", new Object[0]), this.width / 2, 16, 16777215);
-      drawCenteredStringRaw(this.fontRendererObj, I18n.format("resourcePack.folderInfo", new Object[0]), this.width / 2 - 77, this.height - 26, 8421504);
+      VanillaScreenText.drawHeader(this.width, I18n.format("resourcePack.title", new Object[0]), LucideIcon.BOXES, 15);
+      int colW = Math.min(242, Math.max(186, (this.width - 56) / 2));
+      int hintCenterX = this.width / 2 - 10 - colW / 2;
+      VanillaScreenText.drawSmallCenteredString(I18n.format("resourcePack.folderInfo", new Object[0]), (float)hintCenterX, (float)(this.height - 22), 0xCCB8B0D0);
       super.drawScreen(mouseX, mouseY, partialTicks);
    }
 

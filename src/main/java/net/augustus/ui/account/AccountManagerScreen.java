@@ -1,20 +1,5 @@
 package net.augustus.ui.account;
 
-import net.augustus.Augustus;
-import net.augustus.alt.AltUsernameGenerator;
-import net.augustus.config.ClientSettingsConfigFile;
-import net.augustus.font.FontManager;
-import net.augustus.render.RenderUtil;
-import net.augustus.settings.property.BooleanProperty;
-import net.augustus.settings.property.StringProperty;
-import net.augustus.ui.GuiButtonClickHandler;
-import net.augustus.ui.GuiPasswordField;
-import net.augustus.ui.menu.ClientMenuTab;
-import net.augustus.ui.modern.font.InterFontUtil;
-import net.augustus.ui.widgets.ScrollBar;
-import net.augustus.utils.TuplePair;
-import net.augustus.utils.file.ClientFileUtil;
-import net.augustus.utils.file.ClientPaths;
 import com.google.common.base.Charsets;
 import com.google.common.collect.Lists;
 import io.netty.buffer.ByteBuf;
@@ -42,12 +27,29 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ThreadLocalRandom;
-import net.minecraft.client.gui.FontRenderer;
+import net.augustus.Augustus;
+import net.augustus.alt.AltUsernameGenerator;
+import net.augustus.config.ClientSettingsConfigFile;
+import net.augustus.render.RenderUtil;
+import net.augustus.settings.property.BooleanProperty;
+import net.augustus.settings.property.StringProperty;
+import net.augustus.ui.AugustusGuiScreen;
+import net.augustus.ui.GuiButtonClickHandler;
+import net.augustus.ui.GuiPasswordField;
+import net.augustus.ui.TabbedMenuScreen;
+import net.augustus.ui.menu.ClientMenuTab;
+import net.augustus.ui.modern.components.GlassMenuButton;
+import net.augustus.ui.modern.font.InterFontUtil;
+import net.augustus.ui.modern.render.LucideIcon;
+import net.augustus.ui.modern.render.UiTheme;
+import net.augustus.ui.widgets.ScrollBar;
+import net.augustus.utils.TuplePair;
+import net.augustus.utils.file.ClientFileUtil;
+import net.augustus.utils.file.ClientPaths;
 import net.minecraft.client.gui.Gui;
 import net.minecraft.client.gui.GuiButton;
 import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.client.gui.GuiTextField;
-import net.minecraft.client.gui.ScaledResolution;
 import net.minecraft.client.multiplayer.ServerData;
 import net.minecraft.client.renderer.GlStateManager;
 import net.minecraft.client.renderer.texture.DynamicTexture;
@@ -58,6 +60,11 @@ import net.minecraft.nbt.NBTTagList;
 import net.minecraft.util.ResourceLocation;
 import org.apache.commons.lang3.Validate;
 
+/**
+ * Account Manager view: Augustus-styled frosted glass workspace with 3 left-column form/action cards,
+ * full-height right-column saved accounts glass container, crisp smaller Inter typography, Tabler icons,
+ * and cursor-tracking hover glow.
+ */
 public class AccountManagerScreen extends ClientMenuTab {
    public static AccountManagerScreen instance;
    public static List randomNames = new ArrayList();
@@ -71,12 +78,472 @@ public class AccountManagerScreen extends ClientMenuTab {
    public static final ScrollBar scrollBar;
    private GuiPasswordField passwordField;
 
+   private float leftX;
+   private float leftW;
+   private float rightX;
+   private float rightW;
+   private float cardPad;
+   private float rowGap;
+   private float colGap;
+   private float labelH;
+   private float signInY;
+   private float signInH;
+   private float emailLabelY;
+   private float emailFieldY;
+   private float passwordLabelY;
+   private float passwordFieldY;
+   private float signInButtonY;
+   private float methodsY;
+   private float methodsH;
+   private float methodsRow1Y;
+   private float methodsRow2Y;
+   private float manageY;
+   private float manageH;
+   private float manageRow1Y;
+   private float manageRow2Y;
+   private float detailY;
+   private float detailH;
+   private float listX;
+   private float listW;
+   private float listTop;
+   private float listHeadingY;
+   private float rowsTop;
+   private float rowsBottom;
+   private float loginX;
+   private float loginW;
+   private float generateX;
+   private float generateW;
+
+   @Override
+   public LucideIcon getTabIcon() {
+      return LucideIcon.USER;
+   }
+
+   private void layoutCards() {
+      float pageX = TabbedMenuScreen.contentX();
+      float pageW = TabbedMenuScreen.contentW();
+      float gap = TabbedMenuScreen.gap();
+      float row = TabbedMenuScreen.rowH();
+      float top = TabbedMenuScreen.bodyTop();
+
+      this.cardPad = clamp(Math.round(row * 0.45F), 9.0F, 12.0F);
+      this.rowGap = clamp(Math.round(row * 0.25F), 5.0F, 7.0F);
+      this.colGap = clamp(Math.round(gap * 0.65F), 6.0F, 8.0F);
+      this.labelH = menuCaptionHeight();
+
+      this.leftX = pageX;
+      this.leftW = clamp(Math.round(pageW * 0.455F), 150.0F, 375.0F);
+      if (this.leftW > pageW - 148.0F) {
+         this.leftW = Math.max(140.0F, pageW - 148.0F);
+      }
+      this.rightX = this.leftX + this.leftW + gap;
+      this.rightW = Math.max(130.0F, TabbedMenuScreen.contentX() + pageW - this.rightX);
+
+      // Card 1 - Sign in form
+      this.signInY = top;
+      this.emailLabelY = this.signInY + this.cardPad;
+      this.emailFieldY = this.emailLabelY + this.labelH + 4.0F;
+      this.passwordLabelY = this.emailFieldY + row + this.rowGap + 1.0F;
+      this.passwordFieldY = this.passwordLabelY + this.labelH + 4.0F;
+      this.signInButtonY = this.passwordFieldY + row + this.rowGap + 2.0F;
+      this.signInH = this.signInButtonY + row + this.cardPad - this.signInY;
+
+      float innerW = this.leftW - this.cardPad * 2.0F;
+      this.loginW = Math.round((innerW - this.colGap) * 0.50F);
+      this.loginX = this.leftX + this.cardPad;
+      this.generateX = this.loginX + this.loginW + this.colGap;
+      this.generateW = Math.max(40.0F, innerW - this.loginW - this.colGap);
+
+      // Card 2 - Alternative sign-in methods
+      this.methodsY = this.signInY + this.signInH + gap;
+      this.methodsRow1Y = this.methodsY + this.cardPad;
+      this.methodsRow2Y = this.methodsRow1Y + row + this.rowGap;
+      this.methodsH = this.methodsRow2Y + row + this.cardPad - this.methodsY;
+
+      // Card 3 - Housekeeping & Altshop
+      this.manageY = this.methodsY + this.methodsH + gap;
+      this.manageRow1Y = this.manageY + this.cardPad;
+      this.manageRow2Y = this.manageRow1Y + row + this.rowGap;
+      this.manageH = this.manageRow2Y + row + this.cardPad - this.manageY;
+
+      // Card 4 - Selected account details when vertical space permits
+      float linePitch = Math.max(menuSmallHeight() + 2.5F, 11.5F);
+      float detailNeeded = this.cardPad * 2.0F + 6.0F * linePitch + 24.0F;
+      float remaining = TabbedMenuScreen.bodyBottom() - (this.manageY + this.manageH + gap);
+      this.detailY = this.manageY + this.manageH + gap;
+      this.detailH = remaining < 78.0F ? 0.0F : Math.min(remaining, detailNeeded);
+
+      // Right Panel - Full-height frosted glass container
+      this.listX = this.rightX;
+      this.listW = this.rightW;
+      this.listTop = top;
+      this.listHeadingY = top + this.cardPad;
+      this.rowsTop = this.listHeadingY + this.labelH + 8.0F;
+      this.rowsBottom = TabbedMenuScreen.bodyBottom();
+   }
+
+   @Override
+   public void drawChromeBehind() {
+      this.layoutCards();
+      this.menuGlassPanel(this.leftX, this.signInY, this.leftW, this.signInH, 0.0F, 1.0F);
+      this.menuGlassPanel(this.leftX, this.methodsY, this.leftW, this.methodsH, 0.0F, 1.0F);
+      this.menuGlassPanel(this.leftX, this.manageY, this.leftW, this.manageH, 0.0F, 1.0F);
+
+      if (this.detailH > 0.0F && this.selectedAccount != null) {
+         this.menuGlassPanel(this.leftX, this.detailY, this.leftW, this.detailH, 0.0F, 1.0F);
+      }
+
+      menuSectionLabel("EMAIL OR TOKEN", this.leftX + this.cardPad, this.emailLabelY, 1.0F);
+      menuSectionLabel("PASSWORD", this.leftX + this.cardPad, this.passwordLabelY, 1.0F);
+
+      // Right full-height glass panel
+      this.menuGlassPanel(this.listX, this.listTop, this.listW, Math.max(0.0F, this.rowsBottom - this.listTop), 0.0F, 1.0F);
+
+      menuSectionLabel("ACCOUNTS", this.listX + this.cardPad, this.listHeadingY, 1.0F);
+      String count = String.valueOf(accounts.size());
+      InterFontUtil capFace = menuCaptionFont();
+      if (capFace != null) {
+         float cw = capFace.getStringWidth(count);
+         capFace.drawStringWithShadow(count, (double)(this.listX + this.listW - this.cardPad - cw),
+               (double)this.listHeadingY, UiTheme.scaleAlpha(TEXT_SUB, 0.80F));
+      }
+
+      if (accounts.isEmpty()) {
+         this.menuEmptyState(
+            this.listX,
+            this.rowsTop,
+            this.listW,
+            Math.max(0.0F, this.rowsBottom - this.rowsTop - 8.0F),
+            LucideIcon.USERS,
+            "No accounts yet",
+            "Sign in with the form on the left, saved accounts stay here.",
+            false
+         );
+      }
+   }
+
+   @Override
+   public void initContent() {
+      super.initContent();
+      this.loadSavedServerList();
+      HashMap map = new HashMap();
+
+      for (ServerData serverData : (Iterable<ServerData>)(this.savedServers)) {
+         ResourceLocation location = new ResourceLocation("servers/" + serverData.serverIP + "/icon");
+         map.put(serverData.serverIP, this.loadServerIconTexture(serverData, location));
+      }
+
+      if (accounts.isEmpty()) {
+         Augustus.getInstance().getConfigManager().accountConfig.load();
+      }
+
+      for (AccountEntry accountEntry : (Iterable<AccountEntry>)(accounts)) {
+         accountEntry.refreshServerIcons(map);
+      }
+
+      this.setStatus("Waiting...", Color.GREEN);
+      this.layoutCards();
+
+      float row = TabbedMenuScreen.rowH();
+      float innerX = this.leftX + this.cardPad;
+      float innerW = this.leftW - this.cardPad * 2.0F;
+      float columnW = (innerW - this.colGap) * 0.5F;
+
+      this.emailOrTokenField = this.addTextField(Math.round(innerX), Math.round(this.emailFieldY),
+            Math.round(innerW), Math.round(row));
+      this.emailOrTokenField.setCustomFont(menuBodyFont());
+      this.passwordField = this.addPasswordField(Math.round(innerX), Math.round(this.passwordFieldY),
+            Math.round(innerW), Math.round(row));
+      this.passwordField.setCustomFont(menuBodyFont());
+
+      this.addGlassButton(Math.round(this.loginX), Math.round(this.signInButtonY), Math.round(this.loginW),
+            Math.round(row), "Login", button -> this.onLoginButtonClick(button))
+            .withIcon(LucideIcon.LOGIN)
+            .withVariant(GlassMenuButton.Variant.PRIMARY);
+      this.addGlassButton(Math.round(this.generateX), Math.round(this.signInButtonY), Math.round(this.generateW),
+            Math.round(row), "Generate", button -> this.onGenerateAlteningClick(button))
+            .withIcon(LucideIcon.REFRESH_CW);
+
+      GuiButtonClickHandler reconnectClick = button -> {
+         String[] strings = new String[]{"igd", ""};
+         String str4 = "<?xml version=\"1.0\" encoding=\"utf-8\"?><s:Envelope xmlns:s=\"http://schemas.xmlsoap.org/soap/envelope/\" s:encodingStyle=\"http://schemas.xmlsoap.org/soap/encoding/\"><s:Body><u:ForceTermination xmlns:u=\"urn:schemas-upnp-org:service:WANIPConnection:1\" /></s:Body></s:Envelope>";
+
+         for (String str5 : strings) {
+            try {
+               String str6 = "http://fritz.box:49000/" + str5 + "upnp/control/WANIPConn1";
+               HttpURLConnection conn = (HttpURLConnection)new URL(str6).openConnection();
+               conn.setRequestMethod("POST");
+               conn.setRequestProperty("Content-Type", "text/xml; charset=\"utf-8\"");
+               conn.setRequestProperty("Connection", "close");
+               conn.setRequestProperty("Content-Length", String.valueOf(str4.length()));
+               conn.setRequestProperty("HOST", "fritz.box:49000");
+               conn.setRequestProperty("SOAPACTION", "\"urn:schemas-upnp-org:service:WANIPConnection:1#ForceTermination\"");
+               conn.setDoOutput(true);
+
+               try (OutputStream outputStream = conn.getOutputStream()) {
+                  outputStream.write(str4.getBytes("UTF-8"));
+               }
+
+               int responseCode = conn.getResponseCode();
+               System.out.println("Response Code: " + responseCode);
+            } catch (Exception e) {
+               System.err.println("Fehler: " + e.getMessage());
+            }
+         }
+      };
+
+      this.addGlassButton(Math.round(innerX), Math.round(this.methodsRow1Y), Math.round(columnW), Math.round(row),
+            "Reconnect", reconnectClick).withIcon(LucideIcon.REFRESH_CW);
+      this.addGlassButton(Math.round(innerX + columnW + this.colGap), Math.round(this.methodsRow1Y),
+            Math.round(columnW), Math.round(row), "Clipboard login", button4 -> this.onClipboardLoginClick(button4))
+            .withIcon(LucideIcon.CLIPBOARD);
+      this.addGlassButton(Math.round(innerX), Math.round(this.methodsRow2Y), Math.round(columnW), Math.round(row),
+            "Device code login", button5 -> this.onDeviceCodeLoginClick(button5))
+            .withIcon(LucideIcon.DEVICE_DESKTOP);
+      this.addGlassButton(Math.round(innerX + columnW + this.colGap), Math.round(this.methodsRow2Y),
+            Math.round(columnW), Math.round(row), "External browser login", button6 -> this.onExternalBrowserLoginClick(button6))
+            .withIcon(LucideIcon.GLOBE);
+
+      this.addGlassButton(Math.round(innerX), Math.round(this.manageRow1Y), Math.round(columnW), Math.round(row),
+            "Delete selected Alt", button7 -> this.onDeleteSelectedClick(button7))
+            .withIcon(LucideIcon.TRASH_2)
+            .withVariant(GlassMenuButton.Variant.DANGER);
+
+      boolean remInv = Boolean.TRUE.equals(this.removeInvalidAccounts.getValue());
+      String toggleLabel = "Remove invalid: " + (remInv ? "§aTrue" : "§cFalse");
+      this.addGlassButton(Math.round(innerX + columnW + this.colGap), Math.round(this.manageRow1Y),
+            Math.round(columnW), Math.round(row), toggleLabel, button8 -> this.onToggleRemoveInvalidClick(button8))
+            .withIcon(LucideIcon.ALERT_TRIANGLE)
+            .withToggleState(remInv);
+
+      GuiButtonClickHandler altshopClick = button9 -> {
+         try {
+            Desktop.getDesktop().browse(new URI("https://alts.fernan.club/"));
+         } catch (URISyntaxException | IOException e2) {
+            e2.printStackTrace();
+         }
+      };
+      this.addGlassButton(Math.round(innerX), Math.round(this.manageRow2Y), Math.round(innerW), Math.round(row),
+            "Fernan's Altshop", altshopClick).withIcon(LucideIcon.SHOPPING_CART);
+
+      scrollBar.setBounds(
+         Math.round(this.listX + this.listW - 10.0F),
+         Math.round(this.rowsTop),
+         Math.round(this.listX + this.listW - 5.0F),
+         Math.round(this.rowsBottom - 10.0F)
+      );
+      scrollBar.setItemCount(accounts.size());
+   }
+
+   @Override
+   public void drawContent(int n, int n2, float f) {
+      super.drawContent(n, n2, f);
+      this.layoutCards();
+      float row = TabbedMenuScreen.rowH();
+      int hintColor = UiTheme.scaleAlpha(TEXT_SUB, 0.62F);
+
+      if (this.emailOrTokenField != null && this.emailOrTokenField.getText().isEmpty()
+            && !this.emailOrTokenField.isFocused()) {
+         this.drawFieldPlaceholder("Email / Email:Password", this.emailOrTokenField.xPosition,
+               this.emailOrTokenField.yPosition, Math.round(row), hintColor, menuBodyFont(), 8.0F);
+      }
+
+      if (this.passwordField != null && this.passwordField.getText().isEmpty() && !this.passwordField.isFocused()) {
+         this.drawFieldPlaceholder("Password", this.passwordField.xPosition, this.passwordField.yPosition,
+               Math.round(row), hintColor, menuBodyFont(), 8.0F);
+      }
+
+      this.drawAccountRows(n, n2);
+      this.drawSelectedAccountDetails();
+      scrollBar.updateAndDraw();
+   }
+
+   private void drawAccountRows(int mouseX, int mouseY) {
+      if (accounts.isEmpty()) {
+         return;
+      }
+      float rowH = 38.0F;
+      float pitch = 42.0F;
+      float innerPad = 10.0F;
+      float barReserve = scrollBar.fitsWithoutScrolling() ? innerPad : 16.0F;
+      float rowX = this.listX + innerPad;
+      float rowW = Math.max(40.0F, this.listW - innerPad - barReserve);
+      int clampedScrollOffset = (int)scrollBar.getClampedScrollOffset();
+
+      AugustusGuiScreen.enableScissor(
+         Math.round(this.listX + 2.0F),
+         Math.round(this.rowsTop),
+         Math.round(this.listX + this.listW - 2.0F),
+         Math.round(this.rowsBottom - 8.0F)
+      );
+      for (int pass = 0; pass < 2; pass++) {
+         float y = this.rowsTop + (float)clampedScrollOffset;
+         for (AccountEntry accountEntry : (Iterable<AccountEntry>)(accounts)) {
+            if (accountEntry.isMarked() != (pass == 0)) {
+               continue;
+            }
+            accountEntry.drawEntry(Math.round(rowX), Math.round(y), Math.round(rowW), Math.round(rowH),
+                  mouseX, mouseY, accountEntry == this.selectedAccount, this);
+            y += pitch;
+         }
+      }
+      AugustusGuiScreen.disableScissor();
+   }
+
+   private void drawSelectedAccountDetails() {
+      if (this.detailH <= 0.0F || this.selectedAccount == null) {
+         return;
+      }
+      InterFontUtil face = menuSmallFont();
+      if (face == null) {
+         return;
+      }
+      float paragraph = Math.max(face.getFontHeight() + 2.5F, 11.5F);
+      float x = this.leftX + this.cardPad;
+      float right = this.leftX + this.leftW - this.cardPad;
+      float y = this.detailY + this.cardPad;
+
+      menuSectionLabel("ACCOUNT DETAILS", x, y, 1.0F);
+      y += menuCaptionHeight() + 5.0F;
+      this.menuDetailLine("§7Name: §f" + this.selectedAccount.getUsername(), x, y, right);
+      y += paragraph;
+      this.menuDetailLine("§7Login type: §f" + this.selectedAccount.getLoginType().getDisplayName(), x, y, right);
+      y += paragraph;
+      String state = this.selectedAccount.isWorking() ? "§aFunctional" : "§cInvalid";
+      this.menuDetailLine("§7Account state: §f" + state, x, y, right);
+      y += paragraph;
+      DateFormat dateInstance = DateFormat.getDateInstance(2);
+      DateFormat timeInstance = DateFormat.getTimeInstance(3);
+      String str6 = dateInstance.format(this.selectedAccount.getLastLoginTime());
+      String str7 = timeInstance.format(this.selectedAccount.getLastLoginTime());
+      this.menuDetailLine("§7Last login: §f" + str6 + " " + str7, x, y, right);
+      y += paragraph;
+      this.menuDetailLine("§7Playtime: §f" + this.selectedAccount.getPlayTimeMillis() / 1000L / 60L + " min", x, y, right);
+      y += paragraph + 2.0F;
+
+      int banned = this.countLoadedServerIcons(this.selectedAccount.getBannedServerIcons().values());
+      if (banned > 0 && y + paragraph < this.detailY + this.detailH - 8.0F) {
+         this.menuDetailLine("§7Banned on servers:", x, y, right);
+         y += paragraph;
+         this.drawServerIconRow(this.selectedAccount.getBannedServerIcons().values(), Math.round(x), Math.round(right),
+               Math.round(y), 10);
+         y += 14.0F;
+      }
+
+      int unbanned = this.countLoadedServerIcons(this.selectedAccount.getUnbannedServerIcons().values());
+      if (unbanned > 0 && y + paragraph < this.detailY + this.detailH - 8.0F) {
+         this.menuDetailLine("§7Unbanned on servers:", x, y, right);
+         y += paragraph;
+         this.drawServerIconRow(this.selectedAccount.getUnbannedServerIcons().values(), Math.round(x), Math.round(right),
+               Math.round(y), 10);
+      }
+   }
+
+   private void menuDetailLine(String text, float x, float y, float right) {
+      InterFontUtil face = menuSmallFont();
+      if (face == null) {
+         return;
+      }
+      String line = text;
+      float available = right - x;
+      if (face.getStringWidthFormatted(line) > available) {
+         String plain = InterFontUtil.stripFormatting(line);
+         line = face.trimToWidth(plain, Math.max(0.0F, available - face.getStringWidth("..."))) + "...";
+      }
+      face.drawStringFormatted(line, (double)x, (double)y, Color.white.getRGB(), true);
+   }
+
+   private void drawServerIconRow(Collection items, int startX, int right, int y, int iconSize) {
+      int cursorX = startX;
+      for (TuplePair tuplePair : (Iterable<TuplePair>)(items)) {
+         if (tuplePair.getSecond() != null && cursorX + iconSize <= right) {
+            GlStateManager.color(1.0F, 1.0F, 1.0F);
+            this.drawDetailServerIcon(cursorX, y, (ResourceLocation)tuplePair.getFirst(), iconSize);
+            cursorX += iconSize + 3;
+         }
+      }
+   }
+
+   private void drawDetailServerIcon(int n, int n2, ResourceLocation location, int size) {
+      this.mc.getTextureManager().bindTexture(location);
+      GlStateManager.enableBlend();
+      Gui.drawModalRectWithCustomSizedTexture(n, n2, 0.0F, 0.0F, size, size, (float)size, (float)size);
+      GlStateManager.disableBlend();
+   }
+
+   public void loadSavedServerList() {
+      try {
+         this.savedServers.clear();
+         NBTTagCompound tag = CompressedStreamTools.read(new File(this.mc.mcDataDir, "servers.dat"));
+         if (tag == null) {
+            return;
+         }
+         NBTTagList tagList = tag.getTagList("servers", 10);
+         for (int i = 0; i < tagList.tagCount(); i++) {
+            this.savedServers.add(ServerData.getServerDataFromNBTCompound(tagList.getCompoundTagAt(i)));
+         }
+      } catch (Exception e) {
+      }
+   }
+
+   @Override
+   public void mouseClicked(int mouseX, int mouseY, int mouseButton) throws IOException {
+      super.mouseClicked(mouseX, mouseY, mouseButton);
+      this.layoutCards();
+
+      for (AccountEntry accountEntry : (Iterable<AccountEntry>)(accounts)) {
+         accountEntry.mouseClicked(mouseX, mouseY, mouseButton);
+         if ((mouseButton == 1 || mouseButton == 0)
+               && RenderUtil.isHovered((float)accountEntry.getRenderX(), (float)accountEntry.getRenderY(),
+                     (float)accountEntry.getRenderWidth(), (float)accountEntry.getRenderHeight(), mouseX, mouseY)) {
+            this.selectedAccount = accountEntry;
+         }
+      }
+
+      scrollBar.handleMouseClick((double)mouseX, (double)mouseY);
+   }
+
+   @Override
+   public void keyTyped(char typedChar, int keyCode) throws IOException {
+      super.keyTyped(typedChar, keyCode);
+      if ((keyCode == 211 || keyCode == 14) && this.selectedAccount != null && !this.emailOrTokenField.isFocused()
+            && !this.passwordField.isFocused()) {
+         accounts.remove(this.selectedAccount);
+         scrollBar.setItemCount(accounts.size());
+         this.selectedAccount = null;
+      }
+   }
+
    @Override
    public void mouseClickMove(int mouseX, int mouseY, int clickedMouseButton, long timeSinceLastClick) {
       super.mouseClickMove(mouseX, mouseY, clickedMouseButton, timeSinceLastClick);
-      double d = (double)mouseY;
-      scrollBar.handleMouseDrag(d);
+      scrollBar.handleMouseDrag((double)mouseY);
    }
+
+   @Override
+   public void handleMouseInput() throws IOException {
+      super.handleMouseInput();
+      scrollBar.handleMouseWheel();
+   }
+
+   public AccountManagerScreen() {
+      super("Account Manager");
+      this.activeLoginTask = null;
+      this.savedServers = Lists.newArrayList();
+      this.apiKey = new StringProperty(ClientSettingsConfigFile.abstractFeature, "API-Key", "");
+      this.removeInvalidAccounts = new BooleanProperty(ClientSettingsConfigFile.abstractFeature,
+            "RemoveInvalidAccounts", false);
+      instance = this;
+      this.loadRandomNames();
+   }
+
+   static {
+      scrollBar = new ScrollBar(42);
+   }
+
+   // ---------------------------------------------------------------------------------------------
+   // Behaviour - unchanged
+   // ---------------------------------------------------------------------------------------------
 
    private void loginFromClipboard() {
       if (this.activeLoginTask == null || this.activeLoginTask.isDone()) {
@@ -103,14 +570,12 @@ public class AccountManagerScreen extends ClientMenuTab {
 
       try {
          BufferedReader reader = new BufferedReader(new FileReader(ClientPaths.CLIENT_DIR + "/names/RandomNames.txt"));
-
          String str3;
          while ((str3 = reader.readLine()) != null) {
             if (!str3.equals("")) {
                randomNames.add(str3.trim());
             }
          }
-
          reader.close();
       } catch (IOException e) {
       }
@@ -120,12 +585,6 @@ public class AccountManagerScreen extends ClientMenuTab {
 
    private static void loginAlteningApiKey(String str) {
       AccountAuthenticator.generateAndLoginTheAltening(str);
-   }
-
-   @Override
-   public void handleMouseInput() throws IOException {
-      super.handleMouseInput();
-      scrollBar.handleMouseWheel();
    }
 
    private void loginInputCredentials() {
@@ -142,7 +601,6 @@ public class AccountManagerScreen extends ClientMenuTab {
                } else {
                   str = AltUsernameGenerator.generateUsername(16);
                }
-
                AccountAuthenticator.loginCracked(str, false);
             });
             this.setActiveLoginTask(completableFuture);
@@ -183,114 +641,6 @@ public class AccountManagerScreen extends ClientMenuTab {
       AccountAuthenticator.loginEasyMc(str);
    }
 
-   @Override
-   public void initContent() {
-      super.initContent();
-      this.loadSavedServerList();
-      HashMap map = new HashMap();
-
-      for (ServerData serverData : (Iterable<ServerData>)(this.savedServers)) {
-         ResourceLocation location = new ResourceLocation("servers/" + serverData.serverIP + "/icon");
-         map.put(serverData.serverIP, this.loadServerIconTexture(serverData, location));
-      }
-
-      if (accounts.isEmpty()) {
-         Augustus.getInstance().getConfigManager().accountConfig.load();
-      }
-
-      for (AccountEntry accountEntry : (Iterable<AccountEntry>)(accounts)) {
-         accountEntry.refreshServerIcons(map);
-      }
-
-      Color green = Color.GREEN;
-      this.setStatus("Waiting...", green);
-      ScaledResolution sr = new ScaledResolution(this.mc);
-      int n = (int)Math.max(118.0F, Math.min((float)sr.getScaledWidth() / 2.0F - 100.0F - 20.0F, 150.0F));
-      this.emailOrTokenField = this.addTextField((byte)104, (byte)54, n, (byte)20);
-      this.passwordField = this.addPasswordField((byte)104, (byte)79, n, (byte)20);
-      GuiButtonClickHandler guiButtonClickHandler = button -> this.onLoginButtonClick(button);
-      this.addButton((byte)104, (byte)104, n, (byte)20, "Login", guiButtonClickHandler);
-      GuiButtonClickHandler guiButtonClickHandler2 = button2 -> this.onGenerateAlteningClick(button2);
-      this.addButton((byte)104, (short)129, n, (byte)20, "Generate", guiButtonClickHandler2);
-      GuiButtonClickHandler guiButtonClickHandler3 = button3 -> {
-         String[] strings = new String[]{"igd", ""};
-         String str4 = "<?xml version=\"1.0\" encoding=\"utf-8\"?><s:Envelope xmlns:s=\"http://schemas.xmlsoap.org/soap/envelope/\" s:encodingStyle=\"http://schemas.xmlsoap.org/soap/encoding/\"><s:Body><u:ForceTermination xmlns:u=\"urn:schemas-upnp-org:service:WANIPConnection:1\" /></s:Body></s:Envelope>";
-
-         for (String str5 : strings) {
-            try {
-               String str6 = "http://fritz.box:49000/" + str5 + "upnp/control/WANIPConn1";
-               HttpURLConnection conn = (HttpURLConnection)new URL(str6).openConnection();
-               conn.setRequestMethod("POST");
-               conn.setRequestProperty("Content-Type", "text/xml; charset=\"utf-8\"");
-               conn.setRequestProperty("Connection", "close");
-               conn.setRequestProperty("Content-Length", String.valueOf(str4.length()));
-               conn.setRequestProperty("HOST", "fritz.box:49000");
-               conn.setRequestProperty("SOAPACTION", "\"urn:schemas-upnp-org:service:WANIPConnection:1#ForceTermination\"");
-               conn.setDoOutput(true);
-
-               try (OutputStream outputStream = conn.getOutputStream()) {
-                  outputStream.write(str4.getBytes("UTF-8"));
-               }
-
-               int responseCode = conn.getResponseCode();
-               System.out.println("Response Code: " + responseCode);
-            } catch (Exception e) {
-               System.err.println("Fehler: " + e.getMessage());
-            }
-         }
-      };
-      this.addButton((byte)104, (short)154, n, (byte)20, "Reconnect", guiButtonClickHandler3);
-      GuiButtonClickHandler guiButtonClickHandler4 = button4 -> this.onClipboardLoginClick(button4);
-      this.addButton((byte)104, (short)179, n, (byte)20, "Clipboard login", guiButtonClickHandler4);
-      GuiButtonClickHandler guiButtonClickHandler5 = button5 -> this.onDeviceCodeLoginClick(button5);
-      this.addButton((byte)104, (short)204, n, (byte)20, "Device code login", guiButtonClickHandler5);
-      GuiButtonClickHandler guiButtonClickHandler6 = button6 -> this.onExternalBrowserLoginClick(button6);
-      this.addButton((byte)104, (short)229, n, (byte)20, "External browser login", guiButtonClickHandler6);
-      GuiButtonClickHandler guiButtonClickHandler7 = button7 -> this.onDeleteSelectedClick(button7);
-      this.addButton((byte)104, (short)254, n, (byte)20, "Delete selected Alt", guiButtonClickHandler7);
-      StringBuilder sb = new StringBuilder().append("Remove invalid: ");
-      String str12;
-      if (!(Boolean)this.removeInvalidAccounts.getValue()) {
-         str12 = "§cFalse";
-      } else {
-         short s7 = 10780;
-         str12 = "§aTrue";
-      }
-
-      this.addButton((byte)104, (short)279, n, (byte)20, sb.append(str12).toString(), button8 -> this.onToggleRemoveInvalidClick(button8));
-      GuiButtonClickHandler guiButtonClickHandler9 = button9 -> {
-         try {
-            Desktop.getDesktop().browse(new URI("https://alts.fernan.club/"));
-         } catch (URISyntaxException | IOException e2) {
-            e2.printStackTrace();
-         }
-      };
-      this.addButton((byte)104, (short)304, n, (byte)20, "§cFernan's Altshop", guiButtonClickHandler9);
-      int n2 = this.width - 5;
-      int height2 = this.height;
-      int width2 = this.width;
-      scrollBar.setBounds(n2, (byte)52, width2, height2);
-      scrollBar.setItemCount(accounts.size());
-   }
-
-   public void loadSavedServerList() {
-
-      try {
-         this.savedServers.clear();
-         NBTTagCompound tag = CompressedStreamTools.read(new File(this.mc.mcDataDir, "servers.dat"));
-         if (tag == null) {
-            return;
-         }
-
-         NBTTagList tagList = tag.getTagList("servers", 10);
-
-         for (int i = 0; i < tagList.tagCount(); i++) {
-            this.savedServers.add(ServerData.getServerDataFromNBTCompound(tagList.getCompoundTagAt(i)));
-         }
-      } catch (Exception e) {
-      }
-   }
-
    private void onExternalBrowserLoginClick(GuiButton button) {
       this.startExternalBrowserLogin();
    }
@@ -325,7 +675,8 @@ public class AccountManagerScreen extends ClientMenuTab {
          this.mc.getTextureManager().loadTexture(location, dynamicTexture);
 
          try {
-            image.getRGB(0, 0, image.getWidth(), image.getHeight(), dynamicTexture.getTextureData(), 0, image.getWidth());
+            image.getRGB(0, 0, image.getWidth(), image.getHeight(), dynamicTexture.getTextureData(), 0,
+                  image.getWidth());
          } catch (Throwable e2) {
          }
 
@@ -341,21 +692,6 @@ public class AccountManagerScreen extends ClientMenuTab {
 
    private static void loginSplitCredentials(String[] strings) {
       AccountAuthenticator.loginMicrosoftCredentials(strings[0], strings[1]);
-   }
-
-   private int drawServerIconRow(Collection items, int n, int n2, int n3, int n4, int n5) {
-      int n6 = 0;
-      int n8 = n * this.countLoadedServerIcons(items);
-
-      for (TuplePair tuplePair : (Iterable<TuplePair>)(items)) {
-         if (tuplePair.getSecond() != null) {
-            GlStateManager.color(1.0F, 1.0F, 1.0F);
-            this.drawDetailServerIcon((int)((float)n2 + (float)(n4 - n2) / 2.0F) - n8 / 2 + n6, n3 + n5, (ResourceLocation)tuplePair.getFirst());
-            n6 += n;
-         }
-      }
-
-      return n5 + 29;
    }
 
    public void startExternalBrowserLogin() {
@@ -383,137 +719,20 @@ public class AccountManagerScreen extends ClientMenuTab {
    }
 
    private void onToggleRemoveInvalidClick(GuiButton button) {
-      BooleanProperty removeInvalidAccounts2 = this.removeInvalidAccounts;
-      Boolean bool = !(Boolean)this.removeInvalidAccounts.getValue();
-      removeInvalidAccounts2.setValue(bool);
-      StringBuilder sb = new StringBuilder().append("Remove invalid: ");
-      String str;
-      if (!(Boolean)this.removeInvalidAccounts.getValue()) {
-         str = "§cFalse";
-      } else {
-         short s = 20679;
-         str = "§aTrue";
+      boolean next = !Boolean.TRUE.equals(this.removeInvalidAccounts.getValue());
+      this.removeInvalidAccounts.setValue(Boolean.valueOf(next));
+      button.displayString = "Remove invalid: " + (next ? "§aTrue" : "§cFalse");
+      if (button instanceof GlassMenuButton) {
+         ((GlassMenuButton)button).setToggleState(next);
       }
-
-      button.displayString = sb.append(str).toString();
    }
 
    private void onDeviceCodeLoginClick(GuiButton button) {
       this.startDeviceCodeLogin();
    }
 
-   @Override
-   public void drawContent(int n, int n2, float f) {
-      super.drawContent(n, n2, f);
-      ScaledResolution sr = new ScaledResolution(this.mc);
-      int n3 = sr.getScaledWidth() - 102;
-      int n4 = (int)Math.max(118.0F, Math.min((float)sr.getScaledWidth() / 2.0F - 100.0F - 20.0F, 150.0F));
-      if (this.emailOrTokenField != null && this.emailOrTokenField.getText().isEmpty() && !this.emailOrTokenField.isFocused()) {
-         this.drawFieldPlaceholder("Email / Email:Password", this.emailOrTokenField.xPosition, this.emailOrTokenField.yPosition, 20, Color.gray.getRGB());
-      }
-
-      if (this.passwordField != null && this.passwordField.getText().isEmpty() && !this.passwordField.isFocused()) {
-         this.drawFieldPlaceholder("Password", this.passwordField.xPosition, this.passwordField.yPosition, 20, Color.gray.getRGB());
-      }
-
-      int n5 = Math.min(n3 - n4 - 20, 300);
-      int n6 = sr.getScaledWidth() - 10 - n5;
-      int clampedScrollOffset = (int)scrollBar.getClampedScrollOffset();
-
-      for (AccountEntry accountEntry : (Iterable<AccountEntry>)(accounts)) {
-         if (accountEntry.isMarked()) {
-            accountEntry.drawEntry(n6, 57 + clampedScrollOffset, n5, (byte)40, n, n2, accountEntry == this.selectedAccount, this.savedServers);
-            clampedScrollOffset += 42;
-         }
-      }
-
-      for (AccountEntry accountEntry2 : (Iterable<AccountEntry>)(accounts)) {
-         if (!accountEntry2.isMarked()) {
-            accountEntry2.drawEntry(n6, 57 + clampedScrollOffset, n5, (byte)40, n, n2, accountEntry2 == this.selectedAccount, this.savedServers);
-            clampedScrollOffset += 42;
-         }
-      }
-
-      if (n3 - n4 - 330 > 300 && this.selectedAccount != null) {
-         int n11 = n4 + 102 + 10;
-         byte b3 = 57;
-         int n12 = n11 + n3 - n4 - 330;
-         int n13 = b3 + 170;
-         RenderUtil.drawRect(n11, b3, n12, n13, new Color(0, 0, 0, 100).getRGB());
-         RenderUtil.scissorRect((float)(n11 + 5), (float)(b3 + 5), (float)(n12 - 5), (float)(n13 - 5));
-         int n14 = 0;
-         n14 = this.drawCenteredDetailLine("§7Detailed information:", n11, b3, n12, n13, n14) + 5;
-         n14 = this.drawCenteredDetailLine("§7Name: §f" + this.selectedAccount.getUsername(), n11, b3, n12, n13, n14);
-         n14 = this.drawCenteredDetailLine("§7Login type: §f" + this.selectedAccount.getLoginType().getDisplayName(), n11, b3, n12, n13, n14);
-         StringBuilder sb = new StringBuilder();
-         short s = 2334;
-         StringBuilder sb2 = sb.append("§7Account state: §f");
-         String str4;
-         if (this.selectedAccount.isWorking()) {
-            str4 = "§aFunctional";
-         } else {
-            s = 6852;
-            str4 = "§cInvalid";
-         }
-
-         n14 = this.drawCenteredDetailLine(sb2.append(str4).toString(), n11, b3, n12, n13, n14);
-         DateFormat dateInstance = DateFormat.getDateInstance(2);
-         DateFormat timeInstance = DateFormat.getTimeInstance(3);
-         String str6 = dateInstance.format(this.selectedAccount.getLastLoginTime());
-         String str7 = timeInstance.format(this.selectedAccount.getLastLoginTime());
-         n14 = this.drawCenteredDetailLine("§7Last login time: §f" + str6 + " " + str7, n11, b3, n12, n13, n14);
-         n14 = this.drawCenteredDetailLine("§7Playtime: §f" + this.selectedAccount.getPlayTimeMillis() / 1000L / 60L + " min", n11, b3, n12, n13, n14);
-         if (this.countLoadedServerIcons(this.selectedAccount.getBannedServerIcons().values()) > 0) {
-            n14 = this.drawCenteredDetailLine("§7Banned on servers:", n11, b3, n12, n13, n14) + 6;
-            n14 = this.drawServerIconRow(this.selectedAccount.getBannedServerIcons().values(), (byte)35, n11, b3, n12, n14);
-         }
-
-         if (this.countLoadedServerIcons(this.selectedAccount.getUnbannedServerIcons().values()) > 0) {
-            n14 = this.drawCenteredDetailLine("§7Unbanned on servers:", n11, b3, n12, n13, n14) + 6;
-            this.drawServerIconRow(this.selectedAccount.getUnbannedServerIcons().values(), (byte)35, n11, b3, n12, n14);
-         }
-      }
-
-      scrollBar.updateAndDraw();
-   }
-
    public void startDeviceCodeLogin() {
       CompletableFuture.runAsync(() -> AccountAuthenticator.loginDeviceCode());
-   }
-
-   @Override
-   public void mouseClicked(int mouseX, int mouseY, int mouseButton) throws IOException {
-      super.mouseClicked(mouseX, mouseY, mouseButton);
-
-      for (AccountEntry accountEntry : (Iterable<AccountEntry>)(accounts)) {
-         accountEntry.mouseClicked(mouseX, mouseY, mouseButton);
-         if ((mouseButton == 1 || mouseButton == 0) && RenderUtil.isHovered((float)accountEntry.getRenderX(), (float)accountEntry.getRenderY(), (float)accountEntry.getRenderWidth(), (float)accountEntry.getRenderHeight(), mouseX, mouseY)
-            )
-          {
-            this.selectedAccount = accountEntry;
-         }
-      }
-
-      double d = (double)mouseX;
-      double d3 = (double)mouseY;
-      scrollBar.handleMouseClick(d, d3);
-   }
-
-   @Override
-   public void keyTyped(char typedChar, int keyCode) throws IOException {
-      super.keyTyped(typedChar, keyCode);
-      if ((keyCode == 211 || keyCode == 14) && this.selectedAccount != null && !this.emailOrTokenField.isFocused() && !this.passwordField.isFocused()) {
-         accounts.remove(this.selectedAccount);
-         scrollBar.setItemCount(accounts.size());
-         this.selectedAccount = null;
-      }
-   }
-
-   private void drawDetailServerIcon(int n, int n2, ResourceLocation location) {
-      this.mc.getTextureManager().bindTexture(location);
-      GlStateManager.enableBlend();
-      Gui.drawModalRectWithCustomSizedTexture(n, n2, 0.0F, 0.0F, 30, 30, 30.0F, 30.0F);
-      GlStateManager.disableBlend();
    }
 
    private void generateAlteningAccount() {
@@ -530,57 +749,17 @@ public class AccountManagerScreen extends ClientMenuTab {
       }
    }
 
-   static {
-      scrollBar = new ScrollBar(42);
-   }
-
    private int countLoadedServerIcons(Collection items) {
       int n = 0;
-
       for (TuplePair tuplePair : (Iterable<TuplePair>)(items)) {
          if (tuplePair.getSecond() != null) {
             n++;
          }
       }
-
       return n;
    }
 
    private static void loginInputAlteningToken(String str) {
       AccountAuthenticator.loginTheAlteningToken(str);
    }
-
-   public AccountManagerScreen() {
-       super("Account Manager");
-      this.activeLoginTask = null;
-      this.savedServers = Lists.newArrayList();
-      this.apiKey = new StringProperty(ClientSettingsConfigFile.abstractFeature, "API-Key", "");
-      this.removeInvalidAccounts = new BooleanProperty(ClientSettingsConfigFile.abstractFeature, "RemoveInvalidAccounts", false);
-      instance = this;
-      this.loadRandomNames();
-   }
-
-   private int drawCenteredDetailLine(String str, int n, int n2, int n3, int n4, int n5) {
-      InterFontUtil font = FontManager.body();
-      if (font == null) {
-         this.fontRendererObj
-            .drawString(
-               str,
-               (float)n + (float)(n3 - n) / 2.0F - (float)this.fontRendererObj.getStringWidth(str) / 2.0F,
-               (float)(n2 + 5 + n5),
-               Color.white.getRGB()
-            );
-      } else {
-         font.drawStringWithShadow(
-            str,
-            (double)((float)n + (float)(n3 - n) / 2.0F - font.getStringWidth(str) / 2.0F),
-            (double)((float)(n2 + 5 + n5)),
-            Color.white.getRGB()
-         );
-      }
-      // The pitch is the body face's line box, not the bitmap font's 9 px one: Inter is taller, so keeping
-      // the old 11 px step would stack the detail rows on top of each other.
-      return n5 + Math.round(FontManager.listLineHeight());
-   }
-
 }

@@ -2,10 +2,12 @@ package net.minecraft.client.gui;
 
 import java.util.List;
 import net.augustus.ui.VanillaScreenText;
+import net.augustus.ui.modern.render.GlassRenderer;
+import net.augustus.ui.modern.render.LucideIcon;
+import net.augustus.ui.modern.render.UiTheme;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.Tessellator;
 import net.minecraft.client.resources.ResourcePackListEntry;
-import net.minecraft.util.EnumChatFormatting;
 
 public abstract class GuiResourcePackList extends GuiListExtended {
    public final Minecraft mc;
@@ -24,11 +26,11 @@ public abstract class GuiResourcePackList extends GuiListExtended {
    }
 
    public GuiResourcePackList(Minecraft mc2, int n, int n2, List list2) {
-      super(mc2, n, n2, 32, n2 - 55 + 4, 36);
+      super(mc2, n, n2, 38, n2 - 60, 40);
       this.mc = mc2;
       this.list = list2;
       this.centerListVertically = false;
-      this.setHasListHeader(true, (int)((float)mc2.fontRendererObj.FONT_HEIGHT * 1.5F));
+      this.setHasListHeader(true, 22);
    }
 
    public ResourcePackListEntry getListEntry(int n) {
@@ -42,8 +44,17 @@ public abstract class GuiResourcePackList extends GuiListExtended {
 
    @Override
    public void drawListHeader(int n, int n2, Tessellator tessellator) {
-      String str = EnumChatFormatting.UNDERLINE + "" + EnumChatFormatting.BOLD + this.getListHeader();
-      VanillaScreenText.drawCenteredString(str, n + this.width / 2, Math.min(this.top + 3, n2), 16777215);
+      float headerY = (float)Math.min(this.top + 5, n2 + 2);
+      LucideIcon icon = this instanceof GuiResourcePackSelected ? LucideIcon.CIRCLE_CHECK : LucideIcon.LIST;
+      int iconColor = this instanceof GuiResourcePackSelected ? 0xFFA855F7 : 0xCCA78BFA;
+      String title = this.getListHeader();
+      float textW = (float)VanillaScreenText.getStringWidth(title);
+      float totalW = 11.0F + 5.0F + textW;
+      float startX = (float)n + ((float)this.width - totalW) * 0.5F;
+      icon.draw(startX, headerY - 0.5F, 10.5F, iconColor, false);
+      VanillaScreenText.drawString(title, Math.round(startX + 16.0F), Math.round(headerY), 0xFFF8FAFC);
+      float sepY = headerY + 13.0F;
+      GlassRenderer.drawSeparator((float)(n + 4), sepY, (float)(n + this.width - 8), sepY, 1.0F, UiTheme.GLASS_DIVIDER);
    }
 
    public List getList() {

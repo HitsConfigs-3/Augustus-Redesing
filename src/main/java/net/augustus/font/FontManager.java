@@ -54,6 +54,11 @@ public class FontManager {
    public static InterFontUtil interSemiBoldLarge;
    public static InterFontUtil interBold;
    public static InterFontUtil interBoldTitle;
+   private static InterFontUtil uiTitleCache;
+   private static InterFontUtil uiHeadingCache;
+   private static InterFontUtil uiBodyCache;
+   private static InterFontUtil uiSmallCache;
+   private static InterFontUtil uiCaptionCache;
    public static final String CLIENT_DATA_DIR;
    public static DynamicFontUtil comfortaaArrayList;
 
@@ -133,7 +138,105 @@ public class FontManager {
       consolas32 = interSemiBoldLarge;
       esp32 = interBold;
       rubikBold32 = interBoldTitle;
+      uiTitleCache = null;
+      uiHeadingCache = null;
+      uiBodyCache = null;
+      uiSmallCache = null;
+      uiCaptionCache = null;
       reloadCustomFonts();
+   }
+
+   public static InterFontUtil uiTitle() {
+      if (uiTitleCache == null) {
+         InterFontUtil base = interSemiBold != null ? interSemiBold : body();
+         if (base != null) {
+            uiTitleCache = base.deriveSize(13.5F);
+         }
+      }
+      return uiTitleCache != null ? uiTitleCache : body();
+   }
+
+   public static InterFontUtil uiHeading() {
+      if (uiHeadingCache == null) {
+         InterFontUtil base = interSemiBold != null ? interSemiBold : body();
+         if (base != null) {
+            uiHeadingCache = base.deriveSize(11.5F);
+         }
+      }
+      return uiHeadingCache != null ? uiHeadingCache : body();
+   }
+
+   public static InterFontUtil uiBody() {
+      if (uiBodyCache == null) {
+         InterFontUtil base = interRegular != null ? interRegular : body();
+         if (base != null) {
+            uiBodyCache = base.deriveSize(10.5F);
+         }
+      }
+      return uiBodyCache != null ? uiBodyCache : body();
+   }
+
+   public static InterFontUtil uiSmall() {
+      if (uiSmallCache == null) {
+         InterFontUtil base = interSmall != null ? interSmall : body();
+         if (base != null) {
+            uiSmallCache = base.deriveSize(9.0F);
+         }
+      }
+      return uiSmallCache != null ? uiSmallCache : body();
+   }
+
+   public static InterFontUtil uiCaption() {
+      if (uiCaptionCache == null) {
+         InterFontUtil base = interSemiBold != null ? interSemiBold : body();
+         if (base != null) {
+            uiCaptionCache = base.deriveSize(8.5F);
+         }
+      }
+      return uiCaptionCache != null ? uiCaptionCache : body();
+   }
+
+   public static String uiFit(InterFontUtil font, String text, float maxWidth) {
+      if (text == null || font == null || maxWidth <= 8.0F || font.getStringWidthFormatted(text) <= maxWidth) {
+         return text == null ? "" : text;
+      }
+      String ellipsis = "...";
+      float avail = Math.max(0.0F, maxWidth - font.getStringWidth(ellipsis));
+      String trimmed = font.trimToWidth(text, avail);
+      return trimmed + ellipsis;
+   }
+
+   public static java.util.List<String> uiWrap(InterFontUtil font, String text, float maxWidth) {
+      java.util.List<String> lines = new java.util.ArrayList<>();
+      if (text == null || text.isEmpty()) {
+         return lines;
+      }
+      if (font == null || maxWidth <= 12.0F) {
+         lines.add(text);
+         return lines;
+      }
+      String[] words = text.split("\\s+");
+      StringBuilder cur = new StringBuilder();
+      for (int i = 0; i < words.length; i++) {
+         String w = words[i];
+         if (cur.length() == 0) {
+            cur.append(w);
+         } else {
+            String next = cur + " " + w;
+            if (font.getStringWidthFormatted(next) <= maxWidth) {
+               cur.setLength(0);
+               cur.append(next);
+            } else {
+               lines.add(cur.toString());
+               cur.setLength(0);
+               cur.append(w);
+            }
+         }
+      }
+      if (cur.length() > 0) {
+         lines.add(cur.toString());
+      }
+      return lines;
    }
 
    private static FormattedUnicodeFontRenderer createFormattedFont(Font font, String str) {

@@ -1,5 +1,7 @@
 package net.minecraft.client.gui;
 
+import net.augustus.ui.VanillaScreenText;
+
 import net.minecraft.client.renderer.GlStateManager;
 import net.minecraft.client.renderer.Tessellator;
 import net.minecraft.client.renderer.WorldRenderer;
@@ -105,9 +107,11 @@ public class GuiScreenCustomizePresets extends GuiScreen {
    public void drawScreen(int mouseX, int mouseY, float partialTicks) {
       this.drawDefaultBackground();
       this.list.drawScreen(mouseX, mouseY, partialTicks);
-      drawCenteredString(this.fontRendererObj, this.title, this.width / 2, 8, 16777215);
-      this.drawString(this.fontRendererObj, this.shareText, 50, 30, 10526880);
-      this.drawString(this.fontRendererObj, this.listText, 50, 70, 10526880);
+      // Inter, same resting colour as the menu, same anchor: y stays 8, only the face and colour change.
+      VanillaScreenText.drawCenteredOnScreen(this.width, this.title, 8, 16777215);
+      // Share caption and list caption in the client face; anchors and the 10526880 grey are unchanged.
+      VanillaScreenText.drawString(this.shareText, 50, 30, 10526880);
+      VanillaScreenText.drawString(this.listText, 50, 70, 10526880);
       this.export.drawTextBox();
       super.drawScreen(mouseX, mouseY, partialTicks);
    }
@@ -193,7 +197,8 @@ public class GuiScreenCustomizePresets extends GuiScreen {
       public void drawSlot(int n, int n2, int n3, int n4, int n5, int n6) {
          GuiScreenCustomizePresets.Info info = (GuiScreenCustomizePresets.Info)GuiScreenCustomizePresets.accessPRESETS().get(n);
          this.drawPresetIcon(n2, n3, info.texture);
-         this.presetsScreen.fontRendererObj.drawString(info.name, n2 + 32 + 10, n3 + 14, 16777215);
+         // Preset name in the client face, same anchor beside the 32 px icon.
+         VanillaScreenText.drawString(info.name, n2 + 32 + 10, n3 + 14, 16777215);
       }
 
       private void drawPresetIcon(int n, int n2, ResourceLocation location) {

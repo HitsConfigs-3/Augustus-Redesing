@@ -24,7 +24,7 @@ public class ServerSelectionList extends GuiListExtended {
 
    @Override
    public int getScrollBarX() {
-      return super.getScrollBarX() + 30;
+      return this.left + (this.width + this.getListWidth()) / 2 + 4;
    }
 
    @Override
@@ -43,7 +43,7 @@ public class ServerSelectionList extends GuiListExtended {
 
    @Override
    public int getListWidth() {
-      return super.getListWidth() + 85;
+      return Math.min(460, Math.max(280, this.owner.width - 76));
    }
 
    @Override

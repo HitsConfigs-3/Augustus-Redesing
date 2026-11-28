@@ -396,6 +396,14 @@ public class GuiPageButtonList extends GuiListExtended {
          return guiEntry.component2;
       }
 
+      /**
+       * This entry paints its two components and nothing else, because its components ARE the option
+       * plates: a page row is one or two 150x20 buttons, sliders, text fields or labels placed side by side
+       * (see {@code populateComponents}), each of which already wears the menu material through
+       * {@code GuiButton}/{@code GuiSlider}. A row surface drawn behind them would double the veil over
+       * them and add a third ring to a line whose two controls already are the options. Untouched on
+       * purpose, not by omission.
+       */
       @Override
       public void drawEntry(int n, int n2, int n3, int n4, int n5, int n6, int n7, boolean flag) {
          this.renderComponent(this.component1, n3, n6, n7, false);

@@ -1,6 +1,7 @@
 package net.augustus.ui;
 
 import net.augustus.font.FontManager;
+import net.augustus.ui.modern.components.GlassMenuButton;
 import net.augustus.ui.modern.font.InterFontUtil;
 import net.augustus.ui.modern.render.UiAnimation;
 import net.augustus.utils.render.BlurShadowManager;
@@ -69,6 +70,15 @@ public class AugustusGuiScreen extends GuiScreen {
       GuiButton button = new GuiButton(nextControlId2, n, n2, n3, n4, str);
       this.buttonList.add(button);
       this.buttonClickHandlers.put(nextControlId2, guiButtonClickHandler);
+      this.nextControlId++;
+      return button;
+   }
+
+   public GlassMenuButton addGlassButton(int x, int y, int width, int height, String label, GuiButtonClickHandler handler) {
+      int id = this.nextControlId;
+      GlassMenuButton button = new GlassMenuButton(id, x, y, width, height, label);
+      this.buttonList.add(button);
+      this.buttonClickHandlers.put(id, handler);
       this.nextControlId++;
       return button;
    }
@@ -326,14 +336,17 @@ public class AugustusGuiScreen extends GuiScreen {
     * Inter screen.
     */
    public void drawFieldPlaceholder(String text, int fieldX, int fieldY, int fieldHeight, int color) {
-      InterFontUtil font = uiFont();
+      this.drawFieldPlaceholder(text, fieldX, fieldY, fieldHeight, color, uiFont(), 4.0F);
+   }
+
+   public void drawFieldPlaceholder(String text, int fieldX, int fieldY, int fieldHeight, int color, InterFontUtil font, float padX) {
       if (font == null) {
-         Minecraft.getMinecraft().fontRendererObj.drawStringWithShadow(text, (float)(fieldX + 4), (float)(fieldY + (fieldHeight - 8) / 2), color);
+         Minecraft.getMinecraft().fontRendererObj.drawStringWithShadow(text, (float)fieldX + padX, (float)(fieldY + (fieldHeight - 8) / 2), color);
          return;
       }
       font.drawStringWithShadow(
          text,
-         (double)((float)fieldX + 4.0F),
+         (double)((float)fieldX + padX),
          (double)((float)fieldY + ((float)fieldHeight - font.getFontHeight()) / 2.0F),
          color
       );

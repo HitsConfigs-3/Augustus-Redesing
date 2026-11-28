@@ -13,8 +13,11 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import net.augustus.utils.interfaces.MC;
 import net.minecraft.client.gui.ScaledResolution;
@@ -51,6 +54,17 @@ import org.lwjgl.opengl.GL11;
  * (icon, size) then serves every colour the UI needs. This was verified, not assumed - see
  * {@code tools/verify/SvgSalamanderCompatTest.java}.
  *
+ * <h2>Why the stroke is thickened in memory</h2>
+ * Tabler's 24 unit grid and 2.0 unit stroke are a 1/12 ratio, which is a hairline once the UI draws
+ * icons at 8-16 GUI px; the complaint that started the change was that the set looked thin and
+ * faceted at those sizes. Both halves of it are answered here without touching the vendored files:
+ * the stroke is multiplied by {@link #STROKE_WEIGHT} (2.0 -> 2.3 units, +15%) as the text is read, and
+ * the mask is rasterised at {@link #SUPERSAMPLE} times the device size so the stroke is drawn with
+ * about six coverage samples across it. Measured in the harness under {@code work/iconcheck/}: a
+ * straight bar goes from 9.00 to 10.35 texels in a 108 px mask and the smallest menu glyph from 2.83
+ * to 5.85 samples across its stroke, and across twelve icon/size pairs the minified on-screen crossing
+ * rises by a median of 13% - the 15% of the mask, with the scatter the 4-tap filter adds.
+ *
  * <h2>Caching and cost</h2>
  * A fresh parse plus rasterisation measures around <b>930 microseconds</b> per icon, so converting
  * inside a frame loop is out of the question. Textures are cached per (identifier, pixel size) and
@@ -80,20 +94,86 @@ public final class IconManager implements MC {
     */
    private static final int MAX_UPLOADS_PER_FRAME = 3;
 
+   /**
+    * Floor for the mask edge, in texels. No call site can reach it: the smallest thing the UI draws is
+    * a main-menu strip glyph at 13.45 device px, which is a 61 px mask here. It exists so a degenerate
+    * request (an icon asked for at a third of a GUI pixel) still produces a bitmap with a stroke in it
+    * rather than a blank 1x1, and it stays low because the value it substitutes is not a size the UI
+    * ever wants.
+    */
    private static final int MIN_PX = 8;
-   private static final int MAX_PX = 192;
+   /**
+    * Ceiling for the mask edge, in texels.
+    *
+    * <p>WHY 256: the largest size the UI asks for is 24 GUI px ({@code RAIL_ICON_SIZE} and the settings
+    * gear in {@code MainClickGuiWindow}), which is 48 device px at GUI scale 2 and therefore a 216 px
+    * mask at {@link #SUPERSAMPLE} - the old cap of 192 would have clipped exactly that case back down to
+    * a 4.0x supersample. 256 is the next power of two over 216, so every call site is served at the full
+    * factor at GUI scale 1 and 2, with 18% headroom. Beyond that it is a memory bound: a GUI scale 3-4
+    * draw of the same icon asks for 324-432 px and is clamped to 256, i.e. 3.56x and 2.67x respectively,
+    * both still above the 2.5x this class shipped before, so the clamp can only make an icon better than
+    * it was. One mask is 4*px^2 bytes, so 256 px is 256 KiB and {@link #CACHE_LIMIT} = 128 entries cannot
+    * exceed 32 MiB even if every entry were the worst case.
+    */
+   private static final int MAX_PX = 256;
    /**
     * Rasterisations per device pixel.
     *
-    * <p>WHY it is this high: 1.5x left a stroke with only ~2.2 coverage samples across it, so at the sizes
-    * the ClickGUI draws (icons land on 30 device px in a 24 px box) the shield's diagonals, the move cross
-    * and the 2x2 grid still resolved as straight chords - the "the icons need more polygons" read. At 2.5x
-    * the same stroke gets ~3.8 samples and, once the sampler actually interpolates them (see
-    * {@link #useSmoothSampling}), the outline lands where the SVG says it is instead of on the nearest
-    * texel centre. The cost is a bigger texture for a cache that never holds more than
-    * {@link #CACHE_LIMIT} entries and is opened a handful of icons per frame.
+    * <p>WHY 4.5x, and why not more: the mask has to carry the stroke's weight and its edges at the same
+    * time. The smallest thing the UI draws is a main-menu strip glyph, 7 design px of a 562 px layout,
+    * which lands on 13.45 device px at 1080p (the GUI scale cancels out of that) - a 34 px mask at 2.5x,
+    * where a Tabler stroke is 2.0 units of a 24 unit grid, so 2.8 texels, and the antialiasing ramp is
+    * one texel: a third of the stroke. That ramp is the chord the shield's arcs and the gear's teeth
+    * resolved to. At 4.5x the same glyph is a 61 px mask with the thickened 2.3 unit stroke at 5.85
+    * samples and the ramp at a sixth of it, which is the "~6 coverage samples across a stroke" target.
+    * The ClickGUI sizes (8.2-24 GUI px) are 74-216 px masks at GUI scale 2, i.e. 7.1-20.7 samples.
+    *
+    * <p>Half-integer on purpose: {@link #useSmoothSampling} installs a plain 4-tap bilinear with no
+    * mipmaps, so a screen pixel reads one mask sample through a filter footprint one texel wide. At a
+    * whole-number ratio (2.0x, 3.0x, 5.0x) every screen pixel lands on the same sub-texel phase and the
+    * mask's antialiasing is thrown away - measured on the GL_LINEAR-minified result at 48 device px the
+    * shield kept 88 distinct coverage levels at 2.5x and 26 at 5.0x. The half steps keep the phase
+    * alternating, which is where the intermediate coverage comes from.
+    *
+    * <p>It is not a weight change, which is worth stating because the request was about weight too:
+    * across 1.0x-6.0x the effective stroke width on the minified result moves by about 2% (the shield at
+    * 48 device px measures 7.34 px at 2.5x and 7.40 px at 4.5x). The weight the user sees comes from the
+    * stroke bump in {@link #svgTextFor} alone, and this factor only decides how well the edge of that
+    * weight is resolved.
+    *
+    * <p>Cost: rasterisation is dominated by SVG parsing, not by fill - min-of-four measurements are
+    * 0.9-1.5 ms per icon and do not grow with the mask (a cold first one measured 3.5 ms) - so the
+    * factor costs texture memory, not frame time: 15 KiB for the 61 px strip mask, 182 KiB for the
+    * 216 px one. The ~48 masks the ClickGUI resolves at once come to about 3 MiB.
     */
-   private static final float SUPERSAMPLE = 2.5F;
+   private static final float SUPERSAMPLE = 4.5F;
+
+   /**
+    * Weight multiplier applied to every {@code stroke-width} in the vendored artwork, in memory.
+    *
+    * <p>WHY 15%: Tabler authors the set on a 24 unit grid with a 2.0 unit stroke, which is a 1/12
+    * ratio, and that ratio is what makes the outline read as a hairline once it is drawn at 8-16 GUI px
+    * - a 12 GUI px icon draws that stroke 1.0 px wide, so its antialiased edge is a large share of its
+    * weight. 2.0 -> 2.3 leaves the set recognisably Tabler (geometry, caps and joins untouched, the ratio
+    * only moves from 1/12 to 1/10.4) while the stroke gains 15% of its area, 7.5% of its width on each
+    * side. Measured on a straight Tabler bar in a 108 px mask, a crossing goes from 9.00 to 10.35 texels,
+    * which is exactly the 2.0 -> 2.3 units asked for. Anything past about 2.6 units starts closing the
+    * counters of the four-arc icons (settings, sparkles) at 16 px, which is why the band stops at +18%.
+    */
+   private static final float STROKE_WEIGHT = 1.15F;
+
+   /**
+    * The {@code stroke-width} attribute as all 62 vendored files write it: double quoted, no unit, one
+    * occurrence per file, always on the root {@code svg} element (measured over the whole set).
+    *
+    * <p>The capture group is numeric-only on purpose. A value the rule does not understand - an
+    * {@code inherit}, a {@code 1.5px} with a CSS unit, or a {@code style="stroke-width:2"} declaration,
+    * which {@link #STROKE_WEIGHT} deliberately does not touch - is left exactly as it is instead of
+    * being rewritten by guesswork and silently distorting the glyph. Nothing in the set hits that path
+    * today; it is what keeps a future icon drop from producing a surprise.
+    */
+   private static final Pattern STROKE_WIDTH =
+         Pattern.compile("stroke-width\\s*=\\s*\"([0-9]*\\.?[0-9]+)\"");
 
    /** Identifiers known to be missing or unparseable, so they are only reported once. */
    private static final Set<String> BROKEN = new HashSet<String>();
@@ -375,8 +455,9 @@ public final class IconManager implements MC {
          while ((read = stream.read(buffer)) > 0) {
             sb.append(new String(buffer, 0, read, Charset.forName("UTF-8")));
          }
-         // See the class comment: Salamander paints currentColor black, which modulation cannot tint.
-         String text = sb.toString().replace("currentColor", "#FFFFFF");
+         // See the class comment: Salamander paints currentColor black, which modulation cannot tint,
+         // and the vendored 2.0 unit stroke is a hairline at the sizes this UI draws.
+         String text = thickenStrokes(sb.toString().replace("currentColor", "#FFFFFF"));
          SVG_TEXT.put(tablerId, text);
          return text;
       } catch (Throwable t) {
@@ -385,6 +466,48 @@ public final class IconManager implements MC {
       } finally {
          closeQuietly(stream);
       }
+   }
+
+   /**
+    * Applies {@link #STROKE_WEIGHT} to every {@code stroke-width} attribute in the raw SVG text.
+    *
+    * <p>In memory, never on disk: the files under {@code assets/augustus/icons/tabler/} stay byte for
+    * byte as upstream ships them, so a future revision can be dropped in and diffed, and the weight of
+    * the whole set stays one number in this class instead of 62 silent edits to vendored art.
+    *
+    * <p>The attribute is rewritten rather than multiplied down into the path data because the stroke is
+    * the only thing Tabler expresses here - {@code fill} is {@code none} - and because Salamander
+    * resolves a plain numeric {@code stroke-width} reliably, which is the same mechanism the file itself
+    * relies on.
+    */
+   private static String thickenStrokes(String svgText) {
+      Matcher matcher = STROKE_WIDTH.matcher(svgText);
+      StringBuffer out = new StringBuffer(svgText.length() + 16);
+      while (matcher.find()) {
+         float weight = Float.parseFloat(matcher.group(1)) * STROKE_WEIGHT;
+         matcher.appendReplacement(out,
+               Matcher.quoteReplacement("stroke-width=\"" + formatWeight(weight) + "\""));
+      }
+      matcher.appendTail(out);
+      return out.toString();
+   }
+
+   /**
+    * Two decimals with trailing zeros trimmed, always with '.' as the separator.
+    *
+    * <p>The locale is pinned because the default one would render 2.3 as "2,3" on a Spanish or German
+    * machine, and an SVG number with a comma in it is a parse error, not a 2.3. The quantum of 0.01 is
+    * finer than anything the 24 unit grid can express (it is 0.4% of a stroke).
+    */
+   private static String formatWeight(float weight) {
+      String value = String.format(Locale.ROOT, "%.2f", weight);
+      while (value.endsWith("0")) {
+         value = value.substring(0, value.length() - 1);
+      }
+      if (value.endsWith(".")) {
+         value = value.substring(0, value.length() - 1);
+      }
+      return value;
    }
 
    private static BufferedImage rasterise(String svgText, int pixelSize) throws Exception {

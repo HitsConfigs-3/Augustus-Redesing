@@ -1,7 +1,14 @@
 package net.minecraft.client.gui;
 
 import java.util.Date;
+import net.augustus.font.FontManager;
 import net.augustus.ui.VanillaScreenText;
+import net.augustus.ui.modern.font.InterFontUtil;
+import net.augustus.ui.modern.render.GlassRenderer;
+import net.augustus.ui.modern.render.LucideIcon;
+import net.augustus.ui.modern.render.MenuScreenSkin;
+import net.augustus.ui.modern.render.UiAnimation;
+import net.augustus.ui.modern.render.UiTheme;
 import net.minecraft.util.EnumChatFormatting;
 import java.io.IOException;
 import java.text.DateFormat;
@@ -70,18 +77,32 @@ public class GuiSelectWorld extends GuiScreen implements GuiYesNoCallback {
    @Override
    public void drawScreen(int mouseX, int mouseY, float partialTicks) {
       this.availableWorlds.drawScreen(mouseX, mouseY, partialTicks);
-      VanillaScreenText.drawCenteredOnScreen(this.width, this.screenTitle, 20, 16777215);
+      VanillaScreenText.drawHeader(this.width, this.screenTitle, LucideIcon.GLOBE, 16);
       super.drawScreen(mouseX, mouseY, partialTicks);
       ClientSettings.renderMainMenuAccountInfo();
    }
 
    public void addWorldSelectionButtons() {
-      this.buttonList.add(this.selectButton = new GuiButton(1, this.width / 2 - 154, this.height - 52, 150, 20, I18n.format("selectWorld.select", new Object[0])));
-      this.buttonList.add(new GuiButton(3, this.width / 2 + 4, this.height - 52, 150, 20, I18n.format("selectWorld.create", new Object[0])));
-      this.buttonList.add(this.renameButton = new GuiButton(6, this.width / 2 - 154, this.height - 28, 72, 20, I18n.format("selectWorld.rename", new Object[0])));
-      this.buttonList.add(this.deleteButton = new GuiButton(2, this.width / 2 - 76, this.height - 28, 72, 20, I18n.format("selectWorld.delete", new Object[0])));
-      this.buttonList.add(this.recreateButton = new GuiButton(7, this.width / 2 + 4, this.height - 28, 72, 20, I18n.format("selectWorld.recreate", new Object[0])));
-      this.buttonList.add(new GuiButton(0, this.width / 2 + 82, this.height - 28, 72, 20, I18n.format("gui.cancel", new Object[0])));
+      int barW = Math.min(430, Math.max(296, this.width - 72));
+      int leftX = (this.width - barW) / 2;
+      int gap = 6;
+      int topBtnW = (barW - gap) / 2;
+      int botBtnW = (barW - gap * 3) / 4;
+      int rem = barW - botBtnW * 4 - gap * 3;
+      int topY = this.height - 54;
+      int botY = this.height - 30;
+      int btnH = 20;
+
+      this.buttonList.add(
+         (this.selectButton = new GuiButton(1, leftX, topY, topBtnW, btnH, I18n.format("selectWorld.select", new Object[0])))
+            .withIcon(LucideIcon.PLAYER_PLAY)
+            .withPrimaryAccent(true)
+      );
+      this.buttonList.add(new GuiButton(3, leftX + topBtnW + gap, topY, barW - topBtnW - gap, btnH, I18n.format("selectWorld.create", new Object[0])).withIcon(LucideIcon.PLUS));
+      this.buttonList.add((this.renameButton = new GuiButton(6, leftX, botY, botBtnW, btnH, I18n.format("selectWorld.rename", new Object[0]))).withIcon(LucideIcon.FILE_TEXT));
+      this.buttonList.add((this.deleteButton = new GuiButton(2, leftX + botBtnW + gap, botY, botBtnW, btnH, I18n.format("selectWorld.delete", new Object[0]))).withIcon(LucideIcon.TRASH_2));
+      this.buttonList.add((this.recreateButton = new GuiButton(7, leftX + (botBtnW + gap) * 2, botY, botBtnW, btnH, I18n.format("selectWorld.recreate", new Object[0]))).withIcon(LucideIcon.REFRESH_CW));
+      this.buttonList.add(new GuiButton(0, leftX + (botBtnW + gap) * 3, botY, botBtnW + rem, btnH, I18n.format("gui.cancel", new Object[0])).withIcon(LucideIcon.ARROW_LEFT));
       this.selectButton.enabled = false;
       this.deleteButton.enabled = false;
       this.renameButton.enabled = false;
@@ -241,13 +262,23 @@ public class GuiSelectWorld extends GuiScreen implements GuiYesNoCallback {
       public final GuiSelectWorld selectWorldScreen;
 
       public List(GuiSelectWorld guiSelectWorld, Minecraft mc2) {
-         super(mc2, guiSelectWorld.width, guiSelectWorld.height, 32, guiSelectWorld.height - 64, 36);
+         super(mc2, guiSelectWorld.width, guiSelectWorld.height, 42, guiSelectWorld.height - 66, 42);
          this.selectWorldScreen = guiSelectWorld;
       }
 
       @Override
+      public int getListWidth() {
+         return Math.min(430, Math.max(240, this.selectWorldScreen.width - 72));
+      }
+
+      @Override
+      public int getScrollBarX() {
+         return this.left + (this.width + this.getListWidth()) / 2 + 4;
+      }
+
+      @Override
       public int getContentHeight() {
-         return GuiSelectWorld.accessSaveList(this.selectWorldScreen).size() * 36;
+         return GuiSelectWorld.accessSaveList(this.selectWorldScreen).size() * 42;
       }
 
       @Override
@@ -263,26 +294,68 @@ public class GuiSelectWorld extends GuiScreen implements GuiYesNoCallback {
             displayName = GuiSelectWorld.getWorldText(this.selectWorldScreen) + " " + (n + 1);
          }
 
-         String fileName = saveFormatComparator.getFileName();
-         fileName = fileName + " (" + GuiSelectWorld.accessDateFormat(this.selectWorldScreen).format(new Date(saveFormatComparator.getLastTimePlayed()));
-         fileName = fileName + ")";
-         String str = "";
+         String fileName = saveFormatComparator.getFileName() + " (" + GuiSelectWorld.accessDateFormat(this.selectWorldScreen).format(new Date(saveFormatComparator.getLastTimePlayed())) + ")";
+         String modeLine;
          if (saveFormatComparator.requiresConversion()) {
-            str = GuiSelectWorld.getConversionText(this.selectWorldScreen) + " " + str;
+            modeLine = GuiSelectWorld.getConversionText(this.selectWorldScreen);
          } else {
-            str = GuiSelectWorld.accessGameModeNames(this.selectWorldScreen)[saveFormatComparator.getEnumGameType().getID()];
+            modeLine = GuiSelectWorld.accessGameModeNames(this.selectWorldScreen)[saveFormatComparator.getEnumGameType().getID()];
             if (saveFormatComparator.isHardcoreModeEnabled()) {
-               str = EnumChatFormatting.DARK_RED + I18n.format("gameMode.hardcore", new Object[0]) + EnumChatFormatting.RESET;
+               modeLine = EnumChatFormatting.DARK_RED + I18n.format("gameMode.hardcore", new Object[0]) + EnumChatFormatting.RESET;
             }
 
             if (saveFormatComparator.getCheatsEnabled()) {
-               str = str + ", " + I18n.format("selectWorld.cheats", new Object[0]);
+               modeLine = modeLine + ", " + I18n.format("selectWorld.cheats", new Object[0]);
             }
          }
 
-         this.selectWorldScreen.drawString(this.selectWorldScreen.fontRendererObj, displayName, n2 + 2, n3 + 1, 16777215);
-         this.selectWorldScreen.drawString(this.selectWorldScreen.fontRendererObj, fileName, n2 + 2, n3 + 12, 8421504);
-         this.selectWorldScreen.drawString(this.selectWorldScreen.fontRendererObj, str, n2 + 2, n3 + 12 + 10, 8421504);
+         float rowX = (float)(n2 - 2);
+         float rowY = (float)n3;
+         float rowW = (float)this.getListWidth();
+         float rowH = (float)n4;
+         boolean selected = this.isSelected(n);
+         boolean hovered = (float)n5 >= rowX && (float)n5 <= rowX + rowW && (float)n6 >= rowY && (float)n6 <= rowY + rowH;
+         String hoverKey = "augustus.selectworld.row." + n;
+         MenuScreenSkin.drawOptionSurface(
+            rowX,
+            rowY,
+            rowW,
+            rowH,
+            MenuScreenSkin.optionRadius(rowW, rowH),
+            UiTheme.smoothState(hoverKey, hovered ? 1.0F : 0.0F),
+            UiTheme.smoothPress(hoverKey + ".press", 0.0F, hovered && UiAnimation.isPrimaryMouseDown()),
+            true,
+            (float)n5,
+            (float)n6,
+            UiTheme.accentColor()
+         );
+
+         // Leading world emblem tile
+         float badgeSize = 26.0F;
+         float badgeX = rowX + 10.0F;
+         float badgeY = rowY + (rowH - badgeSize) * 0.5F;
+         GlassRenderer.drawRoundedGradientBox(badgeX, badgeY, badgeSize, badgeSize, 5.5F,
+            selected ? 0xFF6D28D9 : 0xFF281D3D, selected ? 0xFF3B0764 : 0xFF171026, 0, 0.0F, 0.0F);
+         GlassRenderer.drawRoundedOutline(badgeX, badgeY, badgeSize, badgeSize, 5.5F, 1.0F,
+            selected ? UiTheme.withAlpha(UiTheme.accentColor(), 200) : UiTheme.GLASS_BORDER);
+         LucideIcon.GLOBE.drawCentered(badgeX + badgeSize * 0.5F, badgeY + badgeSize * 0.5F, 13.0F, selected ? 0xFFF8FAFC : 0xCCA78BFA);
+
+         float textX = badgeX + badgeSize + 10.0F;
+         float maxTextW = Math.max(40.0F, rowW - (textX - rowX) - 12.0F);
+         InterFontUtil titleFace = FontManager.uiBody();
+         InterFontUtil smallFace = FontManager.uiSmall();
+
+         String fitName = FontManager.uiFit(titleFace, displayName, maxTextW);
+         String fitMeta = FontManager.uiFit(smallFace, fileName, maxTextW);
+         String fitMode = FontManager.uiFit(smallFace, modeLine, maxTextW);
+
+         VanillaScreenText.drawString(fitName, Math.round(textX), Math.round(rowY + 4.0F), selected ? 0xFFF3E8FF : 16777215);
+         VanillaScreenText.drawSmallString(fitMeta, textX, rowY + 15.5F, 0xFFB8B0D0);
+         VanillaScreenText.drawSmallString(fitMode, textX, rowY + 25.0F, 0xCC94A3B8);
+
+         if (selected) {
+            MenuScreenSkin.drawSelectionRing(rowX, rowY, rowW, rowH, MenuScreenSkin.optionRadius(rowW, rowH));
+         }
       }
 
       @Override

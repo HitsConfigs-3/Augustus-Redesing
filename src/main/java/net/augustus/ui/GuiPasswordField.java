@@ -2,20 +2,19 @@ package net.augustus.ui;
 
 import net.augustus.font.FontManager;
 import net.augustus.ui.modern.font.InterFontUtil;
+import net.augustus.ui.modern.render.MenuScreenSkin;
+import net.augustus.ui.modern.render.UiTheme;
 import net.minecraft.client.gui.GuiPageButtonList;
 import com.google.common.base.Predicate;
 import com.google.common.base.Predicates;
 import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.client.gui.Gui;
 import net.minecraft.client.gui.GuiScreen;
-import net.minecraft.client.renderer.GlStateManager;
-import net.minecraft.client.renderer.Tessellator;
-import net.minecraft.client.renderer.WorldRenderer;
-import net.minecraft.client.renderer.vertex.DefaultVertexFormats;
 import net.minecraft.util.ChatAllowedCharacters;
 import net.minecraft.util.MathHelper;
 
 public class GuiPasswordField extends Gui {
+   private static final int SELECTION_ALPHA = 110;
    private boolean isFocused;
    private boolean canLoseFocus;
    private boolean visible;
@@ -38,6 +37,9 @@ public class GuiPasswordField extends Gui {
    private int cursorPosition;
    public int xPosition;
    private String text = "";
+   private InterFontUtil customFont;
+   private float wellHoverAnim = 0.0F;
+   private float wellFocusAnim = 0.0F;
 
    /**
     * The client's Inter face, matching {@code GuiTextField}: password dots and caret placement must use
@@ -45,6 +47,22 @@ public class GuiPasswordField extends Gui {
     */
    private static InterFontUtil passwordFont() {
       return FontManager.body();
+   }
+
+   public void setCustomFont(InterFontUtil font) {
+      this.customFont = font;
+   }
+
+   public InterFontUtil getCustomFont() {
+      return this.customFont;
+   }
+
+   private InterFontUtil resolveFont() {
+      return this.customFont != null ? this.customFont : passwordFont();
+   }
+
+   private int horizontalPadding() {
+      return this.customFont != null ? 8 : 4;
    }
 
    public String getText() {
@@ -319,7 +337,7 @@ public class GuiPasswordField extends Gui {
          }
 
          int width2 = this.getWidth();
-         InterFontUtil font = passwordFont();
+         InterFontUtil font = this.resolveFont();
          if (font == null) {
             int n2 = this.fontRenderer.trimStringToWidth(this.text.substring(this.lineScrollOffset), width2).length() + this.lineScrollOffset;
             if (selectionPos == this.lineScrollOffset) {
@@ -377,14 +395,33 @@ public class GuiPasswordField extends Gui {
          this.text = this.text + "*";
       }
 
-      InterFontUtil font = passwordFont();
+      InterFontUtil font = this.resolveFont();
       if (this.isVisible()) {
          if (font == null) {
             this.drawTextBoxFallback();
          } else {
             if (this.isEnableBackgroundDrawing()) {
-               drawRect(this.xPosition - 1, this.yPosition - 1, this.xPosition + this.width + 1, this.yPosition + this.height + 1, -6250336);
-               drawRect(this.xPosition, this.yPosition, this.xPosition + this.width, this.yPosition + this.height, -16777216);
+               float mx = TabbedMenuScreen.mouseX();
+               float my = TabbedMenuScreen.mouseY();
+               boolean hovered = this.isEnabled
+                  && mx >= (float)this.xPosition
+                  && mx <= (float)(this.xPosition + this.width)
+                  && my >= (float)this.yPosition
+                  && my <= (float)(this.yPosition + this.height);
+               this.wellHoverAnim = UiTheme.smoothState(this.wellHoverAnim, hovered ? 1.0F : 0.0F);
+               this.wellFocusAnim = UiTheme.smoothState(this.wellFocusAnim, this.isFocused ? 1.0F : 0.0F);
+               MenuScreenSkin.drawWellSurface(
+                  (float)this.xPosition,
+                  (float)this.yPosition,
+                  (float)this.width,
+                  (float)this.height,
+                  MenuScreenSkin.optionRadius((float)this.width, (float)this.height),
+                  this.wellHoverAnim,
+                  this.wellFocusAnim,
+                  mx,
+                  my,
+                  UiTheme.accentColor()
+               );
             }
 
             int color = this.isEnabled ? this.enabledColor : this.disabledColor;
@@ -394,7 +431,7 @@ public class GuiPasswordField extends Gui {
             String visibleText = font.trimToWidth(this.text.substring(scrollStart), (float)this.getWidth());
             boolean caretInside = caretPos >= 0 && caretPos <= visibleText.length();
             boolean blinkVisible = this.isFocused && this.cursorCounter / 6 % 2 == 0 && caretInside;
-            float textX = this.enableBackgroundDrawing ? (float)(this.xPosition + 4) : (float)this.xPosition;
+            float textX = this.enableBackgroundDrawing ? (float)(this.xPosition + this.horizontalPadding()) : (float)this.xPosition;
             float fontHeight = font.getFontHeight();
             float textY = this.enableBackgroundDrawing
                ? (float)this.yPosition + ((float)this.height - fontHeight) * 0.5F
@@ -428,10 +465,11 @@ public class GuiPasswordField extends Gui {
 
             int caretHeight = (int)Math.ceil((double)fontHeight);
             if (blinkVisible) {
+               int caretArgb = UiTheme.withAlpha(UiTheme.accentColor(), 255);
                if (caretAtEnd) {
-                  Gui.drawRect((int)caretX, (int)textY - 1, (int)caretX + 1, (int)textY + 1 + caretHeight, -3092272);
+                  Gui.drawRect((int)caretX, (int)textY - 1, (int)caretX + 1, (int)textY + 1 + caretHeight, caretArgb);
                } else {
-                  font.drawStringWithShadow("_", (double)caretX, (double)textY, color);
+                  font.drawStringWithShadow("_", (double)caretX, (double)textY, caretArgb);
                }
             }
 
@@ -513,10 +551,10 @@ public class GuiPasswordField extends Gui {
       if (this.isFocused && flag && mouseButton == 0) {
          int n = mouseX - this.xPosition;
          if (this.enableBackgroundDrawing) {
-            n -= 4;
+            n -= this.horizontalPadding();
          }
 
-         InterFontUtil clickFont = passwordFont();
+         InterFontUtil clickFont = this.resolveFont();
          if (clickFont == null) {
             String str2 = this.fontRenderer.trimStringToWidth(this.text.substring(this.lineScrollOffset), this.getWidth());
             this.setCursorPosition(this.fontRenderer.trimStringToWidth(str2, n).length() + this.lineScrollOffset);
@@ -554,7 +592,7 @@ public class GuiPasswordField extends Gui {
    }
 
    public int getWidth() {
-      return this.isEnableBackgroundDrawing() ? this.width - 8 : this.width;
+      return this.isEnableBackgroundDrawing() ? this.width - this.horizontalPadding() * 2 : this.width;
    }
 
    public void updateCursorCounter() {
@@ -590,20 +628,7 @@ public class GuiPasswordField extends Gui {
          n = this.xPosition + this.width;
       }
 
-      Tessellator instance = Tessellator.getInstance();
-      WorldRenderer worldRenderer = instance.getWorldRenderer();
-      GlStateManager.color(0.0F, 0.0F, 255.0F, 255.0F);
-      GlStateManager.disableTexture2D();
-      GlStateManager.enableColorLogic();
-      GlStateManager.colorLogicOp(5387);
-      worldRenderer.begin(7, DefaultVertexFormats.POSITION);
-      worldRenderer.pos((double)n, (double)n4, 0.0).endVertex();
-      worldRenderer.pos((double)n3, (double)n4, 0.0).endVertex();
-      worldRenderer.pos((double)n3, (double)n2, 0.0).endVertex();
-      worldRenderer.pos((double)n, (double)n2, 0.0).endVertex();
-      instance.draw();
-      GlStateManager.disableColorLogic();
-      GlStateManager.enableTexture2D();
+      drawRect(n, n2, n3, n4, UiTheme.withAlpha(UiTheme.accentColor(), SELECTION_ALPHA));
    }
 
    public void setEnabledColor(int n) {

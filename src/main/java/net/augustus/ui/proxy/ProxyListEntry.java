@@ -1,19 +1,24 @@
 package net.augustus.ui.proxy;
 
-import net.augustus.Augustus;
-import net.augustus.font.FontManager;
-import net.augustus.render.RenderUtil;
-import net.augustus.ui.modern.font.InterFontUtil;
-import net.augustus.utils.animation.AnimationUtil;
-import net.augustus.utils.animation.EasingType;
-import net.augustus.utils.input.KeyboardInputUtil;
-import net.augustus.utils.network.ProxyEntry;
 import java.awt.Color;
+import net.augustus.Augustus;
+import net.augustus.render.RenderUtil;
+import net.augustus.ui.menu.ClientMenuTab;
+import net.augustus.ui.modern.font.InterFontUtil;
+import net.augustus.ui.modern.render.GlassRenderer;
+import net.augustus.ui.modern.render.LucideIcon;
+import net.augustus.ui.modern.render.UiTheme;
 import net.augustus.utils.TimeHelper;
+import net.augustus.utils.animation.AnimationUtil;
+import net.augustus.utils.input.KeyboardInputUtil;
 import net.augustus.utils.interfaces.MC;
+import net.augustus.utils.network.ProxyEntry;
 import net.minecraft.client.gui.FontRenderer;
-import org.lwjgl.opengl.GL11;
 
+/**
+ * Proxy list row rendered with Augustus frosted glass material, crisp smaller Inter typography,
+ * protocol/ping badges, active/favorite indicators, and cursor-tracking hover glow.
+ */
 public class ProxyListEntry implements MC {
    private boolean hovered;
    private final TimeHelper timeHelper = new TimeHelper();
@@ -29,80 +34,73 @@ public class ProxyListEntry implements MC {
       return this.hovered;
    }
 
-   public void drawEntry(int n, int n2, int n3, int n4, int n5, int n6, boolean flag) {
-      this.renderX = n3;
-      this.renderY = n4;
-      this.renderWidth = n5;
-      this.renderHeight = n6;
+   public void drawEntry(int mouseX, int mouseY, int x, int y, int width, int height, boolean flag,
+         ClientMenuTab owner) {
+      this.renderX = x;
+      this.renderY = y;
+      this.renderWidth = width;
+      this.renderHeight = height;
       this.selected = flag;
-      FontRenderer fontRendererObj = mc.fontRendererObj;
-      float f = (float)n5 / 2.0F;
-      float f2 = (float)n6 / 2.0F;
-      float f3 = (float)n3 + f;
-      float f4 = (float)n4 + f2;
-      GL11.glPushMatrix();
-      boolean isHovered = RenderUtil.isHovered((float)n3, (float)n4, (float)n5, (float)n6, n, n2);
-      if (this.hovered != isHovered) {
-         this.hoverAnimation.start(100, EasingType.easeInSine, isHovered ? 1 : 0, false);
+
+      boolean isHovered = RenderUtil.isHovered((float)x, (float)y, (float)width, (float)height, mouseX, mouseY);
+      this.hovered = isHovered;
+      float hover = owner.menuHover("proxy." + System.identityHashCode(this), isHovered);
+
+      owner.menuRow((float)x, (float)y, (float)width, (float)height, hover, 1.0F);
+      float radius = Math.min(6.0F, Math.min((float)width, (float)height) * 0.5F);
+      int accent = UiTheme.accentColor();
+      if (flag) {
+         GlassRenderer.drawRoundedRect((float)x, (float)y, (float)width, (float)height, radius,
+               UiTheme.withAlpha(accent, 34));
+         GlassRenderer.drawRoundedOutline((float)x, (float)y, (float)width, (float)height, radius, 1.4F,
+               UiTheme.withAlpha(accent, 245));
+         ClientMenuTab.menuAccentRail((float)x + 3.5F, (float)y, (float)height, 0.95F);
       }
 
-      String str;
-      StringBuilder sb;
-      float f5 = (float)(1.0 - this.hoverAnimation.getEasedProgress() * 0.019999999552965164);
-         GL11.glScaled((double)f5, (double)f5, 0.0);
-         f3 /= f5;
-         f4 /= f5;
-         this.hovered = isHovered;
-         RenderUtil.drawRect((double)(f3 - f), (double)(f4 - f2), (double)(f3 + f), (double)(f4 + f2), new Color(0, 0, 0, flag ? 200 : 100).getRGB());
-         GL11.glScaled((double)(1.0F / f5), (double)(1.0F / f5), 0.0);
-         ProxyEntry proxy = Augustus.getInstance().getProxy();
-         StringBuilder sb2 = new StringBuilder();
-         sb = sb2.append("§7IP: ");
-if (proxy != null) {
-if (proxy.matches(this.proxyEntry)) {
-str = "§a";
-} else {
-str = this.isFavorite() ? "§6" : "§f";
-}
-} else {
-str = this.isFavorite() ? "§6" : "§f";
-}
+      ProxyEntry activeProxy = Augustus.getInstance().getProxy();
+      boolean isActive = activeProxy != null && activeProxy.matches(this.proxyEntry);
 
-      // Inter, like every other row of the client menu: the '§' runs are parsed by the SDF atlas itself, so
-      // host/port/ping keep the colours their strings ask for instead of dropping back to the bitmap font.
-      InterFontUtil font = FontManager.body();
-      float lineStep = FontManager.listLineHeight();
-      String lineIp = sb.append(str).append(this.proxyEntry.getHost()).toString();
-      StringBuilder sb3 = new StringBuilder();
-      StringBuilder sb4 = sb3.append("§7Port: ");
-      if (this.isFavorite()) {
-         str = "§6";
-      } else {
-         str = "§f";
+      InterFontUtil titleFace = ClientMenuTab.menuBodyFont();
+      InterFontUtil subFace = ClientMenuTab.menuSmallFont();
+      if (titleFace == null || subFace == null) {
+         FontRenderer fr = mc.fontRendererObj;
+         fr.drawString(this.proxyEntry.getHost() + ":" + this.proxyEntry.getPort(), x + 10, y + 6, Color.white.getRGB());
+         return;
       }
 
-      String linePort = sb4.append(str).append(this.proxyEntry.getPort()).toString();
-      StringBuilder sb5 = new StringBuilder();
-      sb5 = sb5.append("§7Ping: ");
-      String str2;
-      if (this.isFavorite()) {
-         str2 = "§6";
-      } else {
-         str2 = "§f";
-      }
+      // Leading icon badge
+      float iconBox = 20.0F;
+      float iconX = (float)x + (flag ? 11.0F : 9.0F);
+      float iconY = (float)y + ((float)height - iconBox) * 0.5F;
+      int badgeBg = isActive ? 0x2E4ADE80 : (this.isFavorite() ? 0x2EFBBF24 : UiTheme.withAlpha(accent, 36));
+      int iconTint = isActive ? 0xFF4ADE80 : (this.isFavorite() ? 0xFFFBBF24 : UiTheme.lerpArgb(accent, 0xFFFFFFFF, 0.35F));
+      GlassRenderer.drawRoundedBox(iconX, iconY, iconBox, iconBox, 5.0F, badgeBg,
+            UiTheme.withAlpha(iconTint, 95), 0.75F);
+      LucideIcon.GLOBE.drawCentered(iconX + iconBox * 0.5F, iconY + iconBox * 0.5F, 11.0F, iconTint, false);
 
-      String linePing = sb5.append(str2).append(this.proxyEntry.getPing()).toString();
-      if (font == null) {
-         fontRendererObj.drawString(lineIp, (float)n3 + 5.5F, (float)n4 + 3.5F, Color.white.getRGB());
-         fontRendererObj.drawString(linePort, (float)n3 + 5.5F, (float)n4 + 7.0F + (float)fontRendererObj.FONT_HEIGHT, Color.white.getRGB());
-         fontRendererObj.drawString(linePing, (float)n3 + ((float)(n5 - fontRendererObj.getStringWidth(linePing)) - 5.5F), (float)n4 + 3.5F, Color.white.getRGB());
-      } else {
-         font.drawStringWithShadow(lineIp, (double)((float)n3 + 5.5F), (double)((float)n4 + 3.5F), Color.white.getRGB());
-         font.drawStringWithShadow(linePort, (double)((float)n3 + 5.5F), (double)((float)n4 + 3.5F + lineStep), Color.white.getRGB());
-         font.drawStringWithShadow(linePing, (double)((float)n3 + (float)n5 - font.getStringWidth(linePing) - 5.5F), (double)((float)n4 + 3.5F), Color.white.getRGB());
-      }
+      // Ping badge on the right
+      int ping = this.proxyEntry.getPing();
+      String pingText = ping >= 0 ? ping + " ms" : "N/A";
+      int pingColor = ping < 0 ? 0x9994A3B8 : (ping < 120 ? 0xFF4ADE80 : (ping < 280 ? 0xFFFBBF24 : 0xFFF87171));
+      float pingW = subFace.getStringWidth(pingText);
+      float pingX = (float)x + (float)width - 10.0F - pingW;
+      subFace.drawStringWithShadow(pingText, (double)pingX,
+            (double)((float)y + ((float)height - subFace.getFontHeight()) * 0.5F), pingColor);
 
-      GL11.glPopMatrix();
+      // Host + port + protocol badge
+      float textX = iconX + iconBox + 9.0F;
+      float availW = Math.max(40.0F, pingX - textX - 10.0F);
+      int hostColor = isActive ? 0xFF4ADE80 : (this.isFavorite() ? 0xFFFDE68A : ClientMenuTab.TEXT_BASE);
+
+      String hostLine = ClientMenuTab.menuFit(titleFace, this.proxyEntry.getHost() + ":" + this.proxyEntry.getPort(), availW);
+      titleFace.drawStringWithShadow(hostLine, (double)textX, (double)((float)y + 5.0F), hostColor);
+
+      String rawProto = this.proxyEntry.getProxyType();
+      String protoName = rawProto != null && !rawProto.isEmpty() ? rawProto : "SOCKS";
+      String subInfo = protoName + (isActive ? "  •  Connected" : (this.isFavorite() ? "  •  Favorite" : ""));
+      String fittedSub = ClientMenuTab.menuFit(subFace, subInfo, availW);
+      subFace.drawStringWithShadow(fittedSub, (double)textX, (double)((float)y + 18.5F),
+            isActive ? 0xCC86EFAC : ClientMenuTab.TEXT_SUB);
    }
 
    public void setFavorite(boolean favorite) {
@@ -130,7 +128,8 @@ str = this.isFavorite() ? "§6" : "§f";
    }
 
    public void mouseClicked(int n, int n2, int n3, ProxyManagerScreen proxyManagerScreen) {
-      if (n3 == 0 && RenderUtil.isHovered((float)this.renderX, (float)this.renderY, (float)this.renderWidth, (float)this.renderHeight, n, n2)) {
+      if (n3 == 0 && RenderUtil.isHovered((float)this.renderX, (float)this.renderY, (float)this.renderWidth,
+            (float)this.renderHeight, n, n2)) {
          if (KeyboardInputUtil.isKeyDown(157) || KeyboardInputUtil.isKeyDown(29)) {
             this.setFavorite(!this.isFavorite());
             return;
@@ -142,7 +141,8 @@ str = this.isFavorite() ? "§6" : "§f";
                + this.proxyEntry.getPort()
                + (
                   !this.proxyEntry.getUsername().equals("")
-                     ? ":" + this.proxyEntry.getUsername() + (!this.proxyEntry.getPassword().equals("") ? ":" + this.proxyEntry.getPassword() : "")
+                     ? ":" + this.proxyEntry.getUsername()
+                           + (!this.proxyEntry.getPassword().equals("") ? ":" + this.proxyEntry.getPassword() : "")
                      : ""
                );
             proxyManagerScreen.connectToProxy(str, true);
@@ -171,5 +171,4 @@ str = this.isFavorite() ? "§6" : "§f";
    public AnimationUtil getHoverAnimation() {
       return this.hoverAnimation;
    }
-
 }

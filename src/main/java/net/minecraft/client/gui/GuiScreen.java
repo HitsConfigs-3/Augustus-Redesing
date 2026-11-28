@@ -26,7 +26,11 @@ import net.augustus.utils.input.MouseInputUtil;
 import net.augustus.events.listeners.RenderGuiBackgroundListener;
 import net.augustus.events.listeners.InventoryClickListener;
 import net.augustus.ui.TabbedMenuScreen;
+import net.augustus.ui.AugustusGuiScreen;
 import net.augustus.ui.menu.ClientMenuTab;
+import net.augustus.ui.modern.render.MenuScreenSkin;
+import net.augustus.ui.modern.render.UiAnimation;
+import net.minecraft.client.multiplayer.GuiConnecting;
 import net.augustus.Augustus;
 import net.augustus.utils.render.GlStateSaver;
 import net.augustus.events.EventManager;
@@ -135,10 +139,30 @@ public abstract class GuiScreen extends Gui implements GuiYesNoCallback {
       return n == 46 && isCtrlKeyDown() && !isShiftKeyDown() && !isAltKeyDown();
    }
 
+   /**
+    * Background for a screen drawn <em>over a loaded world</em>.
+    *
+    * <p>The dimmed world gradient is the right answer for the screens that live inside a game - the
+    * inventory, a chest, the chat, a book - and it is untouched for them. The pause menu and every menu
+    * screen opened from it are the exception: they are in-game screens that belong to the menu, and the user
+    * asked for the pause menu to show the same backdrop as the main menu, so they draw the menu backdrop
+    * while they are open.</p>
+    *
+    * <p>The {@code RenderGuiBackground} event is still posted first and exactly once, for every screen: the
+    * Custom GUI BG Color module claims screens through it and paints its own colour or blur, and when it
+    * claims one, its choice wins over both the gradient and the menu backdrop - a per-screen background
+    * setting the user made must not be silently overridden by this pass.</p>
+    */
    public void drawWorldBackground(int n) {
       if (this.mc.theWorld != null) {
          if (!RenderGuiBackgroundListener.postRenderGuiBackground(this).isCancelled()) {
-            this.drawGradientRect(0, 0, this.width, this.height, -1072689136, -804253680);
+            this.ensureFrameClock();
+            // Always show the real Minecraft world, lighting, and camera when in-game (Escape menu & in-game submenus).
+            if (this instanceof GuiIngameMenu) {
+               this.drawGradientRect(0, 0, this.width, this.height, 0x38090710, 0x5407050E);
+            } else {
+               this.drawGradientRect(0, 0, this.width, this.height, 0x560B0814, 0x74080610);
+            }
          }
       } else {
          this.drawBackground(n);
@@ -423,7 +447,27 @@ public abstract class GuiScreen extends Gui implements GuiYesNoCallback {
       }
    }
 
+   /**
+    * Draws the screen's background.
+    *
+    * <p>A screen reached from the redesigned main menu - every stock options page, the world and server
+    * selectors, the resource-pack and language pages, the pause menu and anything opened from any of them -
+    * now draws the <em>menu's own</em> baked blurred backdrop (same frames, same zoom, same pan: literally the
+    * same {@code MenuBackdrop} the home screen plays), so a menu screen is indistinguishable from the menu it
+    * was opened from. Everything else keeps the previous path: the client's blue shader or the vanilla dirt
+    * tile.</p>
+    *
+    * <p>Screens inside a world (inventory, chest, chat, book, anvil, the HUD) never reach this method with a
+    * loaded world - {@link #drawWorldBackground(int)} keeps the world gradient for them - and they are
+    * deliberately left alone. The one in-game screen family that does get the backdrop is the menu itself:
+    * see {@link #drawWorldBackground(int)}.</p>
+    */
    public void drawBackground(int n) {
+      if (this.usesMenuBackdrop()) {
+         this.drawMenuScreenBackground();
+         return;
+      }
+
       this.glStateSaver.setCull(false);
       this.glStateSaver.setTexture2D(true);
       this.glStateSaver.setBlend(false);
@@ -451,6 +495,115 @@ public abstract class GuiScreen extends Gui implements GuiYesNoCallback {
       this.glStateSaver.restoreCull();
       this.glStateSaver.restoreTexture2D();
       this.glStateSaver.restoreBlend();
+   }
+
+   /**
+    * The menu backdrop, drawn with the same GL-state bracket the shader path uses.
+    *
+    * <p>WHY the gradient fallback: {@code MenuBackdrop} is a set of baked textures resolved from the resource
+    * pack. If they cannot be loaded the screen must not be left transparent onto whatever was in the
+    * framebuffer - the home screen falls back the same way.</p>
+    */
+   private void drawMenuScreenBackground() {
+      this.glStateSaver.setCull(false);
+      this.glStateSaver.setTexture2D(true);
+      this.glStateSaver.setBlend(false);
+
+      this.ensureFrameClock();
+      float screenWidth = (float)this.width;
+      float screenHeight = (float)this.height;
+      MenuScreenSkin.drawBackdrop(screenWidth, screenHeight);
+      if (!MenuScreenSkin.isBackdropAvailable()) {
+         this.drawGradientRect(0, 0, this.width, this.height, 0xFF22304C, 0xFF0B1020);
+      }
+
+      this.glStateSaver.restoreCull();
+      this.glStateSaver.restoreTexture2D();
+      this.glStateSaver.restoreBlend();
+   }
+
+   /**
+    * Whether this screen belongs to the redesigned menu, i.e. whether it draws the menu backdrop.
+    *
+    * <p>Two ways to belong, and the walk is why the answer covers "any screen opened from the main menu"
+    * without a per-screen edit: the screen is one of the stock menu screens listed in
+    * {@link #isMenuBackdropScreen()}, or one of its ancestors in the {@code parentScreen} chain is. A
+    * confirmation dialog, a "disconnect" page or a server-edit form therefore inherits the backdrop from the
+    * screen that opened it instead of each of them having to be enumerated.</p>
+    *
+    * <p>The walk is depth-capped: {@code parentScreen} is a plain field that a screen may set to itself
+    * (several vanilla screens do, to mean "reopen me"), and an uncapped walk would spin.</p>
+    */
+   private boolean usesMenuBackdrop() {
+      GuiScreen screen = this;
+      for (int depth = 0; screen != null && depth < 32; depth++) {
+         if (screen.isMenuBackdropScreen()) {
+            return true;
+         }
+
+         screen = screen.parentScreen;
+      }
+
+      return false;
+   }
+
+   /**
+    * The stock screens that belong to the menu rather than to the game, by type.
+    *
+    * <p>Deliberately a list of the stock screens the redesign asked for - options and all its pages, the world
+    * and server selectors, the world-creation pages, the resource-pack and language pages, the pause menu.</p>
+    *
+    * <p>WHAT IS NOT HERE, on purpose: the client's own redesigned screens ({@link AugustusGuiScreen} and its
+    * tabbed pages) - they belong to the menu's owner, not to this pass, and they paint their own composition;
+    * the in-game screens (inventory, chest, beacon, chest-of-commands, sign, chat, book,
+    * anvil/enchanting/merchant, the HUD); the transitional loading screens ({@code GuiScreenWorking},
+    * {@code GuiDownloadTerrain}); the error pages; and the demo intro. The user's rule for this round was
+    * explicit: if a screen is not clearly a stock menu screen, leave it exactly as it was and report it.</p>
+    */
+   private boolean isMenuBackdropScreen() {
+      return this instanceof GuiIngameMenu
+         || this instanceof GuiOptions
+         || this instanceof GuiVideoSettings
+         || this instanceof GuiScreenOptionsSounds
+         || this instanceof ScreenChatOptions
+         || this instanceof GuiControls
+         || this instanceof GuiCustomizeSkin
+         || this instanceof GuiLanguage
+         || this instanceof GuiScreenResourcePacks
+         || this instanceof GuiSelectWorld
+         || this instanceof GuiMultiplayer
+         || this instanceof GuiCreateWorld
+         || this instanceof GuiCreateFlatWorld
+         || this instanceof GuiFlatPresets
+         || this instanceof GuiScreenCustomizePresets
+         || this instanceof GuiScreenAddServer
+         || this instanceof GuiScreenServerList
+         || this instanceof GuiRenameWorld
+         || this instanceof GuiShareToLan
+         || this instanceof GuiDisconnected
+         || this instanceof GuiConnecting
+         || this instanceof GuiMainMenu;
+   }
+
+   /**
+    * Advances the shared UI clock once per frame for the screens that never did.
+    *
+    * <p>WHY it is needed here now: the menu backdrop's sequence and the glass material the options are made of
+    * both read {@link UiAnimation#dt()} and {@link UiAnimation#frameId()}, and neither advances unless
+    * somebody calls {@code beginFrame()} once per frame. Without it a stock screen froze the backdrop's clock
+    * and - worse - left the glass backdrop capture's frame id unchanged, so the blur every option samples was
+    * never refreshed.</p>
+    *
+    * <p>WHY the guard: {@code beginFrame()} latches a delta-time from the wall clock, so a second call inside
+    * the same frame measures ~0 s and would freeze every animation for the rest of that frame. The screens
+    * that already call it at the top of their {@code drawScreen} - the pause menu, the stock main menu and
+    * every {@link AugustusGuiScreen} - are therefore skipped, and this method keeps exactly one clock per
+    * frame per screen.</p>
+    */
+   private void ensureFrameClock() {
+      if (!(this instanceof GuiIngameMenu) && !(this instanceof GuiMainMenu) && !(this instanceof AugustusGuiScreen)) {
+         UiAnimation.beginFrame();
+      }
    }
 
    public void handleKeyboardInput() throws IOException {

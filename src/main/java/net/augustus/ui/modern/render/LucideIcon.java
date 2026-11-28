@@ -62,7 +62,28 @@ public enum LucideIcon implements MC {
    SHIELD("shield"),
    LOCK("lock"),
    LOGOUT("logout"),
-   EDIT_HUD("layout-dashboard");
+   EDIT_HUD("layout-dashboard"),
+   USERS("users"),
+   PUZZLE("puzzle"),
+   BROADCAST("broadcast"),
+   USERS_GROUP("message-dots"),
+   SHIRT("shirt"),
+   PHOTO("photo"),
+   PLAYER_PLAY("player-play"),
+   SERVER("server-2"),
+   MAXIMIZE("maximize"),
+   MINIMIZE("minimize"),
+   INFO_CIRCLE("info-circle"),
+   CIRCLE_CHECK("circle-check"),
+   ALERT_TRIANGLE("alert-triangle"),
+   EXTERNAL_LINK("external-link"),
+   FILTER("filter"),
+   PIN("pin"),
+   LOGIN("login"),
+   LINK("link"),
+   SHOPPING_CART("shopping-cart"),
+   DEVICE_DESKTOP("device-desktop"),
+   FILE_TEXT("file-text");
 
    private static final Map<Categorys, LucideIcon> CATEGORY_MAP = new EnumMap<Categorys, LucideIcon>(Categorys.class);
 

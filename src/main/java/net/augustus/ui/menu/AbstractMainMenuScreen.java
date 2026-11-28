@@ -13,6 +13,15 @@ public class AbstractMainMenuScreen extends AugustusGuiScreen {
    public final String multiplayerLabel;
    public final String quitLabel;
    public final String singleplayerLabel = I18n.format("menu.singleplayer", new Object[0]);
+   /**
+    * Whether the shared corner diagnostics (user, module/setting counts, authors, version) are painted.
+    *
+    * <p>The redesigned home screen owns its own footer and account column in its own layout space, so the
+    * stock corners would land outside the composition (and, on a window whose aspect ratio letterboxes the
+    * design rectangle, outside it entirely). Turning them off there keeps the welcome sound and every other
+    * side effect of this class - it only skips four strings.</p>
+    */
+   protected boolean showCornerInfo = true;
 
    @Override
    public void drawScreen(int mouseX, int mouseY, float partialTicks) {
@@ -26,6 +35,10 @@ public class AbstractMainMenuScreen extends AugustusGuiScreen {
       }
 
       super.drawScreen(mouseX, mouseY, partialTicks);
+      if (!this.showCornerInfo) {
+         return;
+      }
+
       Augustus instance = Augustus.getInstance();
       String str = ClientManagers.moduleManager.getModules().size() + " modules and " + instance.getSettingManager().getSettings().size() + " settings loaded";
       float f = (float)(this.width - this.getStringWidth(str) - 2);
@@ -47,7 +60,7 @@ public class AbstractMainMenuScreen extends AugustusGuiScreen {
    }
 
    public static GuiScreen createMainMenuScreen() {
-      return (GuiScreen)(Augustus.getInstance().getModuleManager().clientSettings.sideMainMenu.getValue() ? new SideMainMenuScreen() : new ClassicMainMenuScreen());
+      return (GuiScreen)(Augustus.getInstance().getModuleManager().clientSettings.sideMainMenu.getValue() ? new HomeMainMenuScreen() : new ClassicMainMenuScreen());
    }
 
 

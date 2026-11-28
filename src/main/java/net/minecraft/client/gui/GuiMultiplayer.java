@@ -1,6 +1,7 @@
 package net.minecraft.client.gui;
 
 import net.augustus.ui.VanillaScreenText;
+import net.augustus.ui.modern.render.LucideIcon;
 import net.minecraft.client.network.LanServerDetector;
 import com.google.common.base.Splitter;
 import com.google.common.collect.Lists;
@@ -91,10 +92,10 @@ public class GuiMultiplayer extends GuiScreen implements ServerListHost, GuiYesN
             LOGGER2.warn("Unable to start LAN server detection: " + e.getMessage());
          }
 
-         this.serverListSelector = new ServerSelectionList(this, this.mc, this.width, this.height, 32, this.height - 64, 36);
+         this.serverListSelector = new ServerSelectionList(this, this.mc, this.width, this.height, 42, this.height - 66, 40);
          this.serverListSelector.loadInternetServers(this.savedServerList);
       } else {
-         this.serverListSelector.setDimensions(this.width, this.height, 32, this.height - 64);
+         this.serverListSelector.setDimensions(this.width, this.height, 42, this.height - 66);
       }
 
       this.createButtons();
@@ -213,17 +214,29 @@ public class GuiMultiplayer extends GuiScreen implements ServerListHost, GuiYesN
    }
 
    public void createButtons() {
-      this.buttonList
-         .add(this.btnEditServer = new GuiButton(7, this.width / 2 - 154, this.height - 28, 74, 20, I18n.format("selectServer.edit", new Object[0])));
-      this.buttonList
-         .add(this.btnDeleteServer = new GuiButton(2, this.width / 2 - 76, this.height - 28, 74, 20, I18n.format("selectServer.delete", new Object[0])));
-      this.buttonList
-         .add(this.btnSelectServer = new GuiButton(1, this.width / 2 - 154, this.height - 52, 100, 20, I18n.format("selectServer.select", new Object[0])));
-      this.buttonList.add(new GuiButton(4, this.width / 2 - 50, this.height - 52, 100, 20, I18n.format("selectServer.direct", new Object[0])));
-      this.buttonList.add(new GuiButton(3, this.width / 2 + 4 + 50, this.height - 52, 100, 20, I18n.format("selectServer.add", new Object[0])));
-      this.buttonList.add(new GuiButton(8, this.width / 2 + 2, this.height - 28, 74, 20, I18n.format("selectServer.refresh", new Object[0])));
-      this.buttonList.add(new GuiButton(0, this.width / 2 + 80, this.height - 28, 74, 20, I18n.format("gui.cancel", new Object[0])));
-      this.buttonList.add(new GuiButton(-1338, this.width / 2 + 80, 6, 74, 20, "Mark banned"));
+      int barW = Math.min(460, Math.max(296, this.width - 76));
+      int leftX = (this.width - barW) / 2;
+      int gap = 6;
+      int topBtnW = (barW - gap * 2) / 3;
+      int topRem = barW - topBtnW * 3 - gap * 2;
+      int botBtnW = (barW - gap * 3) / 4;
+      int botRem = barW - botBtnW * 4 - gap * 3;
+      int topY = this.height - 54;
+      int botY = this.height - 30;
+      int btnH = 20;
+
+      this.buttonList.add((this.btnSelectServer = new GuiButton(1, leftX, topY, topBtnW, btnH, I18n.format("selectServer.select", new Object[0]))).withIcon(LucideIcon.LOGIN).withPrimaryAccent(true));
+      this.buttonList.add(new GuiButton(4, leftX + topBtnW + gap, topY, topBtnW, btnH, I18n.format("selectServer.direct", new Object[0])).withIcon(LucideIcon.LINK));
+      this.buttonList.add(new GuiButton(3, leftX + (topBtnW + gap) * 2, topY, topBtnW + topRem, btnH, I18n.format("selectServer.add", new Object[0])).withIcon(LucideIcon.PLUS));
+
+      this.buttonList.add((this.btnEditServer = new GuiButton(7, leftX, botY, botBtnW, btnH, I18n.format("selectServer.edit", new Object[0]))).withIcon(LucideIcon.FILE_TEXT));
+      this.buttonList.add((this.btnDeleteServer = new GuiButton(2, leftX + botBtnW + gap, botY, botBtnW, btnH, I18n.format("selectServer.delete", new Object[0]))).withIcon(LucideIcon.TRASH_2));
+      this.buttonList.add(new GuiButton(8, leftX + (botBtnW + gap) * 2, botY, botBtnW, btnH, I18n.format("selectServer.refresh", new Object[0])).withIcon(LucideIcon.REFRESH_CW));
+      this.buttonList.add(new GuiButton(0, leftX + (botBtnW + gap) * 3, botY, botBtnW + botRem, btnH, I18n.format("gui.cancel", new Object[0])).withIcon(LucideIcon.ARROW_LEFT));
+
+      int markW = 92;
+      int markX = Math.min(this.width - markW - 10, leftX + barW - markW);
+      this.buttonList.add(new GuiButton(-1338, markX, 11, markW, 20, "Mark banned").withIcon(LucideIcon.ALERT_TRIANGLE));
       this.selectServer(this.serverListSelector.getSelectedSlotIndex());
    }
 
@@ -247,7 +260,7 @@ public class GuiMultiplayer extends GuiScreen implements ServerListHost, GuiYesN
       this.hoveringText = null;
       this.drawDefaultBackground();
       this.serverListSelector.drawScreen(mouseX, mouseY, partialTicks);
-      VanillaScreenText.drawCenteredOnScreen(this.width, I18n.format("multiplayer.title", new Object[0]), 20, 16777215);
+      VanillaScreenText.drawHeader(this.width, I18n.format("multiplayer.title", new Object[0]), LucideIcon.SERVER, 16);
       super.drawScreen(mouseX, mouseY, partialTicks);
       ClientSettings.renderMainMenuAccountInfo();
       this.renderHoveringText(this, mouseX, mouseY);
@@ -385,6 +398,20 @@ public class GuiMultiplayer extends GuiScreen implements ServerListHost, GuiYesN
 
    public ServerList getServerList() {
       return this.savedServerList;
+   }
+
+   /**
+    * The row this screen currently has selected, for the entries that paint themselves.
+    *
+    * <p>WHY this accessor exists: a {@code GuiListExtended} entry is handed the <em>hover</em> boolean by
+    * {@code GuiListExtended.drawSlot} (it is {@code getSlotIndexFromScreenCoords(...) == n}), so a server row
+    * cannot tell from its arguments whether it is the selected one - and the selection is what decides if it
+    * wears {@link net.augustus.ui.modern.render.MenuScreenSkin#drawSelectionRing}. The index lives on the list,
+    * the list lives here, and the entry only holds the {@code ServerListHost}; this is the read-only bridge,
+    * with no state and no layout of its own. The {@code -1} is the list's own "nothing selected".</p>
+    */
+   public int getSelectedSlotIndex() {
+      return this.serverListSelector == null ? -1 : this.serverListSelector.getSelectedSlotIndex();
    }
 
    public void setHoveringText(String str) {

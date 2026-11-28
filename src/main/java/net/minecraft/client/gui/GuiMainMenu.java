@@ -12,6 +12,7 @@ import java.util.Random;
 import java.util.concurrent.atomic.AtomicInteger;
 import net.augustus.modules.Module;
 import net.augustus.ClientManagers;
+import net.augustus.ui.VanillaScreenText;
 import net.augustus.ui.menu.AbstractMainMenuScreen;
 import net.augustus.ui.modern.render.UiAnimation;
 import net.minecraft.client.Minecraft;
@@ -159,18 +160,21 @@ public class GuiMainMenu extends GuiScreen implements GuiYesNoCallback {
       GlStateManager.translate((float)(this.width / 2 + 90), 70.0F, 0.0F);
       GlStateManager.rotate(-20.0F, 0.0F, 0.0F, 1.0F);
       float f = 1.8F - MathHelper.abs(MathHelper.sin((float)(Minecraft.getSystemTime() % 1000L) / 1000.0F * 3.1415927F * 2.0F) * 0.1F);
-      f = f * 100.0F / (float)(this.fontRendererObj.getStringWidth(this.splashText) + 32);
+      // The splash is measured with the face it is painted in, so the 100 px scale box still means 100 px:
+      // measuring it with the bitmap font and painting it with Inter would draw it wider than its own box.
+      f = f * 100.0F / (float)(VanillaScreenText.getStringWidth(this.splashText) + 32);
       GlStateManager.scale(f, f, f);
-      drawCenteredString(this.fontRendererObj, this.splashText, 0, -8, -256);
+      // The splash's own yellow (0xFFFF00) is not pure white, so VanillaScreenText passes it through unchanged.
+      VanillaScreenText.drawCenteredString(this.splashText, 0, -8, -256);
       GlStateManager.popMatrix();
       String str = "Minecraft 1.8.9";
       if (this.mc.isDemo()) {
          str = str + " Demo";
       }
 
-      this.drawString(this.fontRendererObj, str, 2, this.height - 10, -1);
+      VanillaScreenText.drawString(str, 2, this.height - 10, -1);
       String str2 = "Copyright Mojang AB. Do not distribute!";
-      this.drawString(this.fontRendererObj, str2, this.width - this.fontRendererObj.getStringWidth(str2) - 2, this.height - 10, -1);
+      VanillaScreenText.drawString(str2, this.width - VanillaScreenText.getStringWidth(str2) - 2, this.height - 10, -1);
       if (this.openGLWarning1 != null && this.openGLWarning1.length() > 0) {
          drawRect(this.openGLWarningX1 - 2, this.openGLWarningY1 - 2, this.openGLWarningX2 + 2, this.openGLWarningY2 - 1, 1428160512);
          this.drawString(this.fontRendererObj, this.openGLWarning1, this.openGLWarningX1, this.openGLWarningY1, -1);

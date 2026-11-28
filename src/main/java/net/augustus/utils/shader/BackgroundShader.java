@@ -7,9 +7,11 @@ import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.IOException;
 import java.util.Objects;
+import net.minecraft.client.gui.ScaledResolution;
 import net.augustus.utils.interfaces.MC;
 import org.apache.commons.io.IOUtils;
 import org.lwjgl.input.Mouse;
+import org.lwjgl.opengl.GL11;
 
 public class BackgroundShader implements MC {
    private ShaderProgram shaderProgram;
@@ -55,6 +57,47 @@ public class BackgroundShader implements MC {
          this.glStateSaver.restoreAlpha();
          this.shaderProgram.unbind();
       }
+   }
+
+   public boolean isCompiled() {
+      return this.shaderProgram != null;
+   }
+
+   public boolean renderInBox(float x, float y, float width, float height, float speed) {
+      if (this.shaderProgram == null || width <= 1.0F || height <= 1.0F) {
+         return false;
+      }
+      net.minecraft.client.gui.ScaledResolution sr = new net.minecraft.client.gui.ScaledResolution(mc);
+      int scale = Math.max(1, sr.getScaleFactor());
+      int scissorX = Math.max(0, (int)Math.floor(x * scale));
+      int scissorY = Math.max(0, mc.displayHeight - (int)Math.ceil((y + height) * scale));
+      int scissorW = Math.max(1, (int)Math.ceil(width * scale));
+      int scissorH = Math.max(1, (int)Math.ceil(height * scale));
+      float centerPxX = scissorX + scissorW * 0.5F;
+      float centerPxY = scissorY + scissorH * 0.5F;
+
+      GL11.glPushAttrib(GL11.GL_ENABLE_BIT | GL11.GL_SCISSOR_BIT | GL11.GL_COLOR_BUFFER_BIT);
+      GL11.glDisable(GL11.GL_TEXTURE_2D);
+      GL11.glEnable(GL11.GL_BLEND);
+      GL11.glBlendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA);
+      GL11.glEnable(GL11.GL_SCISSOR_TEST);
+      GL11.glScissor(scissorX, scissorY, scissorW, scissorH);
+      GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
+
+      this.shaderProgram.bind();
+      float elapsed = (float)(System.currentTimeMillis() - this.startTimeMs) / speed;
+      this.shaderProgram.setUniform1f("time", elapsed);
+      this.shaderProgram.setUniform1f("timeDelta", elapsed);
+      if (Augustus.getInstance().getModuleManager().clientSettings.mouseInputsOnBackgrounds.getValue()) {
+         this.shaderProgram.setUniform2f("mouse", (float)Mouse.getX(), (float)(-Mouse.getY()));
+      }
+      // Doubling the box center coordinates maps gl_FragCoord center of the preview box to shader (0.5, 0.5) / origin.
+      this.shaderProgram.setUniform2f("resolution", centerPxX * 2.0F, centerPxY * 2.0F);
+      this.shaderProgram.drawQuad(0.0F, 0.0F, (float)mc.displayWidth, (float)mc.displayHeight);
+      this.shaderProgram.unbind();
+
+      GL11.glPopAttrib();
+      return true;
    }
 
    public void loadFromFile(String str, String str2) {
