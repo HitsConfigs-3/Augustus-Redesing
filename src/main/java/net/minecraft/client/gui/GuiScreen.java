@@ -21,6 +21,7 @@ import net.augustus.modules.misc.ClientSettings;
 import net.augustus.events.EventRenderGuiBackground;
 import net.augustus.events.EventInventoryClick;
 import net.augustus.utils.shader.BackgroundShader;
+import net.augustus.ui.modern.render.UiTheme;
 import net.augustus.ClientManagers;
 import net.augustus.utils.input.MouseInputUtil;
 import net.augustus.events.listeners.RenderGuiBackgroundListener;
@@ -159,9 +160,9 @@ public abstract class GuiScreen extends Gui implements GuiYesNoCallback {
             this.ensureFrameClock();
             // Always show the real Minecraft world, lighting, and camera when in-game (Escape menu & in-game submenus).
             if (this instanceof GuiIngameMenu) {
-               this.drawGradientRect(0, 0, this.width, this.height, 0x38090710, 0x5407050E);
+               this.drawGradientRect(0, 0, this.width, this.height, UiTheme.withAlpha(UiTheme.menuScrimTopArgb(), 0x38), UiTheme.withAlpha(UiTheme.menuScrimBottomArgb(), 0x54));
             } else {
-               this.drawGradientRect(0, 0, this.width, this.height, 0x560B0814, 0x74080610);
+               this.drawGradientRect(0, 0, this.width, this.height, UiTheme.withAlpha(UiTheme.menuScrimTopArgb(), 0x56), UiTheme.withAlpha(UiTheme.menuScrimBottomArgb(), 0x74));
             }
          }
       } else {
@@ -463,18 +464,15 @@ public abstract class GuiScreen extends Gui implements GuiYesNoCallback {
     * see {@link #drawWorldBackground(int)}.</p>
     */
    public void drawBackground(int n) {
-      if (this.usesMenuBackdrop()) {
-         this.drawMenuScreenBackground();
-         return;
-      }
+      net.augustus.utils.shader.BackgroundShaderManager bsm = Augustus.getInstance().getBackgroundShaderManager();
+      ClientSettings augustusServer = Augustus.getInstance().getModuleManager() != null
+         ? Augustus.getInstance().getModuleManager().clientSettings : null;
+      boolean customEnabled = augustusServer == null || augustusServer.customBackground.getValue();
 
-      this.glStateSaver.setCull(false);
-      this.glStateSaver.setTexture2D(true);
-      this.glStateSaver.setBlend(false);
-      ClientSettings augustusServer = Augustus.getInstance().getModuleManager().clientSettings;
-      if (augustusServer.isToggled() && augustusServer.customBackground.getValue()) {
-         Augustus.getInstance().getBackgroundShaderManager().getCurrentShader().render(1800.0F);
-      } else {
+      if (!customEnabled) {
+         this.glStateSaver.setCull(false);
+         this.glStateSaver.setTexture2D(true);
+         this.glStateSaver.setBlend(false);
          GlStateManager.disableLighting();
          GlStateManager.disableFog();
          Tessellator instance = Tessellator.getInstance();
@@ -490,6 +488,35 @@ public abstract class GuiScreen extends Gui implements GuiYesNoCallback {
          worldRenderer.pos((double)this.width, 0.0, 0.0).tex((double)((float)this.width / 32.0F), (double)n).color(64, 64, 64, 255).endVertex();
          worldRenderer.pos(0.0, 0.0, 0.0).tex(0.0, (double)n).color(64, 64, 64, 255).endVertex();
          instance.draw();
+         this.glStateSaver.restoreCull();
+         this.glStateSaver.restoreTexture2D();
+         this.glStateSaver.restoreBlend();
+         return;
+      }
+
+      if (bsm != null && bsm.isShaderBackdropActive()) {
+         this.glStateSaver.setCull(false);
+         this.glStateSaver.setTexture2D(true);
+         this.glStateSaver.setBlend(false);
+         bsm.getCurrentShader().render(1800.0F);
+         this.glStateSaver.restoreCull();
+         this.glStateSaver.restoreTexture2D();
+         this.glStateSaver.restoreBlend();
+         return;
+      }
+
+      if (this.usesMenuBackdrop()) {
+         this.drawMenuScreenBackground();
+         return;
+      }
+
+      this.glStateSaver.setCull(false);
+      this.glStateSaver.setTexture2D(true);
+      this.glStateSaver.setBlend(false);
+      if (bsm != null && bsm.getCurrentShader() != null) {
+         bsm.getCurrentShader().render(1800.0F);
+      } else {
+         this.drawGradientRect(0, 0, this.width, this.height, 0xFF22304C, 0xFF0B1020);
       }
 
       this.glStateSaver.restoreCull();

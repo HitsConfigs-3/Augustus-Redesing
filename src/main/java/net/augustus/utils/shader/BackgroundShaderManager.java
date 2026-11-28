@@ -1,11 +1,15 @@
 package net.augustus.utils.shader;
 
 import net.augustus.Augustus;
+import net.augustus.ClientManagers;
 import net.augustus.config.ClientSettingsConfigFile;
+import net.augustus.modules.misc.ClientSettings;
 import net.augustus.render.GpuVendorDetector;
 import net.augustus.settings.property.StringProperty;
+import net.augustus.ui.menu.MenuBackdrop;
 import net.augustus.utils.file.ClientFileUtil;
 import net.augustus.utils.file.ClientPaths;
+import net.minecraft.client.renderer.GlStateManager;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -22,13 +26,74 @@ import net.minecraft.block.state.pattern.BlockStateHelper;
 import org.apache.commons.io.FileUtils;
 
 public class BackgroundShaderManager {
+   public static final String MODE_ANIMATED = "animated";
+   public static final String MODE_SHADER = "shader";
+
    private final StringProperty selectedShader;
+   private final StringProperty backdropMode;
+   private final StringProperty selectedScene;
    private final HashMap shadersByName;
    private final List sortedShaders;
    private BackgroundShader currentShader;
+   private String activeMode = MODE_ANIMATED;
+   private String activeSceneId = MenuBackdrop.DEFAULT_PRESET_ID;
 
    public BackgroundShader getCurrentShader() {
       return this.currentShader;
+   }
+
+   public boolean isCustomBackgroundEnabled() {
+      if (ClientManagers.moduleManager == null || ClientManagers.moduleManager.clientSettings == null) {
+         return true;
+      }
+      ClientSettings cs = ClientManagers.moduleManager.clientSettings;
+      return cs.customBackground != null && cs.customBackground.getValue();
+   }
+
+   public boolean isShaderBackdropActive() {
+      return this.isCustomBackgroundEnabled() && MODE_SHADER.equalsIgnoreCase(this.activeMode) && this.currentShader != null;
+   }
+
+   public boolean isAnimatedSceneActive() {
+      return this.isCustomBackgroundEnabled() && !MODE_SHADER.equalsIgnoreCase(this.activeMode);
+   }
+
+   public String getBackdropMode() {
+      return this.activeMode;
+   }
+
+   public void setBackdropMode(String mode) {
+      if (MODE_SHADER.equalsIgnoreCase(mode)) {
+         this.activeMode = MODE_SHADER;
+      } else {
+         this.activeMode = MODE_ANIMATED;
+      }
+   }
+
+   public String getSelectedSceneId() {
+      return this.activeSceneId;
+   }
+
+   public void selectAnimatedScene(String sceneId) {
+      MenuBackdrop.BackdropPreset preset = MenuBackdrop.findPreset(sceneId);
+      this.activeSceneId = preset.getId();
+      this.activeMode = MODE_ANIMATED;
+      MenuBackdrop.getShared().setPreset(this.activeSceneId);
+   }
+
+   public boolean renderActiveShaderFullscreen() {
+      if (this.currentShader == null || !this.currentShader.isCompiled()) {
+         return false;
+      }
+      GlStateManager.disableCull();
+      GlStateManager.enableTexture2D();
+      GlStateManager.disableBlend();
+      GlStateManager.color(1.0F, 1.0F, 1.0F, 1.0F);
+      this.currentShader.render(1800.0F);
+      GlStateManager.enableBlend();
+      GlStateManager.enableCull();
+      GlStateManager.color(1.0F, 1.0F, 1.0F, 1.0F);
+      return true;
    }
 
    private void extractResourceFile(String str, String str2, boolean flag) {
@@ -85,6 +150,12 @@ public class BackgroundShaderManager {
        super();
       this.shadersByName = new HashMap();
       this.selectedShader = (StringProperty)((StringProperty)new StringProperty(ClientSettingsConfigFile.abstractFeature, "SelectedShader", "").withOnValueChanged(obj -> this.selectShader((String)obj))).withValueSupplier(() -> this.getCurrentShaderName());
+      this.backdropMode = (StringProperty)((StringProperty)new StringProperty(ClientSettingsConfigFile.abstractFeature, "BackdropMode", MODE_ANIMATED).withOnValueChanged(obj -> this.setBackdropMode((String)obj))).withValueSupplier(() -> this.getBackdropMode());
+      this.selectedScene = (StringProperty)((StringProperty)new StringProperty(ClientSettingsConfigFile.abstractFeature, "SelectedScene", MenuBackdrop.DEFAULT_PRESET_ID).withOnValueChanged(obj -> {
+         MenuBackdrop.BackdropPreset preset = MenuBackdrop.findPreset((String)obj);
+         this.activeSceneId = preset.getId();
+         MenuBackdrop.getShared().setPreset(this.activeSceneId);
+      })).withValueSupplier(() -> this.getSelectedSceneId());
       String str = Augustus.getInstance().getName().toLowerCase(Locale.ROOT);
       String str2 = str + "/shaders";
       String str3 = str2;

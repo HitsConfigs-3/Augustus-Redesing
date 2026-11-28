@@ -46,7 +46,7 @@ public class TabbedMenuScreen extends AugustusGuiScreen {
    private static final int RAIL_PLATE_TRAILING_B_PERCENT = 42;
 
    private final List tabs;
-   private final MenuBackdrop backdrop = new MenuBackdrop();
+   private final MenuBackdrop backdrop = MenuBackdrop.getShared();
    private int selectedTabIndex;
    private float activePlateY = -1.0F;
 
@@ -305,16 +305,22 @@ public class TabbedMenuScreen extends AugustusGuiScreen {
    private void drawMenuBackdrop() {
       float w = (float)this.width;
       float h = (float)this.height;
-      if (this.backdrop.isAvailable()) {
+      net.augustus.utils.shader.BackgroundShaderManager bsm = Augustus.getInstance().getBackgroundShaderManager();
+      if (bsm != null && !bsm.isCustomBackgroundEnabled()) {
+         this.backdrop.invalidateDraw();
+         this.drawGradientRect(0, 0, this.width, this.height, UiTheme.menuPillFillTopArgb(), 0xFF0A0D16);
+      } else if (bsm != null && bsm.isShaderBackdropActive() && bsm.renderActiveShaderFullscreen()) {
+         this.backdrop.invalidateDraw();
+      } else if (this.backdrop.isAvailable()) {
          this.backdrop.draw(0.0F, 0.0F, w, h, 1.0F);
-         // Full-frame soft frost veil so the whole backdrop reads as the dreamy Augustus glass scene
          this.backdrop.drawFrost(0.0F, 0.0F, w, h, 0.72F);
       } else {
-         RenderUtil.drawRect(0, 0, this.width, this.height, 0xFF100B1C);
+         this.backdrop.invalidateDraw();
+         RenderUtil.drawRect(0, 0, this.width, this.height, UiTheme.menuPillFillBottomArgb());
       }
 
-      // Atmospheric dark indigo-violet tint scrim for crisp glass contrast
-      this.drawGradientRect(0, 0, this.width, this.height, 0x48090614, 0x7A05030D);
+      // Atmospheric themed glass scrim for crisp glass contrast
+      this.drawGradientRect(0, 0, this.width, this.height, UiTheme.menuScrimTopArgb(), UiTheme.menuScrimBottomArgb());
 
       // Subtle brand ambient wash from top-left logo corner
       int accent = UiTheme.accentColor();
@@ -423,8 +429,8 @@ public class TabbedMenuScreen extends AugustusGuiScreen {
          badgeSize,
          badgeSize,
          7.0F,
-         UiTheme.withAlpha(UiTheme.lerpArgb(0xFF1A112C, accent, 0.20F), 220),
-         UiTheme.withAlpha(0xFF0E091A, 232),
+         UiTheme.withAlpha(UiTheme.lerpArgb(UiTheme.menuPillFillTopArgb(), accent, 0.20F), 220),
+         UiTheme.withAlpha(UiTheme.menuPillFillBottomArgb(), 232),
          UiTheme.withAlpha(UiTheme.lerpArgb(accent, 0xFFFFFFFF, 0.25F), 140),
          UiTheme.BORDER_THICKNESS,
          bx + badgeSize * 0.5F,
@@ -482,7 +488,7 @@ public class TabbedMenuScreen extends AugustusGuiScreen {
       }
       int argb;
       if ("Waiting...".equals(status)) {
-         argb = UiTheme.lerpArgb(UiTheme.accentColor(), 0xFFD8B4FE, 0.45F);
+         argb = UiTheme.lerpArgb(UiTheme.accentColor(), 0xFFF1F5F9, 0.45F);
       } else {
          Color color = ClientMenuTab.getStatusColor(tab);
          argb = color == null ? 0xFFF2F0FA : UiTheme.lerpArgb(color.getRGB(), 0xFFFFFFFF, 0.15F);
@@ -523,12 +529,12 @@ public class TabbedMenuScreen extends AugustusGuiScreen {
 
       GlassRenderer.drawRoundedBox(
          px, py, pillW, pillH, pillH * 0.5F,
-         0x66120B1F,
+         UiTheme.withAlpha(UiTheme.menuPillFillBottomArgb(), 0x66),
          0x1CFFFFFF,
          0.75F
       );
       GlassRenderer.drawCircle(px + 8.5F, centerY, 2.3F, validSession ? 0xFF4ADE80 : 0xFFF87171);
-      face.drawStringWithShadow(fitted, (double)(px + 14.5F), (double)(centerY - face.getFontHeight() * 0.5F), 0xCCB8B0C8);
+      face.drawStringWithShadow(fitted, (double)(px + 14.5F), (double)(centerY - face.getFontHeight() * 0.5F), 0xCCB8C2D4);
    }
 
    private static int railPlateLeadingRgb() {
@@ -596,7 +602,7 @@ public class TabbedMenuScreen extends AugustusGuiScreen {
                radius,
                UiTheme.withAlpha(railPlateLeadingRgb(), Math.round(92.0F * hovOnly)),
                UiTheme.withAlpha(railPlateTrailingRgb(), Math.round(76.0F * hovOnly)),
-               UiTheme.withAlpha(UiTheme.lerpArgb(accent, 0xFFE2DCFF, 0.25F), Math.round(130.0F * hovOnly)),
+               UiTheme.withAlpha(UiTheme.lerpArgb(accent, 0xFFF8FAFC, 0.25F), Math.round(130.0F * hovOnly)),
                UiTheme.BORDER_THICKNESS,
                lightX,
                lightY,

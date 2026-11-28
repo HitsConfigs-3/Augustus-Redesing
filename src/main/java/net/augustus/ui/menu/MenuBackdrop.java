@@ -2,6 +2,9 @@ package net.augustus.ui.menu;
 
 import java.awt.image.BufferedImage;
 import java.io.InputStream;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
 import javax.imageio.ImageIO;
 import net.augustus.ui.modern.render.UiAnimation;
 import net.minecraft.client.Minecraft;
@@ -13,36 +16,132 @@ import net.minecraft.client.renderer.vertex.DefaultVertexFormats;
 import net.minecraft.util.ResourceLocation;
 
 /**
- * Ambient backdrop of the redesigned main menu: the clip supplied with the redesign, baked into a sequence
- * of graded stills and played back as a slow ping-pong loop with a crossfade between neighbours.
- *
- * <p>Why a baked sequence rather than the video or a live shader: decoding a 1080p clip at runtime would
- * cost far more than the menu is worth on Java 8 / 1.8.9 hardware, and the frames are graded once at bake
- * time instead. The bake keeps a second, heavily blurred copy of every frame (the <em>frost</em> set, a
- * 320x180 smear of the same grade). Panels and the player figure frost themselves by sampling that set
- * rather than by reading the framebuffer: a per-frame capture with {@code KawaseBlurEngine} looks the same
- * but stalls some drivers badly enough to freeze the client, so the blur is paid for once, at bake time,
- * and is guaranteed to line up with whatever is behind it because it <em>is</em> what is behind it.
- *
- * <p>Only four textures are ever resident - two sharp slots and two frost slots - and each slot owns a
- * fixed-size {@link DynamicTexture} whose pixel buffer is rewritten when the sequence advances (180 frames
- * would otherwise sit in VRAM permanently for a background the glass panels cover most of). Both the loop
- * and its drift are driven by {@link UiAnimation#dt()}, so playback is frame-rate independent.
+ * Ambient backdrop engine for menu screens: plays selectable ping-pong frame sequences
+ * (Earth Horizon custom clip + animated Minecraft shader scenes), keeping matching low-res frost twins
+ * synchronized in VRAM via a tiny 4-slot {@link DynamicTexture} ring.
  */
 public final class MenuBackdrop {
-   /** Frames baked by {@code work/bake_video_backdrop.py}: 30 s of source at 3 fps. */
-   private static final int FRAME_COUNT = 90;
-   /** Seconds of source time represented by one frame. */
-   private static final float FRAME_SECONDS = 30.0F / (float)FRAME_COUNT;
-   /** Share of each interval spent crossfading into the next frame. */
-   private static final float FADE_PORTION = 0.62F;
-   /** Baked frames are JPEG (q82, 4:4:4); PNG is kept as a fallback for hand-replaced art. */
-   private static final String FRAME_PATH_JPEG = "textures/menu/bg_%02d.jpg";
-   private static final String FRAME_PATH_PNG = "textures/menu/bg_%02d.png";
-   /** Blurred twin of each frame, used as the frost source for panels and the figure dissolve. */
-   private static final String FROST_PATH_JPEG = "textures/menu/bgb_%02d.jpg";
-   private static final String FROST_PATH_PNG = "textures/menu/bgb_%02d.png";
+   public static final class BackdropPreset {
+      private final String id;
+      private final String displayName;
+      private final String subtitle;
+      private final String framePattern;
+      private final String frostPattern;
+      private final int frameCount;
+      private final float frameSeconds;
+      private final int swatchTop;
+      private final int swatchBot;
 
+      BackdropPreset(
+         String id,
+         String displayName,
+         String subtitle,
+         String framePattern,
+         String frostPattern,
+         int frameCount,
+         float frameSeconds,
+         int swatchTop,
+         int swatchBot
+      ) {
+         this.id = id;
+         this.displayName = displayName;
+         this.subtitle = subtitle;
+         this.framePattern = framePattern;
+         this.frostPattern = frostPattern;
+         this.frameCount = frameCount;
+         this.frameSeconds = frameSeconds;
+         this.swatchTop = swatchTop;
+         this.swatchBot = swatchBot;
+      }
+
+      public String getId() {
+         return this.id;
+      }
+
+      public String getDisplayName() {
+         return this.displayName;
+      }
+
+      public String getSubtitle() {
+         return this.subtitle;
+      }
+
+      public int getSwatchTop() {
+         return this.swatchTop;
+      }
+
+      public int getSwatchBot() {
+         return this.swatchBot;
+      }
+   }
+
+   public static final String DEFAULT_PRESET_ID = "moon_horizon";
+
+   private static final List<BackdropPreset> PRESETS = Collections.unmodifiableList(Arrays.asList(
+      new BackdropPreset(
+         "moon_horizon",
+         "Earth Horizon",
+         "Custom orbital clip",
+         "textures/menu/bg_%02d.jpg",
+         "textures/menu/bgb_%02d.jpg",
+         90,
+         30.0F / 90.0F,
+         0xFF282458,
+         0xFF0E1020
+      ),
+      new BackdropPreset(
+         "mc_northern",
+         "MC Northern Lights",
+         "Animated MC aurora",
+         "textures/menu/mc_northern/f_%02d.jpg",
+         "textures/menu/mc_northern/b_%02d.jpg",
+         60,
+         16.0F / 60.0F,
+         0xFF059669,
+         0xFF0B1120
+      ),
+      new BackdropPreset(
+         "mc_rainy",
+         "MC Rainy Cabin",
+         "Animated MC rain",
+         "textures/menu/mc_rainy/f_%02d.jpg",
+         "textures/menu/mc_rainy/b_%02d.jpg",
+         60,
+         16.0F / 60.0F,
+         0xFF0284C7,
+         0xFF0F172A
+      ),
+      new BackdropPreset(
+         "mc_overgrown",
+         "MC Overgrown",
+         "Animated MC forest",
+         "textures/menu/mc_overgrown/f_%02d.jpg",
+         "textures/menu/mc_overgrown/b_%02d.jpg",
+         60,
+         16.0F / 60.0F,
+         0xFF15803D,
+         0xFF0B1310
+      ),
+      new BackdropPreset(
+         "mc_fireplace",
+         "MC Cozy Cabin",
+         "Animated MC hearth",
+         "textures/menu/mc_fireplace/f_%02d.jpg",
+         "textures/menu/mc_fireplace/b_%02d.jpg",
+         60,
+         16.0F / 60.0F,
+         0xFFD97706,
+         0xFF271308
+      )
+   ));
+
+   private static final float FADE_PORTION = 0.62F;
+   private static final String FALLBACK_PNG_FRAME = "textures/menu/bg_%02d.png";
+   private static final String FALLBACK_PNG_FROST = "textures/menu/bgb_%02d.png";
+
+   private static final MenuBackdrop SHARED = new MenuBackdrop();
+
+   private BackdropPreset activePreset = PRESETS.get(0);
    private final Slot base = new Slot();
    private final Slot incoming = new Slot();
    private final Slot baseFrost = new Slot();
@@ -50,11 +149,6 @@ public final class MenuBackdrop {
    private float clock;
    private boolean unavailable;
 
-   /*
-    * Geometry of the most recent draw(). Frost callers work in the same GUI coordinates as the screen, so
-    * the backdrop has to hand back where it actually put the frame - including the drift and the zoom - or
-    * the frost would slide against the image it is supposed to be a blur of.
-    */
    private float drawX;
    private float drawY;
    private float drawW;
@@ -64,7 +158,46 @@ public final class MenuBackdrop {
    private int drawStep = -1;
    private boolean drawValid;
 
-   /** True while the baked frames could be loaded; the screen falls back to a plain gradient otherwise. */
+   public static MenuBackdrop getShared() {
+      return SHARED;
+   }
+
+   public static List<BackdropPreset> getPresets() {
+      return PRESETS;
+   }
+
+   public static BackdropPreset findPreset(String id) {
+      if (id != null) {
+         for (BackdropPreset p : PRESETS) {
+            if (p.id.equalsIgnoreCase(id.trim())) {
+               return p;
+            }
+         }
+      }
+      return PRESETS.get(0);
+   }
+
+   public BackdropPreset getActivePreset() {
+      return this.activePreset;
+   }
+
+   public void setPreset(String id) {
+      BackdropPreset target = findPreset(id);
+      if (this.activePreset == target && !this.unavailable) {
+         return;
+      }
+      this.activePreset = target;
+      this.base.index = -1;
+      this.incoming.index = -1;
+      this.baseFrost.index = -1;
+      this.incomingFrost.index = -1;
+      this.unavailable = false;
+      this.drawValid = false;
+      this.drawStep = -1;
+      this.clock = 0.0F;
+   }
+
+   /** True while the baked frames could be loaded; the screen falls back to a plain fill otherwise. */
    public boolean isAvailable() {
       return !this.unavailable;
    }
@@ -74,11 +207,12 @@ public final class MenuBackdrop {
       this.clock = 0.0F;
    }
 
-   /**
-    * Draws the backdrop into the given rectangle in the caller's (logical GUI) coordinates.
-    *
-    * @param opacity global alpha, so the screen can fade the whole backdrop in on entry
-    */
+   /** Clears cached frost geometry when another backdrop renderer (GLSL shader or vanilla) is active. */
+   public void invalidateDraw() {
+      this.drawValid = false;
+   }
+
+   /** Draws the animated backdrop into the given rectangle in logical GUI coordinates. */
    public void draw(float x, float y, float width, float height, float opacity) {
       this.drawValid = false;
       if (this.unavailable || opacity <= 0.003F || width < 4.0F || height < 4.0F) {
@@ -86,19 +220,19 @@ public final class MenuBackdrop {
       }
 
       this.clock += UiAnimation.dt();
-      float timeline = this.clock / FRAME_SECONDS;
+      float timeline = this.clock / this.activePreset.frameSeconds;
       int step = (int)Math.floor((double)timeline);
       float phase = timeline - (float)step;
       float fade = UiAnimation.easeInOutCubic(UiAnimation.clamp01((phase - (1.0F - FADE_PORTION)) / FADE_PORTION));
       this.drawStep = step;
       this.drawFade = fade;
 
-      if (!this.ensure(this.base, frameAt(step), FRAME_PATH_JPEG, FRAME_PATH_PNG)
-         || !this.ensure(this.incoming, frameAt(step + 1), FRAME_PATH_JPEG, FRAME_PATH_PNG)) {
+      String fallbackFrame = DEFAULT_PRESET_ID.equals(this.activePreset.id) ? FALLBACK_PNG_FRAME : null;
+      if (!this.ensure(this.base, frameAt(step, this.activePreset.frameCount), this.activePreset.framePattern, fallbackFrame)
+         || !this.ensure(this.incoming, frameAt(step + 1, this.activePreset.frameCount), this.activePreset.framePattern, fallbackFrame)) {
          return;
       }
 
-      // A very slow zoom and pan: enough parallax to read as motion, never enough to soften the frame.
       float zoom = 1.012F + 0.008F * (float)Math.sin((double)(this.clock * 0.09F));
       float quadW = width * zoom;
       float quadH = height * zoom;
@@ -118,25 +252,36 @@ public final class MenuBackdrop {
       }
    }
 
-   /**
-    * Draws the <em>blurred</em> twin of whatever the backdrop currently shows behind the given rectangle,
-    * clipped to the backdrop itself and crossfaded exactly like the sharp frame, so a caller can frost a
-    * panel with the real backdrop rather than an approximation of it.
-    *
-    * <p>The frost set is only 320x180 and magnified, so the sample is a genuine wide blur; panels stack
-    * their translucent veil on top of it. This is the same picture a live {@code KawaseBlurEngine} capture
-    * would produce, minus the driver hang the capture caused.
-    *
-    * @param alphaTop    alpha at the top edge of the rectangle
-    * @param alphaBottom alpha at the bottom edge; different values give a vertical dissolve
-    */
+   /** Draws an animated miniature preview without altering the main backdrop frost geometry. */
+   public boolean drawPreview(float x, float y, float width, float height) {
+      if (this.unavailable || width < 4.0F || height < 4.0F) {
+         return false;
+      }
+      int step = Math.max(0, this.drawStep);
+      float fade = UiAnimation.clamp01(this.drawFade);
+      if (step == 0 && !this.drawValid) {
+         float timeline = this.clock / this.activePreset.frameSeconds;
+         step = (int)Math.floor((double)timeline);
+         float phase = timeline - (float)step;
+         fade = UiAnimation.easeInOutCubic(UiAnimation.clamp01((phase - (1.0F - FADE_PORTION)) / FADE_PORTION));
+      }
+      String fallbackFrame = DEFAULT_PRESET_ID.equals(this.activePreset.id) ? FALLBACK_PNG_FRAME : null;
+      if (!this.ensure(this.base, frameAt(step, this.activePreset.frameCount), this.activePreset.framePattern, fallbackFrame)
+         || !this.ensure(this.incoming, frameAt(step + 1, this.activePreset.frameCount), this.activePreset.framePattern, fallbackFrame)) {
+         return false;
+      }
+      drawQuad(this.base, x, y, width, height, 1.0F);
+      if (fade > 0.002F) {
+         drawQuad(this.incoming, x, y, width, height, fade);
+      }
+      return true;
+   }
+
    public void drawFrost(float x, float y, float width, float height, float alphaTop, float alphaBottom) {
       if (!this.drawValid || (alphaTop <= 0.003F && alphaBottom <= 0.003F)) {
          return;
       }
 
-      // Clip the request to the drawn quad and shrink the destination with it, so asking for a region near
-      // the edge does not stretch the blur across the whole frame.
       float left = Math.max(x, this.drawX);
       float top = Math.max(y, this.drawY);
       float right = Math.min(x + width, this.drawX + this.drawW);
@@ -156,13 +301,14 @@ public final class MenuBackdrop {
       float quadW = right - left;
       float quadH = bottom - top;
 
-      if (this.ensure(this.baseFrost, frameAt(this.drawStep), FROST_PATH_JPEG, FROST_PATH_PNG)) {
+      String fallbackFrost = DEFAULT_PRESET_ID.equals(this.activePreset.id) ? FALLBACK_PNG_FROST : null;
+      if (this.ensure(this.baseFrost, frameAt(this.drawStep, this.activePreset.frameCount), this.activePreset.frostPattern, fallbackFrost)) {
          drawQuad(this.baseFrost, left, top, quadW, quadH, u0, v0, u1, v1,
             this.drawOpacity * topAlpha, this.drawOpacity * bottomAlpha);
       }
 
       if (this.drawFade > 0.002F
-         && this.ensure(this.incomingFrost, frameAt(this.drawStep + 1), FROST_PATH_JPEG, FROST_PATH_PNG)) {
+         && this.ensure(this.incomingFrost, frameAt(this.drawStep + 1, this.activePreset.frameCount), this.activePreset.frostPattern, fallbackFrost)) {
          float weight = this.drawOpacity * this.drawFade;
          drawQuad(this.incomingFrost, left, top, quadW, quadH, u0, v0, u1, v1,
             weight * topAlpha, weight * bottomAlpha);
@@ -174,19 +320,13 @@ public final class MenuBackdrop {
       this.drawFrost(x, y, width, height, alpha, alpha);
    }
 
-   /**
-    * Frame index for a sequence step, ping-ponged so the loop is seamless: 0..89 then 88..1 and back to
-    * 0. The reversed half costs nothing (the frames are already resident) and removes the jump that
-    * playing 89 straight into 0 would produce.
-    */
-   private static int frameAt(int step) {
-      int period = (FRAME_COUNT - 1) * 2;
+   private static int frameAt(int step, int frameCount) {
+      int period = (frameCount - 1) * 2;
       int wrapped = step % period;
       if (wrapped < 0) {
          wrapped += period;
       }
-
-      return wrapped < FRAME_COUNT ? wrapped : period - wrapped;
+      return wrapped < frameCount ? wrapped : period - wrapped;
    }
 
    private boolean ensure(Slot slot, int index, String jpegPattern, String pngPattern) {
@@ -209,7 +349,6 @@ public final class MenuBackdrop {
 
          image.getRGB(0, 0, slot.width, slot.height, slot.texture.getTextureData(), 0, slot.width);
          slot.texture.updateDynamicTexture();
-         // Bilinear, no mipmaps: the quad is only slightly magnified and mipmapping would soften it.
          slot.texture.setBlurMipmap(true, false);
          slot.index = index;
          return true;
@@ -221,10 +360,9 @@ public final class MenuBackdrop {
 
    private static BufferedImage load(int index, String jpegPattern, String pngPattern) {
       BufferedImage image = loadPath(jpegPattern, index);
-      if (image == null) {
+      if (image == null && pngPattern != null) {
          image = loadPath(pngPattern, index);
       }
-
       return image;
    }
 
@@ -250,11 +388,6 @@ public final class MenuBackdrop {
       drawQuad(slot, x, y, width, height, 0.0F, 0.0F, 1.0F, 1.0F, alpha, alpha);
    }
 
-   /**
-    * One textured quad with a per-vertex alpha pair, so a frost band can ramp into the image instead of
-    * ending on a hard edge. The vertex colours are written per vertex, which is why this needs
-    * {@code POSITION_TEX_COLOR} and a white {@code GlStateManager.color} under it.
-    */
    private static void drawQuad(
       Slot slot, float x, float y, float width, float height, float u0, float v0, float u1, float v1,
       float alphaTop, float alphaBottom) {
@@ -282,7 +415,6 @@ public final class MenuBackdrop {
       GlStateManager.color(1.0F, 1.0F, 1.0F, 1.0F);
    }
 
-   /** One double-buffered frame: the texture it is uploaded into and the index it currently holds. */
    private static final class Slot {
       private DynamicTexture texture;
       private int index = -1;

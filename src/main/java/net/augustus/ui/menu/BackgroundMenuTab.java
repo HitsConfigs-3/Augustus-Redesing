@@ -13,11 +13,13 @@ import net.augustus.ui.modern.render.LucideIcon;
 import net.augustus.ui.modern.render.UiTheme;
 import net.augustus.ui.widgets.ScrollBar;
 import net.augustus.utils.shader.BackgroundShader;
+import net.augustus.utils.shader.BackgroundShaderManager;
 import net.minecraft.client.gui.GuiTextField;
 
 /**
- * Background shader gallery featuring a live miniature preview, search filtering,
- * quick toggles for custom background and mouse input, and a cursor-illuminated glass grid.
+ * Unified Backdrop & Shader gallery featuring live animated preview (for both Minecraft
+ * animated shader clips and built-in Augustus GLSL shaders), category filtering, search,
+ * and quick toggles for Custom BG and Mouse Input.
  */
 public class BackgroundMenuTab extends ClientMenuTab {
    private static final float HERO_H = 88.0F;
@@ -26,8 +28,37 @@ public class BackgroundMenuTab extends ClientMenuTab {
    private static final float ROW_PITCH = CARD_H + ROW_GAP;
    private static final float COL_GAP = 8.0F;
 
+   private static final int FILTER_ALL = 0;
+   private static final int FILTER_ANIMATED = 1;
+   private static final int FILTER_SHADERS = 2;
+
+   private static final class GalleryItem {
+      final MenuBackdrop.BackdropPreset scene;
+      final BackgroundShader shader;
+
+      GalleryItem(MenuBackdrop.BackdropPreset scene) {
+         this.scene = scene;
+         this.shader = null;
+      }
+
+      GalleryItem(BackgroundShader shader) {
+         this.scene = null;
+         this.shader = shader;
+      }
+
+      boolean isScene() {
+         return this.scene != null;
+      }
+
+      String getName() {
+         return this.scene != null ? this.scene.getDisplayName() : (this.shader != null ? this.shader.getName() : "");
+      }
+   }
+
    private final ScrollBar scrollBar;
    private GuiTextField searchField;
+
+   private int filterMode = FILTER_ALL;
 
    private float areaX;
    private float areaTop;
@@ -59,6 +90,11 @@ public class BackgroundMenuTab extends ClientMenuTab {
    private float clearBtnY;
    private float clearBtnSize;
 
+   private final float[] chipX = new float[3];
+   private final float[] chipW = new float[3];
+   private float chipY;
+   private float chipH;
+
    private int lastRowCount = -1;
    private String lastQuery = "";
 
@@ -76,20 +112,34 @@ public class BackgroundMenuTab extends ClientMenuTab {
       return Augustus.getInstance().getBackgroundShaderManager().getSortedShaders();
    }
 
-   private List getFilteredShaders() {
-      List all = this.getAllShaders();
+   private List<GalleryItem> getFilteredItems() {
       String query = this.searchField != null ? this.searchField.getText().trim().toLowerCase(Locale.ROOT) : "";
-      if (query.isEmpty()) {
-         return all;
-      }
-      List filtered = new ArrayList();
-      for (int i = 0; i < all.size(); i++) {
-         BackgroundShader shader = (BackgroundShader)all.get(i);
-         if (shader.getName() != null && shader.getName().toLowerCase(Locale.ROOT).contains(query)) {
-            filtered.add(shader);
+      List<GalleryItem> result = new ArrayList<>();
+
+      if (this.filterMode == FILTER_ALL || this.filterMode == FILTER_ANIMATED) {
+         List<MenuBackdrop.BackdropPreset> scenes = MenuBackdrop.getPresets();
+         for (int i = 0; i < scenes.size(); i++) {
+            MenuBackdrop.BackdropPreset p = scenes.get(i);
+            if (query.isEmpty()
+               || p.getDisplayName().toLowerCase(Locale.ROOT).contains(query)
+               || p.getSubtitle().toLowerCase(Locale.ROOT).contains(query)
+               || "minecraft".contains(query) && p.getId().startsWith("mc_")) {
+               result.add(new GalleryItem(p));
+            }
          }
       }
-      return filtered;
+
+      if (this.filterMode == FILTER_ALL || this.filterMode == FILTER_SHADERS) {
+         List allShaders = this.getAllShaders();
+         for (int i = 0; i < allShaders.size(); i++) {
+            BackgroundShader shader = (BackgroundShader)allShaders.get(i);
+            if (query.isEmpty() || (shader.getName() != null && shader.getName().toLowerCase(Locale.ROOT).contains(query))) {
+               result.add(new GalleryItem(shader));
+            }
+         }
+      }
+
+      return result;
    }
 
    private int columnsForWidth() {
@@ -134,6 +184,17 @@ public class BackgroundMenuTab extends ClientMenuTab {
       this.customToggleY = this.searchY + this.searchH + 8.0F;
       this.mouseToggleX = this.searchX + this.toggleW + 6.0F;
       this.mouseToggleY = this.customToggleY;
+
+      this.chipH = 16.0F;
+      this.chipY = this.gridPanelY + 6.5F;
+      String[] labels = new String[]{"All", "Animated", "GLSL Shaders"};
+      float cursorX = this.gridPanelX + 128.0F;
+      for (int i = 0; i < labels.length; i++) {
+         float w = menuCaptionFont() != null ? menuCaptionFont().getStringWidth(labels[i]) + 14.0F : 46.0F;
+         this.chipX[i] = cursorX;
+         this.chipW[i] = w;
+         cursorX += w + 5.0F;
+      }
    }
 
    private void syncScrollBounds(int filteredCount) {
@@ -164,17 +225,20 @@ public class BackgroundMenuTab extends ClientMenuTab {
       this.searchField.setText(previousText);
 
       this.lastRowCount = -1;
-      this.syncScrollBounds(this.getFilteredShaders().size());
+      this.syncScrollBounds(this.getFilteredItems().size());
    }
 
    @Override
    public void drawContent(int mouseX, int mouseY, float partialTicks) {
       this.layoutGeometry();
+      BackgroundShaderManager bsm = Augustus.getInstance().getBackgroundShaderManager();
       List allShaders = this.getAllShaders();
-      List filteredShaders = this.getFilteredShaders();
-      this.syncScrollBounds(filteredShaders.size());
+      List<GalleryItem> filteredItems = this.getFilteredItems();
+      this.syncScrollBounds(filteredItems.size());
 
-      BackgroundShader currentShader = Augustus.getInstance().getBackgroundShaderManager().getCurrentShader();
+      BackgroundShader currentShader = bsm.getCurrentShader();
+      MenuBackdrop.BackdropPreset activeScene = MenuBackdrop.getShared().getActivePreset();
+      boolean shaderMode = bsm.isShaderBackdropActive();
       boolean customBgEnabled = ClientManagers.moduleManager.clientSettings.customBackground.getValue();
       boolean mouseInputEnabled = ClientManagers.moduleManager.clientSettings.mouseInputsOnBackgrounds.getValue();
 
@@ -186,12 +250,23 @@ public class BackgroundMenuTab extends ClientMenuTab {
       float previewX = this.heroX + 12.0F;
       float previewY = this.heroY + 10.0F;
 
-      GlassRenderer.drawRoundedGradientBox(previewX, previewY, previewW, previewH, 6.0F, 0xFF1A1030, 0xFF0C0716, 0, 0.0F, 0.0F);
-      boolean liveRendered = customBgEnabled && currentShader != null
-         && currentShader.renderInBox(previewX + 2.0F, previewY + 2.0F, previewW - 4.0F, previewH - 4.0F, 6000.0F);
+      GlassRenderer.drawRoundedGradientBox(previewX, previewY, previewW, previewH, 6.0F,
+         UiTheme.menuPillFillTopArgb(), UiTheme.menuPillFillBottomArgb(), 0, 0.0F, 0.0F);
+      boolean liveRendered = false;
+      if (customBgEnabled) {
+         if (shaderMode && currentShader != null) {
+            liveRendered = currentShader.renderInBox(previewX + 2.0F, previewY + 2.0F, previewW - 4.0F, previewH - 4.0F, 6000.0F);
+         } else {
+            liveRendered = MenuBackdrop.getShared().drawPreview(previewX + 2.0F, previewY + 2.0F, previewW - 4.0F, previewH - 4.0F);
+         }
+      }
       if (!liveRendered) {
-         int swatchTop = currentShader != null ? swatchTopForName(currentShader.getName()) : 0xFF4C1D95;
-         int swatchBot = currentShader != null ? swatchBottomForName(currentShader.getName()) : 0xFF1E1B4B;
+         int swatchTop = shaderMode && currentShader != null
+            ? swatchTopForName(currentShader.getName())
+            : activeScene.getSwatchTop();
+         int swatchBot = shaderMode && currentShader != null
+            ? swatchBottomForName(currentShader.getName())
+            : activeScene.getSwatchBot();
          GlassRenderer.drawRoundedGradientBox(previewX + 2.0F, previewY + 2.0F, previewW - 4.0F, previewH - 4.0F, 5.0F,
             UiTheme.withAlpha(swatchTop, 160), UiTheme.withAlpha(swatchBot, 190), 0, 0.0F, 0.0F);
          LucideIcon.PHOTO.drawCentered(previewX + previewW * 0.5F, previewY + previewH * 0.5F - 3.0F, 18.0F, 0xB8E2E8F0);
@@ -202,56 +277,77 @@ public class BackgroundMenuTab extends ClientMenuTab {
          0x00090612, 0xB8090612, 0, 0.0F, 0.0F);
       GlassRenderer.drawRoundedOutline(previewX, previewY, previewW, previewH, 6.0F, 1.0F,
          UiTheme.withAlpha(UiTheme.accentColor(), 135));
-      menuBadge(liveRendered ? "LIVE" : (customBgEnabled ? "FALLBACK" : "OFF"),
+      menuBadge(liveRendered ? (shaderMode ? "SHADER" : "SCENE") : (customBgEnabled ? "FALLBACK" : "OFF"),
          previewX + 6.0F, previewY + previewH - (menuCaptionHeight() + 8.0F),
-         liveRendered ? 0xCC7C3AED : 0x99334155, 0xFFFFFFFF);
+         liveRendered ? UiTheme.withAlpha(UiTheme.accentColor(), 0xCC) : 0x99334155, 0xFFFFFFFF);
 
-      // Middle shader metadata
+      // Middle metadata
       float infoX = previewX + previewW + 14.0F;
       float rightPanelLeft = this.customToggleX - 12.0F;
       float infoW = Math.max(80.0F, rightPanelLeft - infoX);
 
-      menuCaptionFont().drawString("ACTIVE SHADER", infoX, this.heroY + 15.0F, 0xCCA78BFA);
-      String activeName = currentShader != null ? currentShader.getName() : "None";
+      String caption = !customBgEnabled
+         ? "VANILLA BACKGROUND"
+         : (shaderMode ? "ACTIVE GLSL SHADER" : "ACTIVE ANIMATED SCENE");
+      menuCaptionFont().drawString(caption, infoX, this.heroY + 15.0F, UiTheme.withAlpha(UiTheme.accentSoftGlow(), 0xCC));
+      String activeName = !customBgEnabled
+         ? "Off (Vanilla Dirt)"
+         : (shaderMode ? (currentShader != null ? currentShader.getName() : "None") : activeScene.getDisplayName());
       menuTitleFont().drawString(menuFit(menuTitleFont(), activeName, infoW), infoX, this.heroY + 28.0F, 0xFFF8FAFC);
 
-      String subInfo = filteredShaders.size() == allShaders.size()
-         ? allShaders.size() + " GLSL backdrop shaders"
-         : filteredShaders.size() + " of " + allShaders.size() + " shaders shown";
+      int totalCount = MenuBackdrop.getPresets().size() + allShaders.size();
+      String subInfo = filteredItems.size() == totalCount
+         ? MenuBackdrop.getPresets().size() + " animated clips + " + allShaders.size() + " GLSL shaders"
+         : filteredItems.size() + " of " + totalCount + " backdrops shown";
       menuSmallText(menuFit(menuSmallFont(), subInfo, infoW), infoX, this.heroY + 50.0F, TEXT_SUB);
 
-      String modeHint = mouseInputEnabled ? "Interactive mouse parallax ON" : "Standard ambient motion";
+      String modeHint = shaderMode
+         ? (mouseInputEnabled ? "Interactive shader parallax ON" : "Augustus default GLSL shader active")
+         : activeScene.getSubtitle() + " (Synchronized menu frost)";
       menuCaptionFont().drawString(menuFit(menuCaptionFont(), modeHint, infoW), infoX, this.heroY + 65.0F, 0x99CBD5E1);
 
-      // Search icon + placeholder drawn with field
       if (this.searchField != null) {
          if (this.searchField.getText().isEmpty() && !this.searchField.isFocused()) {
-            this.drawFieldPlaceholder("Search shaders...", Math.round(this.searchX) + 14, Math.round(this.searchY),
+            this.drawFieldPlaceholder("Search backdrops...", Math.round(this.searchX) + 14, Math.round(this.searchY),
                Math.round(this.searchH), 0x99A1A1AA, menuBodyFont(), 8.0F);
             LucideIcon.SEARCH.draw(this.searchX + 7.0F, this.searchY + (this.searchH - 11.0F) * 0.5F,
                11.0F, 0x99A1A1AA, false);
          } else {
             LucideIcon.SEARCH.draw(this.searchX + this.searchW - (this.searchField.getText().isEmpty() ? 18.0F : 34.0F),
-               this.searchY + (this.searchH - 11.0F) * 0.5F, 11.0F, 0x80A78BFA, false);
+               this.searchY + (this.searchH - 11.0F) * 0.5F, 11.0F, UiTheme.withAlpha(UiTheme.accentSoftGlow(), 0x80), false);
             if (!this.searchField.getText().isEmpty()) {
                boolean clearHover = menuHovered(this.clearBtnX, this.clearBtnY, this.clearBtnSize, this.clearBtnSize, mouseX, mouseY);
                LucideIcon.CLOSE.drawCentered(this.clearBtnX + this.clearBtnSize * 0.5F, this.clearBtnY + this.clearBtnSize * 0.5F,
-                  10.0F, clearHover ? 0xFFFFFFFF : 0xCCB8B0D0);
+                  10.0F, clearHover ? 0xFFFFFFFF : 0xCCB8C2D4);
             }
          }
       }
 
-      // Quick toggle pills below search bar
       this.drawTogglePill("bg.toggle.custom", "Custom BG", customBgEnabled, this.customToggleX, this.customToggleY, this.toggleW, this.toggleH, mouseX, mouseY);
       this.drawTogglePill("bg.toggle.mouse", "Mouse Input", mouseInputEnabled, this.mouseToggleX, this.mouseToggleY, this.toggleW, this.toggleH, mouseX, mouseY);
 
-      // 2. Bottom Shader Gallery Panel
+      // 2. Bottom Backdrop & Shaders Gallery Panel
       this.menuGlassPanel(this.gridPanelX, this.gridPanelY, this.gridPanelW, this.gridPanelH, 0.0F, 1.0F);
 
       float hdrY = this.gridPanelY + 10.0F;
-      LucideIcon.BOXES.draw(this.gridPanelX + 12.0F, hdrY - 1.0F, 11.5F, 0xCCA78BFA, false);
-      menuSectionLabel("SHADERS GALLERY", this.gridPanelX + 27.0F, hdrY, 1.0F);
-      menuTextRight(filteredShaders.size() + " / " + allShaders.size(), this.gridPanelX + this.gridPanelW - 14.0F, hdrY, TEXT_SUB);
+      LucideIcon.BOXES.draw(this.gridPanelX + 12.0F, hdrY - 1.0F, 11.5F, UiTheme.withAlpha(UiTheme.accentSoftGlow(), 0xCC), false);
+      menuSectionLabel("BACKDROPS & SHADERS", this.gridPanelX + 27.0F, hdrY, 1.0F);
+
+      String[] chipLabels = new String[]{"All", "Animated", "GLSL Shaders"};
+      for (int c = 0; c < chipLabels.length; c++) {
+         boolean selected = this.filterMode == c;
+         boolean hovered = menuHovered(this.chipX[c], this.chipY, this.chipW[c], this.chipH, mouseX, mouseY);
+         float chov = this.menuHover("bg.chip." + c, hovered);
+         this.menuSurface(this.chipX[c], this.chipY, this.chipW[c], this.chipH, 5.0F, chov, selected ? 0.5F : 0.0F, 1.0F);
+         if (selected) {
+            GlassRenderer.drawRoundedOutline(this.chipX[c], this.chipY, this.chipW[c], this.chipH, 5.0F, 1.0F,
+               UiTheme.withAlpha(UiTheme.accentColor(), 200));
+         }
+         menuCaptionFont().drawCenteredStringInBox(chipLabels[c], (double)this.chipX[c], (double)this.chipY,
+            (double)this.chipW[c], (double)this.chipH, selected ? 0xFFFFFFFF : 0xFFCBD5E1);
+      }
+
+      menuTextRight(filteredItems.size() + " / " + totalCount, this.gridPanelX + this.gridPanelW - 14.0F, hdrY, TEXT_SUB);
       GlassRenderer.drawSeparator(this.gridPanelX + 12.0F, this.gridPanelY + 28.0F,
          this.gridPanelX + this.gridPanelW - 12.0F, this.gridPanelY + 28.0F, 1.0F, UiTheme.GLASS_DIVIDER);
 
@@ -260,9 +356,9 @@ public class BackgroundMenuTab extends ClientMenuTab {
       float viewLeft = this.gridPanelX + 12.0F;
       float viewW = Math.max(120.0F, this.gridPanelW - 28.0F);
 
-      if (filteredShaders.isEmpty()) {
+      if (filteredItems.isEmpty()) {
          this.menuEmptyState(viewLeft, viewTop, viewW, viewBottom - viewTop,
-            LucideIcon.SEARCH, "No matching shaders", "Clear the search filter to browse all backdrops.", false);
+            LucideIcon.SEARCH, "No matching backdrops", "Clear the search filter to browse all scenes and shaders.", false);
          return;
       }
 
@@ -277,8 +373,8 @@ public class BackgroundMenuTab extends ClientMenuTab {
          Math.round(viewBottom)
       );
 
-      for (int i = 0; i < filteredShaders.size(); i++) {
-         BackgroundShader shader = (BackgroundShader)filteredShaders.get(i);
+      for (int i = 0; i < filteredItems.size(); i++) {
+         GalleryItem item = filteredItems.get(i);
          int row = i / cols;
          int col = i % cols;
 
@@ -288,10 +384,12 @@ public class BackgroundMenuTab extends ClientMenuTab {
             continue;
          }
 
-         boolean active = currentShader == shader;
+         boolean active = customBgEnabled && (item.isScene()
+            ? (!shaderMode && item.scene.getId().equalsIgnoreCase(activeScene.getId()))
+            : (shaderMode && item.shader == currentShader));
          boolean overCard = mouseX >= viewLeft && mouseX <= viewLeft + viewW && mouseY >= viewTop && mouseY <= viewBottom
             && menuHovered(cardX, cardY, cardW, CARD_H, mouseX, mouseY);
-         float hover = this.menuHover("shader." + shader.getName(), overCard);
+         float hover = this.menuHover((item.isScene() ? "scene." : "shader.") + item.getName(), overCard);
 
          this.menuSurface(cardX, cardY, cardW, CARD_H, 7.0F, hover, active ? 0.55F : 0.0F, 1.0F);
 
@@ -305,29 +403,30 @@ public class BackgroundMenuTab extends ClientMenuTab {
             menuAccentRail(cardX + 2.0F, cardY + 8.0F, CARD_H - 16.0F, 1.0F);
          }
 
-         // Swatch tile
          float swatchSize = 26.0F;
          float swatchX = cardX + 9.0F;
          float swatchY = cardY + (CARD_H - swatchSize) * 0.5F;
-         int swTop = swatchTopForName(shader.getName());
-         int swBot = swatchBottomForName(shader.getName());
+         int swTop = item.isScene() ? item.scene.getSwatchTop() : swatchTopForName(item.getName());
+         int swBot = item.isScene() ? item.scene.getSwatchBot() : swatchBottomForName(item.getName());
          GlassRenderer.drawRoundedGradientBox(swatchX, swatchY, swatchSize, swatchSize, 6.0F, swTop, swBot, 0, 0.0F, 0.0F);
          GlassRenderer.drawRoundedOutline(swatchX, swatchY, swatchSize, swatchSize, 6.0F, 1.0F,
             active ? UiTheme.withAlpha(0xFFFFFFFF, 140) : UiTheme.withAlpha(0xFFFFFFFF, 45));
-         iconForName(shader.getName()).drawCentered(swatchX + swatchSize * 0.5F, swatchY + swatchSize * 0.5F, 13.0F, 0xFFF8FAFC);
+         LucideIcon cardIcon = item.isScene() ? LucideIcon.PLAYER_PLAY : iconForName(item.getName());
+         cardIcon.drawCentered(swatchX + swatchSize * 0.5F, swatchY + swatchSize * 0.5F, 12.5F, 0xFFF8FAFC);
 
-         // Shader title + subtitle
          float textX = swatchX + swatchSize + 9.0F;
          float maxTextW = Math.max(40.0F, cardW - (textX - cardX) - (active ? 26.0F : 10.0F));
-         int titleColor = active ? 0xFFF3E8FF : UiTheme.lerpArgb(0xFFE2E8F0, 0xFFFFFFFF, hover);
-         menuText(menuFit(menuBodyFont(), shader.getName(), maxTextW), textX, cardY + 9.0F, titleColor);
+         int titleColor = active ? UiTheme.lerpArgb(UiTheme.accentColor(), 0xFFFFFFFF, 0.72F) : UiTheme.lerpArgb(0xFFE2E8F0, 0xFFFFFFFF, hover);
+         menuText(menuFit(menuBodyFont(), item.getName(), maxTextW), textX, cardY + 9.0F, titleColor);
 
-         String subLabel = active ? "Active backdrop" : (shader.isCompiled() ? "GLSL shader" : "Shader preset");
+         String subLabel = active
+            ? "Active backdrop"
+            : (item.isScene() ? item.scene.getSubtitle() : (item.shader.isCompiled() ? "Augustus GLSL" : "Shader preset"));
          menuCaptionFont().drawString(menuFit(menuCaptionFont(), subLabel, maxTextW), textX, cardY + 24.0F,
-            active ? 0xFFC4B5FD : 0x9994A3B8);
+            active ? UiTheme.accentSoftGlow() : 0x9994A3B8);
 
          if (active) {
-            LucideIcon.CIRCLE_CHECK.drawCentered(cardX + cardW - 14.0F, cardY + CARD_H * 0.5F, 13.0F, 0xFFA855F7);
+            LucideIcon.CIRCLE_CHECK.drawCentered(cardX + cardW - 14.0F, cardY + CARD_H * 0.5F, 13.0F, UiTheme.accentColor());
          }
       }
 
@@ -347,7 +446,7 @@ public class BackgroundMenuTab extends ClientMenuTab {
 
       float dotX = x + 11.0F;
       float dotY = y + h * 0.5F;
-      int dotColor = enabled ? 0xFFA855F7 : 0x9964748B;
+      int dotColor = enabled ? UiTheme.accentColor() : 0x9964748B;
       if (enabled) {
          GlassRenderer.drawCircle(dotX, dotY, 4.2F, UiTheme.withAlpha(dotColor, 75));
       }
@@ -376,7 +475,7 @@ public class BackgroundMenuTab extends ClientMenuTab {
 
    private static int swatchTopForName(String name) {
       if (name == null) {
-         return 0xFF6D28D9;
+         return UiTheme.accentColor();
       }
       String lower = name.toLowerCase(Locale.ROOT);
       if (lower.contains("red") || lower.contains("fire") || lower.contains("sun") || lower.contains("lava")) {
@@ -391,12 +490,12 @@ public class BackgroundMenuTab extends ClientMenuTab {
       if (lower.contains("gold") || lower.contains("amber") || lower.contains("yellow")) {
          return 0xFFD97706;
       }
-      return 0xFF7C3AED;
+      return UiTheme.accentColor();
    }
 
    private static int swatchBottomForName(String name) {
       if (name == null) {
-         return 0xFF2E1065;
+         return UiTheme.accentDeep();
       }
       String lower = name.toLowerCase(Locale.ROOT);
       if (lower.contains("red") || lower.contains("fire") || lower.contains("sun") || lower.contains("lava")) {
@@ -406,12 +505,12 @@ public class BackgroundMenuTab extends ClientMenuTab {
          return 0xFF064E3B;
       }
       if (lower.contains("blue") || lower.contains("water") || lower.contains("ice") || lower.contains("sky") || lower.contains("polar")) {
-         return 0xFF1E1B4B;
+         return 0xFF0F172A;
       }
       if (lower.contains("gold") || lower.contains("amber") || lower.contains("yellow")) {
          return 0xFF451A03;
       }
-      return 0xFF1E1038;
+      return UiTheme.accentDeep();
    }
 
    @Override
@@ -431,14 +530,26 @@ public class BackgroundMenuTab extends ClientMenuTab {
          if (menuHovered(this.customToggleX, this.customToggleY, this.toggleW, this.toggleH, mouseX, mouseY)) {
             boolean next = !ClientManagers.moduleManager.clientSettings.customBackground.getValue();
             ClientManagers.moduleManager.clientSettings.customBackground.setValue(next);
+            Augustus.getInstance().getConfigManager().saveAllAsync();
             ClientSettings.playButtonClickSound();
             return;
          }
          if (menuHovered(this.mouseToggleX, this.mouseToggleY, this.toggleW, this.toggleH, mouseX, mouseY)) {
             boolean next = !ClientManagers.moduleManager.clientSettings.mouseInputsOnBackgrounds.getValue();
             ClientManagers.moduleManager.clientSettings.mouseInputsOnBackgrounds.setValue(next);
+            Augustus.getInstance().getConfigManager().saveAllAsync();
             ClientSettings.playButtonClickSound();
             return;
+         }
+
+         for (int c = 0; c < 3; c++) {
+            if (menuHovered(this.chipX[c], this.chipY, this.chipW[c], this.chipH, mouseX, mouseY)) {
+               this.filterMode = c;
+               this.lastRowCount = -1;
+               this.scrollBar.scrollOffset = 0.0D;
+               ClientSettings.playButtonClickSound();
+               return;
+            }
          }
 
          float viewTop = this.gridPanelY + 33.0F;
@@ -446,21 +557,28 @@ public class BackgroundMenuTab extends ClientMenuTab {
          float viewLeft = this.gridPanelX + 12.0F;
          float viewW = Math.max(120.0F, this.gridPanelW - 28.0F);
          if (mouseX >= viewLeft && mouseX <= viewLeft + viewW && mouseY >= viewTop && mouseY <= viewBottom) {
-            List filteredShaders = this.getFilteredShaders();
+            List<GalleryItem> filteredItems = this.getFilteredItems();
             int cols = this.columnsForWidth();
             float cardW = (viewW - COL_GAP * (cols - 1)) / (float)cols;
             float scrollOffset = (float)((int)this.scrollBar.getClampedScrollOffset());
-            for (int i = 0; i < filteredShaders.size(); i++) {
+            for (int i = 0; i < filteredItems.size(); i++) {
                int row = i / cols;
                int col = i % cols;
                float cardX = viewLeft + col * (cardW + COL_GAP);
                float cardY = viewTop + scrollOffset + row * ROW_PITCH;
                if (menuHovered(cardX, cardY, cardW, CARD_H, mouseX, mouseY)) {
-                  BackgroundShader shader = (BackgroundShader)filteredShaders.get(i);
-                  Augustus.getInstance().getBackgroundShaderManager().selectShader(shader.getName().toLowerCase(Locale.ROOT));
+                  GalleryItem item = filteredItems.get(i);
+                  BackgroundShaderManager bsm = Augustus.getInstance().getBackgroundShaderManager();
+                  if (item.isScene()) {
+                     bsm.selectAnimatedScene(item.scene.getId());
+                  } else {
+                     bsm.selectShader(item.shader.getName().toLowerCase(Locale.ROOT));
+                     bsm.setBackdropMode(BackgroundShaderManager.MODE_SHADER);
+                  }
                   if (!ClientManagers.moduleManager.clientSettings.customBackground.getValue()) {
                      ClientManagers.moduleManager.clientSettings.customBackground.setValue(true);
                   }
+                  Augustus.getInstance().getConfigManager().saveAllAsync();
                   ClientSettings.playButtonClickSound();
                   break;
                }

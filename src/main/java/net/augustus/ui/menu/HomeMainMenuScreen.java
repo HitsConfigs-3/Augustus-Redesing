@@ -14,6 +14,7 @@ import net.augustus.font.FontManager;
 import net.augustus.ui.modern.font.InterFontUtil;
 import net.augustus.ui.modern.render.GlassRenderer;
 import net.augustus.ui.modern.render.LucideIcon;
+import net.augustus.ui.modern.render.MaskedTexture;
 import net.augustus.ui.modern.render.MenuGlassSurface;
 import net.augustus.ui.modern.render.UiAnimation;
 import net.augustus.ui.modern.render.UiTheme;
@@ -174,14 +175,13 @@ public final class HomeMainMenuScreen extends AbstractMainMenuScreen {
    // this list because they are not neutral - they carry the accent, which is the one decoration a pill is
    // allowed this round.
    private static final int TEXT_HOT = 0xFFFFFFFF;
-   private static final int TEXT_BASE = 0xE6EDE7F4;
-   private static final int TEXT_SUB = 0xB3B7A9C6;
+   private static final int TEXT_BASE = 0xE6F1F5F9;
+   private static final int TEXT_SUB = 0xB3B4BED0;
    private static final int TEXT_STRIP_ICON = 0xF2F2F4FA;
-   private static final int TEXT_CHEVRON = 0x99B9AECB;
+   private static final int TEXT_CHEVRON = 0x99B4BED0;
    private static final int TEXT_FOOT = 0xF2FFFFFF;
-   private static final int TEXT_FOOT_DIM = 0x8CD8CFDC;
-   /** Underlay for the tooltip, whose glass alone is too thin to read over the lit part of the planet. */
-   private static final int TOOLTIP_SCRIM = 0xB8100C1C;
+   private static final int TEXT_FOOT_DIM = 0x8CD6DEE8;
+   private static final MaskedTexture BRAND_MARK = MaskedTexture.of("/assets/augustus/textures/menu/logo_mark.png");
 
    /**
     * Opacity of the frost layer inside a pill: the backdrop's own pre-baked blur, painted at full strength
@@ -224,8 +224,6 @@ public final class HomeMainMenuScreen extends AbstractMainMenuScreen {
     * underneath it. That surviving fifth is what still makes these pills glass rather than paint; the veil
     * is what makes them the ClickGUI's colour rather than the accent's.
     */
-   private static final int PILL_FILL_TOP = 0xFF1A1028;
-   private static final int PILL_FILL_BOTTOM = 0xFF150D20;
    private static final float PILL_VEIL = 0.78F;
 
    /**
@@ -271,7 +269,7 @@ public final class HomeMainMenuScreen extends AbstractMainMenuScreen {
    // State
    // -------------------------------------------------------------------------------------------
 
-   private final MenuBackdrop backdrop = new MenuBackdrop();
+   private final MenuBackdrop backdrop = MenuBackdrop.getShared();
    private final List<Spot> spots = new ArrayList<Spot>();
    private final List<ServerData> servers = new ArrayList<ServerData>();
    private final Map<String, DynamicTexture> serverIcons = new HashMap<String, DynamicTexture>();
@@ -465,9 +463,16 @@ public final class HomeMainMenuScreen extends AbstractMainMenuScreen {
       float width = (float)this.width;
       float height = (float)this.height;
 
-      if (this.backdrop.isAvailable()) {
+      net.augustus.utils.shader.BackgroundShaderManager bsm = Augustus.getInstance().getBackgroundShaderManager();
+      if (bsm != null && !bsm.isCustomBackgroundEnabled()) {
+         this.backdrop.invalidateDraw();
+         this.fillGradient(0.0F, 0.0F, width, height, UiTheme.menuPillFillTopArgb(), 0xFF0A0D16);
+      } else if (bsm != null && bsm.isShaderBackdropActive() && bsm.renderActiveShaderFullscreen()) {
+         this.backdrop.invalidateDraw();
+      } else if (this.backdrop.isAvailable()) {
          this.backdrop.draw(0.0F, 0.0F, width, height, fade);
       } else {
+         this.backdrop.invalidateDraw();
          this.fillGradient(0.0F, 0.0F, width, height, 0xFF22304C, 0xFF0B1020);
       }
 
@@ -522,8 +527,10 @@ public final class HomeMainMenuScreen extends AbstractMainMenuScreen {
    private void drawHero(float alpha) {
       float lift = (1.0F - alpha) * 12.0F;
       float markW = MARK_H * 512.0F / 398.0F;
-      this.drawTexture(logoLocation(), this.X((this.designW - markW) * 0.5F), this.Y(MARK_TOP + lift), this.S(markW),
-            this.S(MARK_H), UiAnimation.clamp01(alpha * 1.1F));
+      float markAlpha = UiAnimation.clamp01(alpha * 1.1F);
+      int markTint = UiTheme.scaleAlpha(0xFFFFFFFF, markAlpha);
+      BRAND_MARK.draw(this.X((this.designW - markW) * 0.5F), this.Y(MARK_TOP + lift), this.S(markW),
+            this.S(MARK_H), UiTheme.accentColor(), markTint, markTint);
 
       this.trackedCentre(FontManager.interBold, this.brandWordmark(), this.designW * 0.5F, WORD_TOP + lift, FS_WORD,
             WORD_TRACK, UiTheme.scaleAlpha(TEXT_FOOT, alpha));
@@ -610,6 +617,8 @@ public final class HomeMainMenuScreen extends AbstractMainMenuScreen {
       this.drawFrostPill(x, y, width, height, radius, a);
 
       int accent = UiTheme.accentColor();
+      int pillFillTop = UiTheme.menuPillFillTopArgb();
+      int pillFillBottom = UiTheme.menuPillFillBottomArgb();
       // The light follows the pointer, but stays inside the pill: on a 117 px capsule a cursor that has
       // already left it, or a caller forwarding the raw mouse position, must still light it from within
       // rather than from beyond its edge.
@@ -618,8 +627,8 @@ public final class HomeMainMenuScreen extends AbstractMainMenuScreen {
       float r = Math.min(radius, Math.min(width, height) * 0.5F);
 
       GlassRenderer.drawRoundedGradientBox(x, y, width, height, r, r, r, r,
-            UiTheme.scaleAlpha(PILL_FILL_TOP, PILL_VEIL * a * (1.0F - 0.06F * p)),
-            UiTheme.scaleAlpha(PILL_FILL_BOTTOM, PILL_VEIL * a * (1.0F - 0.06F * p)),
+            UiTheme.scaleAlpha(pillFillTop, PILL_VEIL * a * (1.0F - 0.06F * p)),
+            UiTheme.scaleAlpha(pillFillBottom, PILL_VEIL * a * (1.0F - 0.06F * p)),
             0,
             UiTheme.BORDER_THICKNESS,
             0.0F,
@@ -630,7 +639,7 @@ public final class HomeMainMenuScreen extends AbstractMainMenuScreen {
             Math.max(width, height) * PILL_LIGHT_RADIUS,
             UiTheme.scaleAlpha(UiTheme.lerpArgb(accent, 0xFFFFFFFF, PILL_LIGHT_LIFT), a));
 
-      int edgeRgb = UiTheme.lerpArgb(accent, PILL_FILL_TOP, PILL_EDGE_MIX);
+      int edgeRgb = UiTheme.lerpArgb(accent, pillFillTop, PILL_EDGE_MIX);
       int edgeAlpha = Math.round(PILL_EDGE_ALPHA + (PILL_EDGE_HOVER_ALPHA - PILL_EDGE_ALPHA) * h);
       GlassRenderer.drawRoundedOutline(x, y, width, height, r, UiTheme.BORDER_THICKNESS,
             UiTheme.scaleAlpha(UiTheme.withAlpha(edgeRgb, edgeAlpha), a));
@@ -653,6 +662,10 @@ public final class HomeMainMenuScreen extends AbstractMainMenuScreen {
     * reaches outside the pill and what is left uncovered is a sub-pixel sliver hugging the arc.
     */
    private void drawFrostPill(float x, float y, float width, float height, float radius, float alpha) {
+      net.augustus.utils.shader.BackgroundShaderManager bsm = Augustus.getInstance().getBackgroundShaderManager();
+      if (bsm == null || !bsm.isAnimatedSceneActive()) {
+         return;
+      }
       float strength = FROST_STRENGTH * UiAnimation.clamp01(alpha);
       if (strength <= 0.004F || width < 1.0F || height < 1.0F) {
          return;
@@ -915,8 +928,9 @@ public final class HomeMainMenuScreen extends AbstractMainMenuScreen {
       float y = FOOTER_TOP;
       float markH = 8.5F;
       float markW = markH * 512.0F / 398.0F;
-      this.drawTexture(logoLocation(), this.X(MARGIN - 1.0F), this.Y(y + 0.6F), this.S(markW), this.S(markH),
-            opacity);
+      int footerMarkTint = UiTheme.scaleAlpha(0xFFFFFFFF, opacity);
+      BRAND_MARK.draw(this.X(MARGIN - 1.0F), this.Y(y + 0.6F), this.S(markW), this.S(markH),
+            UiTheme.accentColor(), footerMarkTint, footerMarkTint);
 
       float textX = MARGIN + markW + 4.0F;
       this.trackedLeft(FontManager.interBold, this.brandWordmark(), textX, y, FS_FOOT, 0.8F,
@@ -968,7 +982,7 @@ public final class HomeMainMenuScreen extends AbstractMainMenuScreen {
       // are frosted for the same reason the pills are - a glass badge over a sharp frame is the one thing
       // this menu's own material never looks like.
       this.drawFrostPill(x, y, boxW, boxH, radius, this.tooltipAlpha);
-      GlassRenderer.drawRoundedRect(x, y, boxW, boxH, radius, UiTheme.scaleAlpha(TOOLTIP_SCRIM, this.tooltipAlpha));
+      GlassRenderer.drawRoundedRect(x, y, boxW, boxH, radius, UiTheme.scaleAlpha(UiTheme.menuTooltipScrimArgb(), this.tooltipAlpha));
       MenuGlassSurface.panel(x, y, boxW, boxH, radius, UiTheme.accentColor(), 0.0F, 0.0F, this.tooltipAlpha);
       this.text(face, label, this.toDesignX(x + padX), this.toDesignY(y + padY), FS_PILL,
             UiTheme.scaleAlpha(TEXT_HOT, this.tooltipAlpha));
@@ -1019,7 +1033,7 @@ public final class HomeMainMenuScreen extends AbstractMainMenuScreen {
       } else if ("language".equals(id)) {
          this.openScreen(new GuiLanguage(this, this.mc.gameSettings, this.mc.getLanguageManager()));
       } else if ("background".equals(id)) {
-         this.openScreen(new ClientTabContainerScreen(this, 2));
+         this.openScreen(new ClientTabContainerScreen(this, Augustus.getInstance().getClientTabManager().indexOf(BackgroundMenuTab.class)));
       } else if ("fullscreen".equals(id)) {
          try {
             this.mc.toggleFullscreen();
@@ -1030,11 +1044,11 @@ public final class HomeMainMenuScreen extends AbstractMainMenuScreen {
       } else if ("quit".equals(id)) {
          this.mc.shutdown();
       } else if ("account".equals(id)) {
-         this.openScreen(new ClientTabContainerScreen(this, 0));
+         this.openScreen(new ClientTabContainerScreen(this, Augustus.getInstance().getClientTabManager().indexOf(net.augustus.ui.account.AccountManagerScreen.class)));
       } else if ("proxies".equals(id)) {
-         this.openScreen(new ClientTabContainerScreen(this, 1));
+         this.openScreen(new ClientTabContainerScreen(this, Augustus.getInstance().getClientTabManager().indexOf(net.augustus.ui.proxy.ProxyManagerScreen.class)));
       } else if ("changelog".equals(id)) {
-         this.openScreen(new ClientTabContainerScreen(this, 3));
+         this.openScreen(new ClientTabContainerScreen(this, Augustus.getInstance().getClientTabManager().indexOf(ChangelogMenuTab.class)));
       } else if ("packs".equals(id)) {
          this.openScreen(new GuiScreenResourcePacks(this));
       } else if ("quickplay".equals(id)) {
