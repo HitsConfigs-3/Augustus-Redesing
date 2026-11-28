@@ -100,6 +100,7 @@ public class Augustus {
       }
 
       initialized = true;
+      net.augustus.utils.file.LegacyConfigMigrator.migrateIfNeeded();
       Setting.notifyListenersOnConfigLoad = true;
       this.yawPitchHelper = new PlayerRotationHandler();
       this.mouseWheelTracker = new MouseWheelTracker();
