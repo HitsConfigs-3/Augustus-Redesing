@@ -162,11 +162,11 @@ public class ChangelogMenuTab extends ClientMenuTab {
 
    private static int dotColorForType(ChangelogEntryType type) {
       if (type == null) {
-         return 0xFFA855F7;
+         return UiTheme.accentColor();
       }
       switch (type) {
          case ADDED:
-            return 0xFFA855F7;
+            return UiTheme.accentColor();
          case IMPROVED:
             return 0xFFFBBF24;
          case FIXED:
@@ -174,7 +174,7 @@ public class ChangelogMenuTab extends ClientMenuTab {
          case REMOVED:
             return 0xFFF87171;
          default:
-            return 0xFFA855F7;
+            return UiTheme.accentColor();
       }
    }
 
@@ -238,7 +238,7 @@ public class ChangelogMenuTab extends ClientMenuTab {
          float secBottom = y + section.totalHeight;
          if (secBottom >= viewTop - 20.0F && y <= viewBottom + 20.0F) {
             // Version header bullet dot + version title + Latest badge
-            int headerDotColor = s == 0 ? 0xFFA855F7 : 0xCC94A3B8;
+            int headerDotColor = s == 0 ? UiTheme.accentColor() : 0xCC94A3B8;
             if (s == 0) {
                GlassRenderer.drawCircle(contentLeft + 3.0F, y + menuHeadingHeight() * 0.52F, 4.5F, UiTheme.withAlpha(headerDotColor, 65));
             }
@@ -250,7 +250,7 @@ public class ChangelogMenuTab extends ClientMenuTab {
             if (s == 0) {
                float badgeX = titleX + menuHeadingFont().getStringWidth(section.versionTitle) + 8.0F;
                float badgeY = y + (menuHeadingHeight() - (menuCaptionHeight() + 5.0F)) * 0.5F;
-               menuBadge("Latest", badgeX, badgeY, 0xCC7C3AED, 0xFFFFFFFF);
+               menuBadge("Latest", badgeX, badgeY, UiTheme.withAlpha(UiTheme.accentColor(), 0xCC), 0xFFFFFFFF);
             }
 
             float entryY = y + headingPitch;

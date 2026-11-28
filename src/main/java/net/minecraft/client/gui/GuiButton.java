@@ -205,7 +205,7 @@ public class GuiButton extends Gui {
          float scaledW = contentW * labelScale;
          float startX = cx - scaledW * 0.5F;
          int iconColor = this.enabled
-            ? (this.primaryAccent ? UiTheme.lerpArgb(accent, 0xFFFFFFFF, 0.45F) : UiTheme.lerpArgb(0xFFB8B0D0, 0xFFF3E8FF, hovT))
+            ? (this.primaryAccent ? UiTheme.lerpArgb(accent, 0xFFFFFFFF, 0.45F) : UiTheme.lerpArgb(0xFFB4BED0, 0xFFF8FAFC, hovT))
             : UiTheme.disabledTextColor();
          float iconY = y + (h - iconSize) * 0.5F + prsT * 0.4F;
          icon.draw(startX, iconY, iconSize, iconColor, false);

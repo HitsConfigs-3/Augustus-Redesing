@@ -45,6 +45,14 @@ public final class MenuScreenSkin {
    public static final int FILL_TOP = 0xFF1A1028;
    /** Menu pill fill, bottom: {@code HomeMainMenuScreen.PILL_FILL_BOTTOM}. */
    public static final int FILL_BOTTOM = 0xFF150D20;
+   /** Dynamic theme-aware pill top fill. */
+   public static int fillTop() {
+      return UiTheme.menuPillFillTopArgb();
+   }
+   /** Dynamic theme-aware pill bottom fill. */
+   public static int fillBottom() {
+      return UiTheme.menuPillFillBottomArgb();
+   }
    /** Veil strength of that fill over the backdrop: {@code HomeMainMenuScreen.PILL_VEIL}. */
    public static final float VEIL = 0.78F;
    /** How far the ring's colour is pulled from the accent towards {@link #FILL_TOP}. */
@@ -68,8 +76,8 @@ public final class MenuScreenSkin {
     */
    public static final int LABEL_COLOR = 0xE6EDE7F4;
 
-   /** One backdrop for every menu screen: the frame set is four textures, and a per-screen instance leaks. */
-   private static final MenuBackdrop BACKDROP = new MenuBackdrop();
+   /** One shared animated backdrop for every menu screen. */
+   private static final MenuBackdrop BACKDROP = MenuBackdrop.getShared();
 
    private MenuScreenSkin() {
    }
@@ -176,12 +184,14 @@ public final class MenuScreenSkin {
       }
 
       float press = 1.0F - PRESS_DARKEN * p;
-      int top = enabled ? UiTheme.scaleAlpha(FILL_TOP, VEIL * press) : UiTheme.glassDisabledFillArgb();
-      int bottom = enabled ? UiTheme.scaleAlpha(FILL_BOTTOM, VEIL * press) : top;
+      int dynamicTop = fillTop();
+      int dynamicBottom = fillBottom();
+      int top = enabled ? UiTheme.scaleAlpha(dynamicTop, VEIL * press) : UiTheme.glassDisabledFillArgb();
+      int bottom = enabled ? UiTheme.scaleAlpha(dynamicBottom, VEIL * press) : top;
 
       float lightX = Math.max(x + width * 0.15F, Math.min(x + width * 0.85F, mouseX));
       float lightY = Math.max(y + height * 0.25F, Math.min(y + height * 0.75F, mouseY));
-      int edgeRgb = UiTheme.lerpArgb(accentArgb, FILL_TOP, EDGE_MIX);
+      int edgeRgb = UiTheme.lerpArgb(accentArgb, dynamicTop, EDGE_MIX);
       int edgeAlpha = Math.round((float)EDGE_ALPHA + (float)(EDGE_HOVER_ALPHA - EDGE_ALPHA) * h);
       int borderArgb = enabled ? UiTheme.withAlpha(edgeRgb, edgeAlpha) : UiTheme.scaleAlpha(UiTheme.GLASS_BORDER, 0.55F);
 
@@ -283,7 +293,7 @@ public final class MenuScreenSkin {
       int top = UiTheme.glassRecessedFillArgb(h * 0.45F, f, accentArgb);
       int bottom = UiTheme.lerpArgb(top, UiTheme.glassRecessedDepthRgb(), 0.25F);
       int resting = UiTheme.scaleAlpha(UiTheme.GLASS_BORDER_STRONG, 0.72F);
-      int hoverRing = UiTheme.withAlpha(UiTheme.lerpArgb(accentArgb, FILL_TOP, 0.42F), 210);
+      int hoverRing = UiTheme.withAlpha(UiTheme.lerpArgb(accentArgb, fillTop(), 0.42F), 210);
       int border = UiTheme.lerpArgb(UiTheme.lerpArgb(resting, hoverRing, h), UiTheme.withAlpha(accentArgb, 255), f);
 
       float lightX = Float.isNaN(mouseX) || mouseX < -9000.0F ? x + width * 0.5F : Math.max(x + 6.0F, Math.min(x + width - 6.0F, mouseX));
@@ -328,15 +338,15 @@ public final class MenuScreenSkin {
          return;
       }
       float r = Math.max(0.0F, Math.min(radius, Math.min(width, height) * 0.5F));
-      GlassRenderer.drawSoftShadow(x, y, width, height, r, 14.0F, 4.0F, 0x52040208);
+      GlassRenderer.drawSoftShadow(x, y, width, height, r, 14.0F, 4.0F, 0x52030408);
       GlassRenderer.drawMenuGlassBox(
          x,
          y,
          width,
          height,
          r,
-         0xBA140D22,
-         0xCC0D0818,
+         UiTheme.menuContainerTopArgb(),
+         UiTheme.menuContainerBottomArgb(),
          UiTheme.GLASS_BORDER_STRONG,
          UiTheme.BORDER_THICKNESS,
          x + width * 0.5F,

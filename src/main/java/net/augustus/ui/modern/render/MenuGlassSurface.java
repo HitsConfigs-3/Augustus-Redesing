@@ -233,7 +233,7 @@ public final class MenuGlassSurface {
     * Alpha of the pale anchor {@link #zoneGlow} blends a caller's accent towards: the same anchor
     * {@link UiTheme#glassBorderFocusedOrHover} mixes into the pill's own hover ring.
     */
-   private static final int ZONE_ACCENT_ANCHOR = 0xFFE2DCFF;
+   private static final int ZONE_ACCENT_ANCHOR = 0xFFF8FAFC;
 
    /**
     * How far {@link #zoneGlow} lifts the caller's accent towards {@link #ZONE_ACCENT_ANCHOR}.

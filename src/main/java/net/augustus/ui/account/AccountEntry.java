@@ -166,7 +166,7 @@ public class AccountEntry implements MC {
       float headX = (float)x + (selected ? 11.0F : 9.0F);
       float headY = (float)y + ((float)height - head) * 0.5F;
       GlassRenderer.drawRoundedBox(headX - 1.0F, headY - 1.0F, head + 2.0F, head + 2.0F, 4.5F,
-            0x660B0814, 0x22FFFFFF, 0.75F);
+            UiTheme.withAlpha(UiTheme.menuPillFillBottomArgb(), 0x66), 0x22FFFFFF, 0.75F);
       ResourceLocation location = (ResourceLocation)MinotarAvatarCache.avatarCache.get(this.username);
       if (location != null) {
          UiIconResources.drawIcon(location, (int)headX, (int)headY, (int)head, (int)head, 1.0);

@@ -98,11 +98,11 @@ public final class UiTheme {
    }
 
    public static int accentDeep() {
-      return lerpArgb(accentColor(), 0xFF28205E, 0.48F);
+      return lerpArgb(accentColor(), 0xFF0B0E17, 0.48F);
    }
 
    public static int accentSoftGlow() {
-      return lerpArgb(accentColor(), 0xFFDAD0FF, 0.36F);
+      return lerpArgb(accentColor(), 0xFFF1F5F9, 0.36F);
    }
 
    /**
@@ -159,7 +159,7 @@ public final class UiTheme {
    }
 
    public static int glassBorderFocusedOrHover(float hoverT, int accent) {
-      return lerpArgb(glassBorderColor(), withAlpha(lerpArgb(accent, 0xFFE2DCFF, 0.20F), 155), UiAnimation.clamp01(hoverT));
+      return lerpArgb(glassBorderColor(), withAlpha(lerpArgb(accent, 0xFFF8FAFC, 0.20F), 155), UiAnimation.clamp01(hoverT));
    }
 
    public static int primaryTextColor() {
@@ -280,13 +280,92 @@ public final class UiTheme {
     * <p>The colour's own alpha is deliberately ignored: strength is the Opacity slider's job
     * ({@link #glassTintMix()}), so the picker's alpha can never silently switch the tint off.</p>
     */
+   private static final int DEFAULT_CLICKGUI_BG_RGB = 0x0E101A;
+
    public static int clientGlassTintRgb() {
-      if (ClientManagers.moduleManager != null
-         && ClientManagers.moduleManager.customClientColor != null
-         && ClientManagers.moduleManager.customClientColor.color2 != null) {
-         return ClientManagers.moduleManager.customClientColor.color2.getColorInt((byte)0) & 0x00FFFFFF;
+      if (ClientManagers.moduleManager != null) {
+         ClickGui clickGui = ClientManagers.moduleManager.clickGui;
+         if (clickGui != null) {
+            if (clickGui.backgroundColor != null) {
+               int bgRgb = clickGui.backgroundColor.getColorInt((byte)0) & 0x00FFFFFF;
+               if (clickGui.backgroundColor.isClientColorEnabled() || bgRgb != DEFAULT_CLICKGUI_BG_RGB) {
+                  return bgRgb;
+               }
+            }
+            if (clickGui.hoverTextColor != null && !clickGui.hoverTextColor.isClientColorEnabled()) {
+               return clickGui.hoverTextColor.getColorInt((byte)0) & 0x00FFFFFF;
+            }
+         }
+         if (ClientManagers.moduleManager.customClientColor != null
+            && ClientManagers.moduleManager.customClientColor.color2 != null) {
+            return ClientManagers.moduleManager.customClientColor.color2.getColorInt((byte)0) & 0x00FFFFFF;
+         }
       }
       return -1;
+   }
+
+   /**
+    * Computes a theme-tinted dark glass surface color at the requested normalized HSB brightness.
+    * Uses the same client/ClickGUI hue resolution as ClickGUI cards so Home/Menus/Buttons track the theme.
+    */
+   public static int menuGlassRgb(float brightness) {
+      float b = Math.max(0.03F, Math.min(0.45F, brightness));
+      int neutral = 0xFF000000 | (Color.HSBtoRGB(0.62F, 0.16F, b) & 0x00FFFFFF);
+      int tinted = applyClientGlassTint(neutral);
+      if (tinted == neutral && ClientManagers.moduleManager == null) {
+         return 0xFF000000 | (Color.HSBtoRGB(0.75F, 0.56F, b) & 0x00FFFFFF);
+      }
+      return tinted;
+   }
+
+   public static int menuPillFillTopArgb() {
+      float darknessFactor = 0.85F + (1.0F - UiAnimation.clamp01(glassDarkness())) * 0.65F;
+      return lerpArgb(menuGlassRgb(Math.min(0.32F, 0.165F * darknessFactor)), accentColor(), 0.08F);
+   }
+
+   public static int menuPillFillBottomArgb() {
+      float darknessFactor = 0.85F + (1.0F - UiAnimation.clamp01(glassDarkness())) * 0.65F;
+      return lerpArgb(menuGlassRgb(Math.min(0.28F, 0.125F * darknessFactor)), accentColor(), 0.05F);
+   }
+
+   public static int menuContainerTopArgb() {
+      float darknessFactor = 0.85F + (1.0F - UiAnimation.clamp01(glassDarkness())) * 0.60F;
+      int alpha = Math.max(120, Math.min(230, Math.round((0.56F + glassOpacity() * 0.24F) * 255.0F)));
+      return withAlpha(lerpArgb(menuGlassRgb(Math.min(0.30F, 0.140F * darknessFactor)), accentColor(), 0.06F), alpha);
+   }
+
+   public static int menuContainerBottomArgb() {
+      float darknessFactor = 0.85F + (1.0F - UiAnimation.clamp01(glassDarkness())) * 0.60F;
+      int alpha = Math.max(135, Math.min(242, Math.round((0.64F + glassOpacity() * 0.24F) * 255.0F)));
+      return withAlpha(lerpArgb(menuGlassRgb(Math.min(0.24F, 0.098F * darknessFactor)), accentColor(), 0.04F), alpha);
+   }
+
+   public static int menuScrimTopArgb() {
+      return withAlpha(menuGlassRgb(0.06F), 0x48);
+   }
+
+   public static int menuScrimBottomArgb() {
+      return withAlpha(menuGlassRgb(0.04F), 0x7A);
+   }
+
+   public static int menuTooltipScrimArgb() {
+      return withAlpha(menuGlassRgb(0.11F), 0xB8);
+   }
+
+   public static int menuTextBaseArgb() {
+      return 0xE6F1F5F9;
+   }
+
+   public static int menuTextSubArgb() {
+      return withAlpha(lerpArgb(0xFFB4BED0, accentSoftGlow(), 0.22F), 0xB8);
+   }
+
+   public static int menuTextDimArgb() {
+      return withAlpha(lerpArgb(0xFFD6DEE8, accentSoftGlow(), 0.15F), 0x8C);
+   }
+
+   public static int menuAccentMutedArgb() {
+      return lerpArgb(accentColor(), 0xFFFFFFFF, 0.42F);
    }
 
    /**

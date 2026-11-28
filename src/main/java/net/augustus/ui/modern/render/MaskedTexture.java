@@ -105,10 +105,22 @@ public final class MaskedTexture {
    }
 
    private void upload(int accentArgb) {
+      int normalizedAccent = (accentArgb & 0x00FFFFFF) == 0 ? AUTHORED_ACCENT : (0xFF000000 | (accentArgb & 0x00FFFFFF));
+      if (normalizedAccent == AUTHORED_ACCENT) {
+         BufferedImage original = new BufferedImage(this.artworkWidth, this.artworkHeight, BufferedImage.TYPE_INT_ARGB);
+         original.setRGB(0, 0, this.artworkWidth, this.artworkHeight, this.artworkRgb, 0, this.artworkWidth);
+         this.textureId = BufferedImageTextureUtil.uploadTexture(original);
+         this.tintedAccent = accentArgb;
+         return;
+      }
+
+      float[] authoredHsb = java.awt.Color.RGBtoHSB(AUTHORED_ACCENT >> 16 & 255, AUTHORED_ACCENT >> 8 & 255, AUTHORED_ACCENT & 255, null);
+      float[] targetHsb = java.awt.Color.RGBtoHSB(normalizedAccent >> 16 & 255, normalizedAccent >> 8 & 255, normalizedAccent & 255, null);
+      float satFactor = authoredHsb[1] > 0.01F ? (targetHsb[1] / authoredHsb[1]) : 1.0F;
+      float briFactor = 0.35F + 0.65F * (targetHsb[2] / Math.max(0.25F, authoredHsb[2]));
+
       int[] pixels = new int[this.artworkRgb.length];
-      float fr = (float)(accentArgb >> 16 & 255) / (float)(AUTHORED_ACCENT >> 16 & 255);
-      float fg = (float)(accentArgb >> 8 & 255) / (float)(AUTHORED_ACCENT >> 8 & 255);
-      float fb = (float)(accentArgb & 255) / (float)(AUTHORED_ACCENT & 255);
+      float[] pixHsb = new float[3];
       for (int i = 0; i < this.artworkRgb.length; ++i) {
          int argb = this.artworkRgb[i];
          int alpha = argb >>> 24;
@@ -116,21 +128,22 @@ public final class MaskedTexture {
             pixels[i] = 0;
             continue;
          }
-         int r = scaleChannel(argb >> 16 & 255, fr);
-         int g = scaleChannel(argb >> 8 & 255, fg);
-         int b = scaleChannel(argb & 255, fb);
-         pixels[i] = alpha << 24 | r << 16 | g << 8 | b;
+         int pr = argb >> 16 & 255;
+         int pg = argb >> 8 & 255;
+         int pb = argb & 255;
+         java.awt.Color.RGBtoHSB(pr, pg, pb, pixHsb);
+         float newSat = targetHsb[1] < 0.06F
+            ? Math.min(pixHsb[1], targetHsb[1])
+            : Math.max(0.0F, Math.min(1.0F, pixHsb[1] * satFactor));
+         float newBri = Math.max(0.0F, Math.min(1.0F, pixHsb[2] * briFactor));
+         int rgb = java.awt.Color.HSBtoRGB(targetHsb[0], newSat, newBri) & 0x00FFFFFF;
+         pixels[i] = (alpha << 24) | rgb;
       }
 
       BufferedImage tinted = new BufferedImage(this.artworkWidth, this.artworkHeight, BufferedImage.TYPE_INT_ARGB);
       tinted.setRGB(0, 0, this.artworkWidth, this.artworkHeight, pixels, 0, this.artworkWidth);
       this.textureId = BufferedImageTextureUtil.uploadTexture(tinted);
       this.tintedAccent = accentArgb;
-   }
-
-   private static int scaleChannel(int value, float factor) {
-      int scaled = Math.round((float)value * factor);
-      return scaled < 0 ? 0 : (scaled > 255 ? 255 : scaled);
    }
 
    /**

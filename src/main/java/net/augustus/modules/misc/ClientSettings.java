@@ -194,13 +194,13 @@ public class ClientSettings extends Module implements TickListener, PacketListen
 
          net.augustus.ui.modern.render.MenuScreenSkin.drawGlassContainer(pillX, pillY, pillW, pillH, 6.0F);
          int accDot = premium ? 0xFF4ADE80 : 0xFFF87171;
-         int prxDot = proxy != null ? 0xFFA855F7 : 0xCC94A3B8;
+         int prxDot = proxy != null ? net.augustus.ui.modern.render.UiTheme.accentColor() : 0xCC94A3B8;
 
          net.augustus.ui.modern.render.LucideIcon.USER.draw(pillX + 7.0F, pillY + 4.5F, 8.5F, accDot, false);
          font.drawStringWithShadow(accName, (double)(pillX + 19.0F), (double)(pillY + 4.0F), 0xFFF8FAFC);
 
          net.augustus.ui.modern.render.LucideIcon.SHIELD.draw(pillX + 7.0F, pillY + 14.5F, 8.5F, prxDot, false);
-         font.drawStringWithShadow(proxyLabel, (double)(pillX + 19.0F), (double)(pillY + 14.0F), proxy != null ? 0xFFE2E8F0 : 0xCCB8B0D0);
+         font.drawStringWithShadow(proxyLabel, (double)(pillX + 19.0F), (double)(pillY + 14.0F), proxy != null ? 0xFFE2E8F0 : 0xCCB8C2D4);
       }
    }
 

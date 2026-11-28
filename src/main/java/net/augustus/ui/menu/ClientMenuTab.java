@@ -30,7 +30,7 @@ public abstract class ClientMenuTab extends AugustusGuiScreen {
    private static final int FROST_ARC_STEPS = 6;
 
    public static final int TEXT_BASE = MenuScreenSkin.LABEL_COLOR;
-   public static final int TEXT_SUB = 0xB8B7A9C8;
+   public static final int TEXT_SUB = 0xB8B8C2D4;
    public static final int CONTAINER_TOP = 0xFF140D22;
    public static final int CONTAINER_BOTTOM = 0xFF0E0919;
 
@@ -99,19 +99,25 @@ public abstract class ClientMenuTab extends AugustusGuiScreen {
       float r = cardRadius(width, height);
       GlassRenderer.drawSoftShadow(
          x, y, width, height, r, 10.0F, 3.0F,
-         UiTheme.scaleAlpha(0x4504020A, a)
+         UiTheme.scaleAlpha(0x45030408, a)
       );
       this.menuFrost(x, y, width, height, r, a);
 
       int accent = UiTheme.accentColor();
-      int topFill = UiTheme.lerpArgb(CONTAINER_TOP, accent, 0.06F);
-      int botFill = UiTheme.lerpArgb(CONTAINER_BOTTOM, UiTheme.accentDeep(), 0.05F);
+      int topFill = UiTheme.lerpArgb(UiTheme.menuContainerTopArgb(), accent, 0.06F);
+      int botFill = UiTheme.lerpArgb(UiTheme.menuContainerBottomArgb(), UiTheme.accentDeep(), 0.05F);
       int restBorder = UiTheme.lerpArgb(0x28FFFFFF, accent, 0.24F);
-      int hovBorder = UiTheme.withAlpha(UiTheme.lerpArgb(accent, 0xFFE2DCFF, 0.22F), 210);
+      int hovBorder = UiTheme.withAlpha(UiTheme.lerpArgb(accent, 0xFFF8FAFC, 0.22F), 210);
       int border = UiTheme.lerpArgb(restBorder, hovBorder, h);
 
       float lightX = Math.max(x + 12.0F, Math.min(x + width - 12.0F, TabbedMenuScreen.mouseX()));
       float lightY = Math.max(y + 12.0F, Math.min(y + height - 12.0F, TabbedMenuScreen.mouseY()));
+
+      boolean shaderBg = net.augustus.Augustus.getInstance() != null
+         && net.augustus.Augustus.getInstance().getBackgroundShaderManager() != null
+         && net.augustus.Augustus.getInstance().getBackgroundShaderManager().isShaderBackdropActive();
+      float topAlphaScale = shaderBg ? 0.56F : 0.72F;
+      float botAlphaScale = shaderBg ? 0.64F : 0.78F;
 
       GlassRenderer.drawMenuGlassBox(
          x,
@@ -119,8 +125,8 @@ public abstract class ClientMenuTab extends AugustusGuiScreen {
          width,
          height,
          r,
-         UiTheme.scaleAlpha(topFill, 0.72F * a),
-         UiTheme.scaleAlpha(botFill, 0.78F * a),
+         UiTheme.scaleAlpha(topFill, topAlphaScale * a),
+         UiTheme.scaleAlpha(botFill, botAlphaScale * a),
          UiTheme.scaleAlpha(border, a),
          UiTheme.BORDER_THICKNESS,
          lightX,
@@ -164,7 +170,9 @@ public abstract class ClientMenuTab extends AugustusGuiScreen {
       float lightX = Math.max(x + width * 0.12F, Math.min(x + width * 0.88F, TabbedMenuScreen.mouseX()));
       float lightY = Math.max(y + height * 0.20F, Math.min(y + height * 0.80F, TabbedMenuScreen.mouseY()));
 
-      int edgeRgb = UiTheme.lerpArgb(accent, PILL_FILL_TOP, PILL_EDGE_MIX);
+      int pillTop = UiTheme.menuPillFillTopArgb();
+      int pillBot = UiTheme.menuPillFillBottomArgb();
+      int edgeRgb = UiTheme.lerpArgb(accent, pillTop, PILL_EDGE_MIX);
       int edgeAlpha = Math.round(PILL_EDGE_ALPHA + (PILL_EDGE_HOVER_ALPHA - PILL_EDGE_ALPHA) * h);
 
       GlassRenderer.drawMenuGlassBox(
@@ -173,8 +181,8 @@ public abstract class ClientMenuTab extends AugustusGuiScreen {
          width,
          height,
          r,
-         UiTheme.scaleAlpha(PILL_FILL_TOP, PILL_VEIL * a * (1.0F - PILL_PRESS_DARKEN * p)),
-         UiTheme.scaleAlpha(PILL_FILL_BOTTOM, PILL_VEIL * a * (1.0F - PILL_PRESS_DARKEN * p)),
+         UiTheme.scaleAlpha(pillTop, PILL_VEIL * a * (1.0F - PILL_PRESS_DARKEN * p)),
+         UiTheme.scaleAlpha(pillBot, PILL_VEIL * a * (1.0F - PILL_PRESS_DARKEN * p)),
          UiTheme.scaleAlpha(UiTheme.withAlpha(edgeRgb, edgeAlpha), a),
          UiTheme.BORDER_THICKNESS,
          lightX,
@@ -186,6 +194,11 @@ public abstract class ClientMenuTab extends AugustusGuiScreen {
    }
 
    protected void menuFrost(float x, float y, float width, float height, float radius, float alpha) {
+      if (net.augustus.Augustus.getInstance() == null
+         || net.augustus.Augustus.getInstance().getBackgroundShaderManager() == null
+         || !net.augustus.Augustus.getInstance().getBackgroundShaderManager().isAnimatedSceneActive()) {
+         return;
+      }
       MenuBackdrop backdrop = TabbedMenuScreen.backdrop();
       float strength = FROST_STRENGTH * UiAnimation.clamp01(alpha);
       if (backdrop == null || strength <= 0.004F || width < 2.0F || height < 2.0F) {

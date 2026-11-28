@@ -108,21 +108,23 @@ public class GlassMenuButton extends GuiButton {
       drawBackdropFrost(x, y, w, h, r);
 
       float press = 1.0F - MenuScreenSkin.PRESS_DARKEN * this.pressAnim;
-      int baseTop = MenuScreenSkin.FILL_TOP;
-      int baseBot = MenuScreenSkin.FILL_BOTTOM;
+      int pillTop = MenuScreenSkin.fillTop();
+      int pillBot = MenuScreenSkin.fillBottom();
+      int baseTop = pillTop;
+      int baseBot = pillBot;
       if (this.variant == Variant.PRIMARY) {
-         baseTop = UiTheme.lerpArgb(MenuScreenSkin.FILL_TOP, accent, 0.22F + 0.14F * this.hoverAnim);
-         baseBot = UiTheme.lerpArgb(MenuScreenSkin.FILL_BOTTOM, UiTheme.accentDeep(), 0.26F + 0.12F * this.hoverAnim);
+         baseTop = UiTheme.lerpArgb(pillTop, accent, 0.22F + 0.14F * this.hoverAnim);
+         baseBot = UiTheme.lerpArgb(pillBot, UiTheme.accentDeep(), 0.26F + 0.12F * this.hoverAnim);
       } else if (this.variant == Variant.DANGER && this.hoverAnim > 0.02F) {
-         baseTop = UiTheme.lerpArgb(MenuScreenSkin.FILL_TOP, UiTheme.DANGER_ACCENT, 0.18F * this.hoverAnim);
-         baseBot = UiTheme.lerpArgb(MenuScreenSkin.FILL_BOTTOM, 0xFF280B12, 0.22F * this.hoverAnim);
+         baseTop = UiTheme.lerpArgb(pillTop, UiTheme.DANGER_ACCENT, 0.18F * this.hoverAnim);
+         baseBot = UiTheme.lerpArgb(pillBot, 0xFF280B12, 0.22F * this.hoverAnim);
       }
 
       int topFill = this.enabled ? UiTheme.scaleAlpha(baseTop, MenuScreenSkin.VEIL * press) : UiTheme.glassDisabledFillArgb();
       int botFill = this.enabled ? UiTheme.scaleAlpha(baseBot, MenuScreenSkin.VEIL * press) : topFill;
       int edgeRgb = this.variant == Variant.PRIMARY
-         ? UiTheme.lerpArgb(accent, 0xFFE2DCFF, 0.25F * this.hoverAnim)
-         : UiTheme.lerpArgb(effAccent, MenuScreenSkin.FILL_TOP, this.variant == Variant.DANGER ? 0.52F : MenuScreenSkin.EDGE_MIX);
+         ? UiTheme.lerpArgb(accent, 0xFFF8FAFC, 0.25F * this.hoverAnim)
+         : UiTheme.lerpArgb(effAccent, pillTop, this.variant == Variant.DANGER ? 0.52F : MenuScreenSkin.EDGE_MIX);
       int edgeAlpha = this.variant == Variant.PRIMARY
          ? Math.round(185.0F + 70.0F * this.hoverAnim)
          : Math.round((float)MenuScreenSkin.EDGE_ALPHA + (float)(MenuScreenSkin.EDGE_HOVER_ALPHA - MenuScreenSkin.EDGE_ALPHA) * this.hoverAnim);
@@ -216,7 +218,7 @@ public class GlassMenuButton extends GuiButton {
 
       if (hasRight) {
          float chevSize = Math.min(10.0F, h * 0.42F);
-         this.rightIcon.drawCentered(x + w - 9.0F, centerY, chevSize, UiTheme.scaleAlpha(0xFFC4B5FD, 0.85F + 0.15F * this.hoverAnim), false);
+         this.rightIcon.drawCentered(x + w - 9.0F, centerY, chevSize, UiTheme.scaleAlpha(UiTheme.accentSoftGlow(), 0.85F + 0.15F * this.hoverAnim), false);
       } else if (hasDot) {
          int dotColor = this.toggleState.booleanValue() ? 0xFF4ADE80 : 0xFFF87171;
          GlassRenderer.drawCircle(x + w - 9.5F, centerY, 2.5F, dotColor);
@@ -224,6 +226,11 @@ public class GlassMenuButton extends GuiButton {
    }
 
    private static void drawBackdropFrost(float x, float y, float width, float height, float radius) {
+      if (net.augustus.Augustus.getInstance() == null
+         || net.augustus.Augustus.getInstance().getBackgroundShaderManager() == null
+         || !net.augustus.Augustus.getInstance().getBackgroundShaderManager().isAnimatedSceneActive()) {
+         return;
+      }
       MenuBackdrop backdrop = TabbedMenuScreen.backdrop();
       if (backdrop == null || !backdrop.isAvailable() || width < 2.0F || height < 2.0F) {
          return;

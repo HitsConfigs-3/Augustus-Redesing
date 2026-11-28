@@ -147,7 +147,7 @@ public abstract class ResourcePackListEntry implements GuiListExtended.IGuiListE
       List wrappedDesc = FontManager.uiWrap(descFace, str, availW);
       for (int i = 0; i < 2 && i < wrappedDesc.size(); i++) {
          String line = FontManager.uiFit(descFace, (String)wrappedDesc.get(i), availW);
-         VanillaScreenText.drawSmallString(line, textX, (float)n3 + 15.5F + 9.5F * (float)i, 0xFFB8B0D0);
+         VanillaScreenText.drawSmallString(line, textX, (float)n3 + 15.5F + 9.5F * (float)i, 0xFFB8C2D4);
       }
    }
 

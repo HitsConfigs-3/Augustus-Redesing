@@ -335,10 +335,11 @@ public class GuiSelectWorld extends GuiScreen implements GuiYesNoCallback {
          float badgeX = rowX + 10.0F;
          float badgeY = rowY + (rowH - badgeSize) * 0.5F;
          GlassRenderer.drawRoundedGradientBox(badgeX, badgeY, badgeSize, badgeSize, 5.5F,
-            selected ? 0xFF6D28D9 : 0xFF281D3D, selected ? 0xFF3B0764 : 0xFF171026, 0, 0.0F, 0.0F);
+            selected ? UiTheme.accentColor() : UiTheme.menuPillFillTopArgb(),
+            selected ? UiTheme.accentDeep() : UiTheme.menuPillFillBottomArgb(), 0, 0.0F, 0.0F);
          GlassRenderer.drawRoundedOutline(badgeX, badgeY, badgeSize, badgeSize, 5.5F, 1.0F,
             selected ? UiTheme.withAlpha(UiTheme.accentColor(), 200) : UiTheme.GLASS_BORDER);
-         LucideIcon.GLOBE.drawCentered(badgeX + badgeSize * 0.5F, badgeY + badgeSize * 0.5F, 13.0F, selected ? 0xFFF8FAFC : 0xCCA78BFA);
+         LucideIcon.GLOBE.drawCentered(badgeX + badgeSize * 0.5F, badgeY + badgeSize * 0.5F, 13.0F, selected ? 0xFFF8FAFC : UiTheme.withAlpha(UiTheme.accentSoftGlow(), 0xCC));
 
          float textX = badgeX + badgeSize + 10.0F;
          float maxTextW = Math.max(40.0F, rowW - (textX - rowX) - 12.0F);
@@ -349,8 +350,8 @@ public class GuiSelectWorld extends GuiScreen implements GuiYesNoCallback {
          String fitMeta = FontManager.uiFit(smallFace, fileName, maxTextW);
          String fitMode = FontManager.uiFit(smallFace, modeLine, maxTextW);
 
-         VanillaScreenText.drawString(fitName, Math.round(textX), Math.round(rowY + 4.0F), selected ? 0xFFF3E8FF : 16777215);
-         VanillaScreenText.drawSmallString(fitMeta, textX, rowY + 15.5F, 0xFFB8B0D0);
+         VanillaScreenText.drawString(fitName, Math.round(textX), Math.round(rowY + 4.0F), selected ? 0xFFF8FAFC : 16777215);
+         VanillaScreenText.drawSmallString(fitMeta, textX, rowY + 15.5F, 0xFFB4BED0);
          VanillaScreenText.drawSmallString(fitMode, textX, rowY + 25.0F, 0xCC94A3B8);
 
          if (selected) {

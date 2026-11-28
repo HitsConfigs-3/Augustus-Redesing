@@ -39,7 +39,7 @@ public class ServerListEntryLanScan implements GuiListExtended.IGuiListEntry {
             str = "o o O";
       }
 
-      VanillaScreenText.drawSmallCenteredString(str, (float)this.mc.currentScreen.width * 0.5F, (float)(centerY + 2), 0xCCB8B0D0);
+      VanillaScreenText.drawSmallCenteredString(str, (float)this.mc.currentScreen.width * 0.5F, (float)(centerY + 2), 0xCCB8C2D4);
    }
 
    @Override

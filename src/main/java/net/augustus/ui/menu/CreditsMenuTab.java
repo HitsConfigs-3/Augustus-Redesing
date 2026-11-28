@@ -181,7 +181,7 @@ public class CreditsMenuTab extends ClientMenuTab {
       float cursorY = y + OUTER_PAD;
       float textW = w - OUTER_PAD * 2.0F;
 
-      LucideIcon.USERS.draw(padX, cursorY + 1.0F, 12.0F, 0xCCA78BFA, false);
+      LucideIcon.USERS.draw(padX, cursorY + 1.0F, 12.0F, UiTheme.withAlpha(UiTheme.accentSoftGlow(), 0xCC), false);
       menuHeading(menuFit(menuHeadingFont(), section.getSectionTitle(), textW - 18.0F), padX + 17.0F, cursorY, 0xFFF8FAFC);
       cursorY += menuHeadingHeight() + 6.0F;
 
@@ -202,7 +202,7 @@ public class CreditsMenuTab extends ClientMenuTab {
          GlassRenderer.drawSeparator(padX, cursorY, x + w - OUTER_PAD, cursorY, 1.0F, UiTheme.withAlpha(UiTheme.accentColor(), 50));
          cursorY += 6.0F;
 
-         menuCaptionFont().drawString("LINKS", padX, cursorY, 0xFFA78BFA);
+         menuCaptionFont().drawString("LINKS", padX, cursorY, UiTheme.accentSoftGlow());
          cursorY += line;
 
          for (int l = 0; l < links.size(); l++) {

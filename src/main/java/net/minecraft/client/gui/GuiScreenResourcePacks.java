@@ -91,7 +91,7 @@ public class GuiScreenResourcePacks extends GuiScreen {
       VanillaScreenText.drawHeader(this.width, I18n.format("resourcePack.title", new Object[0]), LucideIcon.BOXES, 15);
       int colW = Math.min(242, Math.max(186, (this.width - 56) / 2));
       int hintCenterX = this.width / 2 - 10 - colW / 2;
-      VanillaScreenText.drawSmallCenteredString(I18n.format("resourcePack.folderInfo", new Object[0]), (float)hintCenterX, (float)(this.height - 22), 0xCCB8B0D0);
+      VanillaScreenText.drawSmallCenteredString(I18n.format("resourcePack.folderInfo", new Object[0]), (float)hintCenterX, (float)(this.height - 22), 0xCCB8C2D4);
       super.drawScreen(mouseX, mouseY, partialTicks);
    }
 

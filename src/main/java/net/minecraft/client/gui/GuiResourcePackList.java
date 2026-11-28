@@ -46,7 +46,7 @@ public abstract class GuiResourcePackList extends GuiListExtended {
    public void drawListHeader(int n, int n2, Tessellator tessellator) {
       float headerY = (float)Math.min(this.top + 5, n2 + 2);
       LucideIcon icon = this instanceof GuiResourcePackSelected ? LucideIcon.CIRCLE_CHECK : LucideIcon.LIST;
-      int iconColor = this instanceof GuiResourcePackSelected ? 0xFFA855F7 : 0xCCA78BFA;
+      int iconColor = this instanceof GuiResourcePackSelected ? UiTheme.accentColor() : UiTheme.withAlpha(UiTheme.accentSoftGlow(), 0xCC);
       String title = this.getListHeader();
       float textW = (float)VanillaScreenText.getStringWidth(title);
       float totalW = 11.0F + 5.0F + textW;

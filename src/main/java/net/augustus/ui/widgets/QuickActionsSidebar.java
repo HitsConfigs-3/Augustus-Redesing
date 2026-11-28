@@ -173,7 +173,7 @@ public final class QuickActionsSidebar implements MC {
             pillHovered ? 1.0F : 0.0F, 0.0F, true,
             (float)n, (float)n2, UiTheme.accentColor()
          );
-         LucideIcon.ARROW_LEFT.drawCentered(pillX + pillW * 0.5F, pillY + pillH * 0.5F, 10.5F, pillHovered ? 0xFFF8FAFC : 0xCCA78BFA);
+         LucideIcon.ARROW_LEFT.drawCentered(pillX + pillW * 0.5F, pillY + pillH * 0.5F, 10.5F, pillHovered ? 0xFFF8FAFC : UiTheme.withAlpha(UiTheme.accentSoftGlow(), 0xCC));
       } else {
          int n4 = sr.getScaledWidth() - n3;
          MenuScreenSkin.drawGlassContainer((float)(n3 - 4), 6.0F, (float)(n4), (float)(sr.getScaledHeight() - 12), 8.0F);
