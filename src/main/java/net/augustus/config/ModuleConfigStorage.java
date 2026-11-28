@@ -53,6 +53,32 @@ public class ModuleConfigStorage extends JsonConfigFile {
       return bytes != null && bytes.length >= 4 && bytes[0] == (byte)0xAE && bytes[1] == (byte)0x53;
    }
 
+   public static byte[] encryptConfigBytes(byte[] plaintext) {
+      if (plaintext == null) {
+         return new byte[0];
+      }
+      byte[] encrypted = CONFIG_CIPHER.encryptPkcs7(plaintext, 0, plaintext.length);
+      byte[] out = new byte[ENCRYPTED_MAGIC_HEADER.length + encrypted.length];
+      System.arraycopy(ENCRYPTED_MAGIC_HEADER, 0, out, 0, ENCRYPTED_MAGIC_HEADER.length);
+      System.arraycopy(encrypted, 0, out, ENCRYPTED_MAGIC_HEADER.length, encrypted.length);
+      return out;
+   }
+
+   public static byte[] decryptConfigRawBytes(byte[] bytes) {
+      if (bytes == null || bytes.length == 0) {
+         return new byte[0];
+      }
+      if (hasEncryptedHeader(bytes)) {
+         int payloadLen = bytes.length - ENCRYPTED_MAGIC_HEADER.length;
+         try {
+            return CONFIG_CIPHER.decryptPkcs7(bytes, ENCRYPTED_MAGIC_HEADER.length, payloadLen);
+         } catch (Exception ignored) {
+            return CONFIG_CIPHER.decryptRawBlocks(bytes, ENCRYPTED_MAGIC_HEADER.length, payloadLen);
+         }
+      }
+      return bytes;
+   }
+
    public static String decryptConfigBytes(byte[] bytes) {
       ConfigLoadReport silent = new ConfigLoadReport("<bytes>", null);
       String text = decryptWithDiagnostics(bytes, silent);
