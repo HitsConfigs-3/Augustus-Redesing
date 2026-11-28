@@ -108,6 +108,11 @@ public class GuiNewChat extends Gui {
       this.printChatMessageWithOptionalDeletion(component, 0);
    }
 
+   public synchronized void printIrcChatMessage(IChatComponent component) {
+      this.setChatLine(component, 0, this.mc.ingameGUI.getUpdateCounter(), false, true);
+      logger.info("[AUGUSTUS-IRC] " + component.getUnformattedText());
+   }
+
    public int getLineCount() {
       return this.getChatHeight() / 9;
    }
@@ -181,6 +186,10 @@ public class GuiNewChat extends Gui {
    }
 
    private void setChatLine(IChatComponent component, int n, int n2, boolean flag) {
+      this.setChatLine(component, n, n2, flag, false);
+   }
+
+   private void setChatLine(IChatComponent component, int n, int n2, boolean flag, boolean ircMessage) {
       if (n != 0) {
          this.deleteChatLine(n);
       }
@@ -194,7 +203,7 @@ public class GuiNewChat extends Gui {
             this.scroll(1);
          }
 
-         this.drawnChatLines.add(0, new ChatLine(n2, component2, n));
+         this.drawnChatLines.add(0, new ChatLine(n2, component2, n, ircMessage));
       }
 
       if (!ClientManagers.moduleManager.chat.isToggled() || !ClientManagers.moduleManager.chat.noChatLimit.getValue()) {
@@ -203,7 +212,7 @@ public class GuiNewChat extends Gui {
          }
 
          if (!flag) {
-            this.chatLines.add(0, new ChatLine(n2, component, n));
+            this.chatLines.add(0, new ChatLine(n2, component, n, ircMessage));
 
             while (this.chatLines.size() > 100) {
                this.chatLines.remove(this.chatLines.size() - 1);
@@ -256,11 +265,9 @@ public class GuiNewChat extends Gui {
                ChatLine chatLine = (ChatLine)this.drawnChatLines.get(i + this.scrollPos);
                if (chatLine != null) {
                   n7++;
-                  if (ClientManagers.moduleManager.antiStrike.shouldHideChat()) {
-                     if (!chatLine.getChatComponent().getUnformattedText().startsWith("§6[§9" + Augustus.getInstance().getName() + "§6] ")) {
-                        n7--;
-                        continue;
-                     }
+                  if (this.shouldFilterLine(chatLine)) {
+                     n7--;
+                     continue;
                   }
 
                   int n8 = n - chatLine.getUpdatedCounter();
@@ -326,11 +333,9 @@ public class GuiNewChat extends Gui {
          ChatLine chatLine = (ChatLine)this.drawnChatLines.get(i + this.scrollPos);
          if (chatLine != null) {
             n5++;
-            if (ClientManagers.moduleManager.antiStrike.shouldHideChat()) {
-               if (!chatLine.getChatComponent().getUnformattedText().startsWith("§6[§9" + Augustus.getInstance().getName() + "§6] ")) {
-                  n5--;
-                  continue;
-               }
+            if (this.shouldFilterLine(chatLine)) {
+               n5--;
+               continue;
             }
 
             int n9 = n - chatLine.getUpdatedCounter();
@@ -366,6 +371,23 @@ public class GuiNewChat extends Gui {
       if (n6 != 0) {
          RenderUtil.drawRect(b, n7, n6, n8, n4);
       }
+   }
+
+   private boolean shouldFilterLine(ChatLine chatLine) {
+      if (ClientManagers.moduleManager.antiStrike.shouldHideChat()) {
+         if (!chatLine.getChatComponent().getUnformattedText().startsWith("§6[§9" + Augustus.getInstance().getName() + "§6] ") && !chatLine.isIrcMessage()) {
+            return true;
+         }
+      }
+      if (net.augustus.irc.IrcManager.getInstance().getConfig().isExclusiveChatMode()) {
+         if (!chatLine.isIrcMessage()) {
+            String unformatted = chatLine.getChatComponent().getUnformattedText();
+            if (!unformatted.startsWith("§6[§9IRC§6]") && !unformatted.startsWith("§6[§9" + Augustus.getInstance().getName() + "§6] ")) {
+               return true;
+            }
+         }
+      }
+      return false;
    }
 
 }

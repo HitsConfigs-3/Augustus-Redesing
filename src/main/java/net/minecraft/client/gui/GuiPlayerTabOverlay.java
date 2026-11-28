@@ -320,7 +320,19 @@ public class GuiPlayerTabOverlay extends Gui {
          }
       }
 
-      return str + (ClientManagers.moduleManager.murdererFinder.isMurderer(networkPlayerInfo.getGameProfile().getName()) ? " §7[§4Murderer§7]§9" : "");
+      String result = str + (ClientManagers.moduleManager.murdererFinder.isMurderer(networkPlayerInfo.getGameProfile().getName()) ? " §7[§4Murderer§7]§9" : "");
+      net.augustus.irc.IrcManager irc = net.augustus.irc.IrcManager.getInstance();
+      if (irc.getConfig().isShowTabBadges()) {
+         String gameNick = networkPlayerInfo.getGameProfile().getName();
+         String uuid = networkPlayerInfo.getGameProfile().getId() != null ? networkPlayerInfo.getGameProfile().getId().toString() : "";
+         net.augustus.irc.IrcUserRecord ircUser = irc.resolveUserByNameOrUuid(gameNick, uuid);
+         if (ircUser != null) {
+            String lvlCol = net.augustus.irc.ClientLevelSystem.minecraftColorCode(ircUser.getLevel());
+            String origHint = ircUser.usesDifferentServerNick() ? " §8(§d" + ircUser.getDisplayOriginalNick() + "§8)" : "";
+            result = "§5§lA §8[" + lvlCol + "Lv." + ircUser.getLevel() + "§8] §r" + result + origHint;
+         }
+      }
+      return result;
    }
 
    public void resetFooterHeader() {

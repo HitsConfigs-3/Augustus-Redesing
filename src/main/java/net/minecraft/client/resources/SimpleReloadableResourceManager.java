@@ -40,6 +40,7 @@ public class SimpleReloadableResourceManager implements IReloadableResourceManag
    private void notifyReloadListeners() {
       for (IResourceManagerReloadListener listener : (Iterable<IResourceManagerReloadListener>)(this.reloadListeners)) {
          listener.onResourceManagerReload(this);
+         net.augustus.ui.StartupSplashRenderer.pulse(0.06F, 0.24F);
       }
    }
 

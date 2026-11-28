@@ -77,6 +77,10 @@ public class GuiChat extends GuiScreen {
 
    @Override
    public void mouseClicked(int mouseX, int mouseY, int mouseButton) throws IOException {
+      if (mouseButton == 0 && this.handleIrcBarClick(mouseX, mouseY)) {
+         return;
+      }
+
       if (mouseButton == 0) {
          if (this.handleComponentClick(this.mc.ingameGUI.getChatGUI().getChatComponent(Mouse.getX(), Mouse.getY()))) {
             return;
@@ -149,6 +153,7 @@ public class GuiChat extends GuiScreen {
       Keyboard.enableRepeatEvents(true);
       this.sentHistoryCursor = this.mc.ingameGUI.getChatGUI().getSentMessages().size();
       this.inputField = new GuiTextField(0, this.fontRendererObj, 4, this.height - 12, this.width - 4, 12);
+      this.inputField.setUseMinecraftFont(true);
       this.inputField.setMaxStringLength(100);
       this.inputField.setEnableBackgroundDrawing(false);
       this.inputField.setFocused(true);
@@ -172,15 +177,128 @@ public class GuiChat extends GuiScreen {
 
    @Override
    public void drawScreen(int mouseX, int mouseY, float partialTicks) {
+      net.augustus.irc.IrcManager irc = net.augustus.irc.IrcManager.getInstance();
+      boolean ircEnabled = irc.getConfig().isIrcEnabled();
+      boolean exclusiveIrc = ircEnabled && irc.getConfig().isExclusiveChatMode();
+
       drawRect(2, this.height - 14, this.width - 2, this.height - 2, -2147483648);
+      if (exclusiveIrc) {
+         int accent = net.augustus.ui.modern.render.UiTheme.accentColor();
+         net.augustus.ui.modern.render.GlassRenderer.drawRoundedOutline(
+            2.0F, (float)(this.height - 14), (float)(this.width - 4), 12.0F, 3.0F, 1.0F,
+            net.augustus.ui.modern.render.UiTheme.withAlpha(accent, 210)
+         );
+      }
+
       Chat chat = Augustus.getInstance().getModuleManager().chat;
       this.inputField.drawTextBoxWithShadowOption(!chat.isToggled() || chat.fontShadow.getValue());
+      if (exclusiveIrc && this.inputField.getText().isEmpty()) {
+         String hint = "Escribe en el chat exclusivo de Augustus IRC...";
+         this.fontRendererObj.drawStringWithShadow(hint, 6.0F, (float)(this.height - 12), 0x88CBD5E1);
+      }
+
+      if (ircEnabled) {
+         this.drawIrcChatModeBar(mouseX, mouseY, exclusiveIrc);
+      }
+
       IChatComponent chatComponent = this.mc.ingameGUI.getChatGUI().getChatComponent(Mouse.getX(), Mouse.getY());
       if (chatComponent != null && chatComponent.getChatStyle().getChatHoverEvent() != null) {
          this.handleComponentHover(chatComponent, mouseX, mouseY);
       }
 
       super.drawScreen(mouseX, mouseY, partialTicks);
+   }
+
+   private void drawIrcChatModeBar(int mouseX, int mouseY, boolean exclusiveIrc) {
+      net.augustus.irc.IrcManager irc = net.augustus.irc.IrcManager.getInstance();
+      net.augustus.ui.modern.font.InterFontUtil face = net.augustus.font.FontManager.uiSmall();
+      int accent = net.augustus.ui.modern.render.UiTheme.accentColor();
+      float barY = (float)(this.height - 31);
+      float barH = 14.0F;
+
+      String globalLabel = "Global";
+      float globalW = (face != null ? face.getStringWidth(globalLabel) : (float)this.fontRendererObj.getStringWidth(globalLabel)) + 14.0F;
+      float globalX = 2.0F;
+      drawChatModePill(globalX, barY, globalW, barH, globalLabel, !exclusiveIrc, mouseX, mouseY, accent, face, this.fontRendererObj);
+
+      String ircLabel = "Augustus IRC (" + irc.getOnlineUserCount() + ")";
+      float ircW = (face != null ? face.getStringWidth(ircLabel) : (float)this.fontRendererObj.getStringWidth(ircLabel)) + 16.0F;
+      float ircX = globalX + globalW + 4.0F;
+      drawChatModePill(ircX, barY, ircW, barH, ircLabel, exclusiveIrc, mouseX, mouseY, accent, face, this.fontRendererObj);
+
+      if (exclusiveIrc) {
+         java.util.List<net.augustus.irc.IrcUserRecord> users = irc.getOnlineUsersSorted();
+         StringBuilder namesOnly = new StringBuilder();
+         for (int i = 0; i < users.size(); i++) {
+            if (i > 0) {
+               namesOnly.append("  ·  ");
+            }
+            namesOnly.append(users.get(i).getDisplayOriginalNick());
+         }
+         String listStr = namesOnly.toString();
+         float listX = ircX + ircW + 6.0F;
+         float maxListW = (float)(this.width - 4) - listX;
+         if (maxListW > 48.0F && !listStr.isEmpty()) {
+            String trimmed = face != null
+               ? net.augustus.font.FontManager.uiFit(face, listStr, maxListW - 14.0F)
+               : this.fontRendererObj.trimStringToWidth(listStr, (int)(maxListW - 14.0F));
+            float pillW = (face != null ? face.getStringWidth(trimmed) : (float)this.fontRendererObj.getStringWidth(trimmed)) + 14.0F;
+            net.augustus.ui.modern.render.GlassRenderer.drawRoundedBox(
+               listX, barY, Math.min(maxListW, pillW), barH, 4.0F, 0xB80E1019,
+               net.augustus.ui.modern.render.UiTheme.withAlpha(accent, 110), 0.75F
+            );
+            if (face != null) {
+               face.drawStringWithShadow(trimmed, (double)(listX + 7.0F), (double)(barY + (barH - face.getFontHeight()) * 0.5F), 0xFFE2E8F0);
+            } else {
+               this.fontRendererObj.drawStringWithShadow(trimmed, listX + 7.0F, barY + 3.0F, 0xFFE2E8F0);
+            }
+         }
+      }
+   }
+
+   private static void drawChatModePill(
+      float x, float y, float w, float h, String text, boolean active, int mouseX, int mouseY,
+      int accent, net.augustus.ui.modern.font.InterFontUtil face, FontRenderer fallbackFont
+   ) {
+      boolean hovered = (float)mouseX >= x && (float)mouseX <= x + w && (float)mouseY >= y && (float)mouseY <= y + h;
+      int fill = active
+         ? net.augustus.ui.modern.render.UiTheme.lerpArgb(0xD6121521, accent, 0.28F)
+         : (hovered ? 0xCC181B2A : 0xB80E1019);
+      int border = active
+         ? net.augustus.ui.modern.render.UiTheme.withAlpha(accent, 235)
+         : (hovered ? 0x66FFFFFF : 0x33FFFFFF);
+      net.augustus.ui.modern.render.GlassRenderer.drawRoundedBox(x, y, w, h, 4.0F, fill, border, 0.9F);
+      int textColor = active ? 0xFFFFFFFF : 0xFFB8C2D4;
+      if (face != null) {
+         face.drawCenteredStringInBox(text, (double)x, (double)y, (double)w, (double)h, textColor);
+      } else {
+         fallbackFont.drawStringWithShadow(text, x + (w - fallbackFont.getStringWidth(text)) * 0.5F, y + 3.0F, textColor);
+      }
+   }
+
+   private boolean handleIrcBarClick(int mouseX, int mouseY) {
+      net.augustus.irc.IrcManager irc = net.augustus.irc.IrcManager.getInstance();
+      if (!irc.getConfig().isIrcEnabled()) {
+         return false;
+      }
+      net.augustus.ui.modern.font.InterFontUtil face = net.augustus.font.FontManager.uiSmall();
+      float barY = (float)(this.height - 31);
+      float barH = 14.0F;
+      float globalW = (face != null ? face.getStringWidth("Global") : (float)this.fontRendererObj.getStringWidth("Global")) + 14.0F;
+      float globalX = 2.0F;
+      if ((float)mouseX >= globalX && (float)mouseX <= globalX + globalW && (float)mouseY >= barY && (float)mouseY <= barY + barH) {
+         irc.getConfig().setExclusiveChatMode(false);
+         return true;
+      }
+
+      String ircLabel = "Augustus IRC (" + irc.getOnlineUserCount() + ")";
+      float ircW = (face != null ? face.getStringWidth(ircLabel) : (float)this.fontRendererObj.getStringWidth(ircLabel)) + 16.0F;
+      float ircX = globalX + globalW + 4.0F;
+      if ((float)mouseX >= ircX && (float)mouseX <= ircX + ircW && (float)mouseY >= barY && (float)mouseY <= barY + barH) {
+         irc.getConfig().setExclusiveChatMode(true);
+         return true;
+      }
+      return false;
    }
 
    @Override
@@ -250,7 +368,20 @@ public class GuiChat extends GuiScreen {
       } else if (keyCode == 28 || keyCode == 156) {
          String str = this.inputField.getText().trim();
          if (str.length() > 0) {
-            this.sendChatMessage(str);
+            net.augustus.irc.IrcManager irc = net.augustus.irc.IrcManager.getInstance();
+            String prefix = Augustus.getInstance().getModuleManager().clientSettings.commandPrefixes.getSelectedValue();
+            if (irc.getConfig().isIrcEnabled() && irc.getConfig().isExclusiveChatMode() && !str.startsWith(prefix)) {
+               this.mc.ingameGUI.getChatGUI().addToSentMessages(str);
+               irc.sendIrcChat(str);
+            } else if (irc.getConfig().isIrcEnabled() && str.startsWith("#") && !"#".equals(prefix)) {
+               this.mc.ingameGUI.getChatGUI().addToSentMessages(str);
+               String body = str.substring(1).trim();
+               if (!body.isEmpty()) {
+                  irc.sendIrcChat(body);
+               }
+            } else {
+               this.sendChatMessage(str);
+            }
          }
 
          GuiScreen screen2 = (GuiScreen)null;

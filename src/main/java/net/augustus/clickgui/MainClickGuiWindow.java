@@ -3524,9 +3524,11 @@ public class MainClickGuiWindow extends ClickGuiWindow {
          ClickGuiListener.postClickGuiRender();
          return;
       }
-      // Search box click. Same rect the field is drawn at -- it used to be hit-tested against a stale
-      // 220x28 box at y 13, so the bottom third of the visible field did not focus on click.
-      int actionsRight = capsuleX - 14;
+      // Search box click. The search bar is drawn relative to HEADER_TRAILING_PADDING (not the wider
+      // CONTENT_TRAILING_PADDING), so the hit-test must use the same geometry or the clear button
+      // and trailing region are unreachable.
+      int headerCapsuleX = width - Math.round(HEADER_TRAILING_PADDING) - 117;
+      int actionsRight = headerCapsuleX - 14;
       int searchW = Math.min(250, Math.max(150, actionsRight - (this.railColumnW() + 300)));
       int searchX = actionsRight - searchW;
       if (!this.viewingModuleSettings && this.activeSidebarTab != SidebarTab.CONFIGS && searchX >= this.layoutOffsetX() + 210

@@ -82,6 +82,7 @@ import net.augustus.modules.misc.FakeGamemode;
 import net.augustus.modules.misc.Fixes;
 import net.augustus.modules.misc.FlagDetector;
 import net.augustus.modules.misc.FlyDebug;
+import net.augustus.modules.misc.IRC;
 import net.augustus.modules.misc.MidClick;
 import net.augustus.modules.misc.MurdererFinder;
 import net.augustus.modules.misc.NoDiscordRPC;
@@ -489,6 +490,7 @@ public class ModuleManager {
    public final MurdererFinder murdererFinder;
    public final RotationHandler rotationHandler;
    public final ClientSettings clientSettings;
+   public final IRC irc;
    public final RotationRecorder rotationRecorder;
    public final CombatRotationTracker combatRotationTracker;
    public final RotationRenderer rotationRenderer;
@@ -743,6 +745,7 @@ public class ModuleManager {
       this.murdererFinder = new MurdererFinder();
       this.rotationHandler = new RotationHandler();
       this.clientSettings = new ClientSettings();
+      this.irc = new IRC();
       this.rotationRecorder = new RotationRecorder();
       this.combatRotationTracker = new CombatRotationTracker();
       this.rotationRenderer = new RotationRenderer();

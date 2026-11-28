@@ -43,7 +43,41 @@ import org.lwjgl.opengl.GL11;
 
 public abstract class Render implements IEntityRenderer {
    private static final ResourceLocation shadowTextures = new ResourceLocation("textures/misc/shadow.png");
+   private static final net.augustus.ui.modern.render.MaskedTexture AUGUSTUS_NAMETAG_MARK_PREMIUM = net.augustus.ui.modern.render.MaskedTexture.of("/assets/augustus/textures/menu/logo_mark.png");
+   private static final net.augustus.ui.modern.render.MaskedTexture AUGUSTUS_NAMETAG_MARK_FREE = net.augustus.ui.modern.render.MaskedTexture.of("/assets/augustus/textures/menu/logo_mark.png");
    public final RenderManager renderManager;
+
+   public static float getAugustusNameTagLogoWidth(Entity entity, boolean isPlayerLabel, float logoHeight) {
+      if (!isPlayerLabel || !(entity instanceof EntityPlayer)) {
+         return 0.0F;
+      }
+      net.augustus.irc.IrcManager irc = net.augustus.irc.IrcManager.getInstance();
+      if (!irc.getConfig().isIrcEnabled() || !irc.getConfig().isShowLogoOnNametags()) {
+         return 0.0F;
+      }
+      if (irc.resolveUserForPlayer((EntityPlayer)entity) == null) {
+         return 0.0F;
+      }
+      if (!AUGUSTUS_NAMETAG_MARK_PREMIUM.isReady()) {
+         return 0.0F;
+      }
+      float aspect = AUGUSTUS_NAMETAG_MARK_PREMIUM.getAspect() > 0.0F ? AUGUSTUS_NAMETAG_MARK_PREMIUM.getAspect() : 0.91F;
+      return logoHeight * aspect + 2.5F;
+   }
+
+   public static void drawAugustusNameTagLogo(Entity entity, float x, float y, float logoHeight, int colorArgb) {
+      net.augustus.irc.IrcUserRecord ircUser = entity instanceof EntityPlayer
+         ? net.augustus.irc.IrcManager.getInstance().resolveUserForPlayer((EntityPlayer)entity)
+         : null;
+      boolean isPremium = ircUser != null && ircUser.isPremiumLinked();
+      net.augustus.ui.modern.render.MaskedTexture mark = isPremium ? AUGUSTUS_NAMETAG_MARK_PREMIUM : AUGUSTUS_NAMETAG_MARK_FREE;
+      if (!mark.isReady()) {
+         return;
+      }
+      float aspect = mark.getAspect() > 0.0F ? mark.getAspect() : 0.91F;
+      int tint = isPremium ? 0xFF8B5CF6 : 0xFFFFFFFF;
+      mark.drawQuadPreserveDepth(x, y, logoHeight * aspect, logoHeight, tint, colorArgb);
+   }
    public float shadowSize;
    public float shadowOpaque = 1.0F;
    private Class entityClass = null;
@@ -127,17 +161,18 @@ public abstract class Render implements IEntityRenderer {
             b = -10;
          }
 
-         int n2 = fontRenderer.getStringWidth(str) / 2;
+         float logoReserve = getAugustusNameTagLogoWidth(entity, flag, 8.5F);
+         float halfW = ((float)fontRenderer.getStringWidth(str) + logoReserve) / 2.0F;
          GlStateManager.disableTexture2D();
          if (n == 1
             && (
                shaderRenderPass == ShaderRenderPass.BLUR || shaderRenderPass == ShaderRenderPass.SHADOW && !ClientManagers.moduleManager.nameTags.shadowFont.getValue() || !ClientManagers.moduleManager.nameTags.transparent.getValue()
             )) {
             worldRenderer.begin(7, DefaultVertexFormats.POSITION_COLOR);
-            worldRenderer.pos((double)(-n2 - 1), (double)(-1 + b), 0.0).color(0.0F, 0.0F, 0.0F, 0.5F).endVertex();
-            worldRenderer.pos((double)(-n2 - 1), 8.5 + (double)b, 0.0).color(0.0F, 0.0F, 0.0F, 0.5F).endVertex();
-            worldRenderer.pos((double)(n2 + 1), 8.5 + (double)b, 0.0).color(0.0F, 0.0F, 0.0F, 0.5F).endVertex();
-            worldRenderer.pos((double)(n2 + 1), (double)(-1 + b), 0.0).color(0.0F, 0.0F, 0.0F, 0.5F).endVertex();
+            worldRenderer.pos((double)(-halfW - 1.0F), (double)(-1 + b), 0.0).color(0.0F, 0.0F, 0.0F, 0.5F).endVertex();
+            worldRenderer.pos((double)(-halfW - 1.0F), 8.5 + (double)b, 0.0).color(0.0F, 0.0F, 0.0F, 0.5F).endVertex();
+            worldRenderer.pos((double)(halfW + 1.0F), 8.5 + (double)b, 0.0).color(0.0F, 0.0F, 0.0F, 0.5F).endVertex();
+            worldRenderer.pos((double)(halfW + 1.0F), (double)(-1 + b), 0.0).color(0.0F, 0.0F, 0.0F, 0.5F).endVertex();
             instance.draw();
          }
 
@@ -146,20 +181,23 @@ public abstract class Render implements IEntityRenderer {
             && ClientManagers.moduleManager.nameTags.outline.getValue()) {
             GL11.glLineWidth(1.0E-4F);
             worldRenderer.begin(1, DefaultVertexFormats.POSITION_COLOR);
-            worldRenderer.pos((double)(-n2 - 1), (double)(-1 + b), 0.0).color(0.0F, 0.0F, 0.0F, 1.0F).endVertex();
-            worldRenderer.pos((double)(n2 + 1), (double)(-1 + b), 0.0).color(0.0F, 0.0F, 0.0F, 1.0F).endVertex();
-            worldRenderer.pos((double)(-n2 - 1), 8.5 + (double)b, 0.0).color(0.0F, 0.0F, 0.0F, 1.0F).endVertex();
-            worldRenderer.pos((double)(n2 + 1), 8.5 + (double)b, 0.0).color(0.0F, 0.0F, 0.0F, 1.0F).endVertex();
-            worldRenderer.pos((double)(-n2 - 1), (double)(-1 + b), 0.0).color(0.0F, 0.0F, 0.0F, 1.0F).endVertex();
-            worldRenderer.pos((double)(-n2 - 1), 8.5 + (double)b, 0.0).color(0.0F, 0.0F, 0.0F, 1.0F).endVertex();
-            worldRenderer.pos((double)(n2 + 1), (double)(-1 + b), 0.0).color(0.0F, 0.0F, 0.0F, 1.0F).endVertex();
-            worldRenderer.pos((double)(n2 + 1), 8.5 + (double)b, 0.0).color(0.0F, 0.0F, 0.0F, 1.0F).endVertex();
+            worldRenderer.pos((double)(-halfW - 1.0F), (double)(-1 + b), 0.0).color(0.0F, 0.0F, 0.0F, 1.0F).endVertex();
+            worldRenderer.pos((double)(halfW + 1.0F), (double)(-1 + b), 0.0).color(0.0F, 0.0F, 0.0F, 1.0F).endVertex();
+            worldRenderer.pos((double)(-halfW - 1.0F), 8.5 + (double)b, 0.0).color(0.0F, 0.0F, 0.0F, 1.0F).endVertex();
+            worldRenderer.pos((double)(halfW + 1.0F), 8.5 + (double)b, 0.0).color(0.0F, 0.0F, 0.0F, 1.0F).endVertex();
+            worldRenderer.pos((double)(-halfW - 1.0F), (double)(-1 + b), 0.0).color(0.0F, 0.0F, 0.0F, 1.0F).endVertex();
+            worldRenderer.pos((double)(-halfW - 1.0F), 8.5 + (double)b, 0.0).color(0.0F, 0.0F, 0.0F, 1.0F).endVertex();
+            worldRenderer.pos((double)(halfW + 1.0F), (double)(-1 + b), 0.0).color(0.0F, 0.0F, 0.0F, 1.0F).endVertex();
+            worldRenderer.pos((double)(halfW + 1.0F), 8.5 + (double)b, 0.0).color(0.0F, 0.0F, 0.0F, 1.0F).endVertex();
             instance.draw();
          }
 
          GlStateManager.enableTexture2D();
          if (n == 2) {
-            fontRenderer.drawString(str, (float)(-fontRenderer.getStringWidth(str)) / 2.0F, (float)b, ClientManagers.moduleManager.nameTags.throughWalls.getValue() ? -1 : 553648127, false);
+            if (logoReserve > 0.0F) {
+               drawAugustusNameTagLogo(entity, -halfW, (float)b - 0.5F, 8.5F, ClientManagers.moduleManager.nameTags.throughWalls.getValue() ? -1 : 0x55FFFFFF);
+            }
+            fontRenderer.drawString(str, -halfW + logoReserve, (float)b, ClientManagers.moduleManager.nameTags.throughWalls.getValue() ? -1 : 553648127, false);
             if (flag) {
                this.renderNameTagInfo(entity);
             }
@@ -181,7 +219,10 @@ public abstract class Render implements IEntityRenderer {
          GlStateManager.enableDepth();
          GlStateManager.depthMask(true);
          if (n == 2) {
-            fontRenderer.drawString(str, (float)(-fontRenderer.getStringWidth(str)) / 2.0F, (float)b, -1, false);
+            if (logoReserve > 0.0F) {
+               drawAugustusNameTagLogo(entity, -halfW, (float)b - 0.5F, 8.5F, -1);
+            }
+            fontRenderer.drawString(str, -halfW + logoReserve, (float)b, -1, false);
             if (flag) {
                this.renderNameTagInfo(entity);
             }
@@ -310,8 +351,10 @@ public abstract class Render implements IEntityRenderer {
             b = -10;
          }
 
-         float f2 = renderer.getStringWidthFloat(str) / 2.0F;
          float fontHeight = renderer.getFontHeight();
+         float logoH = Math.max(8.0F, fontHeight - 1.0F);
+         float logoReserve = getAugustusNameTagLogoWidth(entity, flag, logoH);
+         float f2 = (renderer.getStringWidthFloat(str) + logoReserve) / 2.0F;
          GlStateManager.disableTexture2D();
          if (shaderRenderPass != ShaderRenderPass.NONE && !ClientManagers.moduleManager.nameTags.shadowFont.getValue() || !ClientManagers.moduleManager.nameTags.transparent.getValue()) {
             worldRenderer.begin(7, DefaultVertexFormats.POSITION_COLOR);
@@ -336,8 +379,11 @@ public abstract class Render implements IEntityRenderer {
          }
 
          GlStateManager.enableTexture2D();
-         float f3 = -f2;
+         float f3 = -f2 + logoReserve;
          float f4 = (float)b;
+         if (logoReserve > 0.0F) {
+            drawAugustusNameTagLogo(entity, -f2, f4 + (fontHeight - logoH) * 0.5F, logoH, ClientManagers.moduleManager.nameTags.throughWalls.getValue() ? -1 : 0x55FFFFFF);
+         }
          renderer.drawString(str, f3, f4, ClientManagers.moduleManager.nameTags.throughWalls.getValue() ? -1 : 553648127, false);
          if (flag) {
             this.renderNameTagInfo(entity);
@@ -358,8 +404,9 @@ public abstract class Render implements IEntityRenderer {
          GlStateManager.popMatrix();
          GlStateManager.enableDepth();
          GlStateManager.depthMask(true);
-         f3 = -f2;
-         f4 = (float)b;
+         if (logoReserve > 0.0F) {
+            drawAugustusNameTagLogo(entity, -f2, f4 + (fontHeight - logoH) * 0.5F, logoH, -1);
+         }
          renderer.drawString(str, f3, f4, (byte)-1, false);
          if (flag) {
             this.renderNameTagInfo(entity);
@@ -462,6 +509,10 @@ public abstract class Render implements IEntityRenderer {
    }
 
    public void renderLivingLabel(Entity entity, String str, double d, double d2, double d3, int n) {
+      this.renderLivingLabel(entity, str, d, d2, d3, n, entity instanceof EntityPlayer);
+   }
+
+   public void renderLivingLabel(Entity entity, String str, double d, double d2, double d3, int n, boolean allowAugustusLogo) {
       if (entity.getDistanceSqToEntity(this.renderManager.livingPlayer) <= (double)(n * n)) {
          FontRenderer fontRenderer = this.getFontRendererFromRenderManager();
          float f = 1.6F;
@@ -484,27 +535,34 @@ public abstract class Render implements IEntityRenderer {
             b = -10;
          }
 
-         int n2 = fontRenderer.getStringWidth(str) / 2;
+         float logoReserve = getAugustusNameTagLogoWidth(entity, allowAugustusLogo, 8.5F);
+         float halfW = ((float)fontRenderer.getStringWidth(str) + logoReserve) / 2.0F;
          if (Config.isShaderPackLoaded()) {
             Shaders.disableTexture2D();
          }
 
          GlStateManager.disableTexture2D();
          worldRenderer.begin(7, DefaultVertexFormats.POSITION_COLOR);
-         worldRenderer.pos((double)(-n2 - 1), (double)(-1 + b), 0.0).color(0.0F, 0.0F, 0.0F, 0.25F).endVertex();
-         worldRenderer.pos((double)(-n2 - 1), (double)(8 + b), 0.0).color(0.0F, 0.0F, 0.0F, 0.25F).endVertex();
-         worldRenderer.pos((double)(n2 + 1), (double)(8 + b), 0.0).color(0.0F, 0.0F, 0.0F, 0.25F).endVertex();
-         worldRenderer.pos((double)(n2 + 1), (double)(-1 + b), 0.0).color(0.0F, 0.0F, 0.0F, 0.25F).endVertex();
+         worldRenderer.pos((double)(-halfW - 1.0F), (double)(-1 + b), 0.0).color(0.0F, 0.0F, 0.0F, 0.25F).endVertex();
+         worldRenderer.pos((double)(-halfW - 1.0F), (double)(8 + b), 0.0).color(0.0F, 0.0F, 0.0F, 0.25F).endVertex();
+         worldRenderer.pos((double)(halfW + 1.0F), (double)(8 + b), 0.0).color(0.0F, 0.0F, 0.0F, 0.25F).endVertex();
+         worldRenderer.pos((double)(halfW + 1.0F), (double)(-1 + b), 0.0).color(0.0F, 0.0F, 0.0F, 0.25F).endVertex();
          instance.draw();
          if (Config.isShaderPackLoaded()) {
             Shaders.enableTexture2D();
          }
 
          GlStateManager.enableTexture2D();
-         fontRenderer.drawString(str, -fontRenderer.getStringWidth(str) / 2, b, 553648127);
+         if (logoReserve > 0.0F) {
+            drawAugustusNameTagLogo(entity, -halfW, (float)b - 0.5F, 8.5F, 0x55FFFFFF);
+         }
+         fontRenderer.drawString(str, -halfW + logoReserve, (float)b, 553648127, false);
          GlStateManager.enableDepth();
          GlStateManager.depthMask(true);
-         fontRenderer.drawString(str, -fontRenderer.getStringWidth(str) / 2, b, -1);
+         if (logoReserve > 0.0F) {
+            drawAugustusNameTagLogo(entity, -halfW, (float)b - 0.5F, 8.5F, -1);
+         }
+         fontRenderer.drawString(str, -halfW + logoReserve, (float)b, -1, false);
          GlStateManager.enableLighting();
          GlStateManager.disableBlend();
          GlStateManager.color(1.0F, 1.0F, 1.0F, 1.0F);
@@ -601,7 +659,7 @@ public abstract class Render implements IEntityRenderer {
                this.renderCustomNameTag(entity, str, d, d2, d3, (int)ClientManagers.moduleManager.nameTags.maximumRenderDistance.getValue(), flag);
          }
       } else {
-         this.renderLivingLabel(entity, str, d, d2, d3, 64);
+         this.renderLivingLabel(entity, str, d, d2, d3, 64, flag);
       }
 
       if (flag2) {
@@ -710,19 +768,23 @@ public abstract class Render implements IEntityRenderer {
             b = -10;
          }
 
-         int n2 = fontRenderer.getStringWidth(str) / 2;
+         float logoReserve = getAugustusNameTagLogoWidth(entity, flag, 8.5F);
+         float halfW = ((float)fontRenderer.getStringWidth(str) + logoReserve) / 2.0F;
          GlStateManager.disableTexture2D();
          if (shaderRenderPass != ShaderRenderPass.NONE && !ClientManagers.moduleManager.nameTags.shadowFont.getValue() || !ClientManagers.moduleManager.nameTags.transparent.getValue()) {
             worldRenderer.begin(7, DefaultVertexFormats.POSITION_COLOR);
-            worldRenderer.pos((double)(-n2 - 1), (double)(-1 + b), 0.0).color(0.0F, 0.0F, 0.0F, 0.25F).endVertex();
-            worldRenderer.pos((double)(-n2 - 1), (double)(8 + b), 0.0).color(0.0F, 0.0F, 0.0F, 0.25F).endVertex();
-            worldRenderer.pos((double)(n2 + 1), (double)(8 + b), 0.0).color(0.0F, 0.0F, 0.0F, 0.25F).endVertex();
-            worldRenderer.pos((double)(n2 + 1), (double)(-1 + b), 0.0).color(0.0F, 0.0F, 0.0F, 0.25F).endVertex();
+            worldRenderer.pos((double)(-halfW - 1.0F), (double)(-1 + b), 0.0).color(0.0F, 0.0F, 0.0F, 0.25F).endVertex();
+            worldRenderer.pos((double)(-halfW - 1.0F), (double)(8 + b), 0.0).color(0.0F, 0.0F, 0.0F, 0.25F).endVertex();
+            worldRenderer.pos((double)(halfW + 1.0F), (double)(8 + b), 0.0).color(0.0F, 0.0F, 0.0F, 0.25F).endVertex();
+            worldRenderer.pos((double)(halfW + 1.0F), (double)(-1 + b), 0.0).color(0.0F, 0.0F, 0.0F, 0.25F).endVertex();
             instance.draw();
          }
 
          GlStateManager.enableTexture2D();
-         fontRenderer.drawString(str, (float)(-fontRenderer.getStringWidth(str)) / 2.0F, (float)b, ClientManagers.moduleManager.nameTags.throughWalls.getValue() ? -1 : 553648127, false);
+         if (logoReserve > 0.0F) {
+            drawAugustusNameTagLogo(entity, -halfW, (float)b - 0.5F, 8.5F, ClientManagers.moduleManager.nameTags.throughWalls.getValue() ? -1 : 0x55FFFFFF);
+         }
+         fontRenderer.drawString(str, -halfW + logoReserve, (float)b, ClientManagers.moduleManager.nameTags.throughWalls.getValue() ? -1 : 553648127, false);
          if (flag) {
             this.renderNameTagInfo(entity);
          }
@@ -742,7 +804,10 @@ public abstract class Render implements IEntityRenderer {
          GlStateManager.popMatrix();
          GlStateManager.enableDepth();
          GlStateManager.depthMask(true);
-         fontRenderer.drawString(str, (float)(-fontRenderer.getStringWidth(str)) / 2.0F, (float)b, -1, false);
+         if (logoReserve > 0.0F) {
+            drawAugustusNameTagLogo(entity, -halfW, (float)b - 0.5F, 8.5F, -1);
+         }
+         fontRenderer.drawString(str, -halfW + logoReserve, (float)b, -1, false);
          if (flag) {
             this.renderNameTagInfo(entity);
          }
@@ -814,8 +879,10 @@ public abstract class Render implements IEntityRenderer {
             b = -10;
          }
 
-         float f2 = renderer.getStringWidthFloat(str) / 2.0F;
          float fontHeight = renderer.getFontHeight();
+         float logoH = Math.max(8.0F, fontHeight - 1.0F);
+         float logoReserve = getAugustusNameTagLogoWidth(entity, flag, logoH);
+         float f2 = (renderer.getStringWidthFloat(str) + logoReserve) / 2.0F;
          GlStateManager.disableTexture2D();
          if (n == 1
             && (
@@ -847,7 +914,10 @@ public abstract class Render implements IEntityRenderer {
 
          GlStateManager.enableTexture2D();
          if (n == 2) {
-            renderer.drawString(str, -f2, (float)b, ClientManagers.moduleManager.nameTags.throughWalls.getValue() ? -1 : 553648127, false);
+            if (logoReserve > 0.0F) {
+               drawAugustusNameTagLogo(entity, -f2, (float)b + (fontHeight - logoH) * 0.5F, logoH, ClientManagers.moduleManager.nameTags.throughWalls.getValue() ? -1 : 0x55FFFFFF);
+            }
+            renderer.drawString(str, -f2 + logoReserve, (float)b, ClientManagers.moduleManager.nameTags.throughWalls.getValue() ? -1 : 553648127, false);
             if (flag) {
                this.renderNameTagInfo(entity);
             }
@@ -869,7 +939,10 @@ public abstract class Render implements IEntityRenderer {
          GlStateManager.enableDepth();
          GlStateManager.depthMask(true);
          if (n == 2) {
-            renderer.drawString(str, -f2, (float)b, (byte)-1, false);
+            if (logoReserve > 0.0F) {
+               drawAugustusNameTagLogo(entity, -f2, (float)b + (fontHeight - logoH) * 0.5F, logoH, -1);
+            }
+            renderer.drawString(str, -f2 + logoReserve, (float)b, (byte)-1, false);
             if (flag) {
                this.renderNameTagInfo(entity);
             }
@@ -915,7 +988,8 @@ public abstract class Render implements IEntityRenderer {
             b = -10;
          }
 
-         float f2 = (float)fontRenderer.getStringWidth(str) / 2.0F;
+         float logoReserve = getAugustusNameTagLogoWidth(entity, flag, 8.5F);
+         float f2 = ((float)fontRenderer.getStringWidth(str) + logoReserve) / 2.0F;
          GlStateManager.disableTexture2D();
          if (shaderRenderPass != ShaderRenderPass.NONE && !ClientManagers.moduleManager.nameTags.shadowFont.getValue() || !ClientManagers.moduleManager.nameTags.transparent.getValue()) {
             worldRenderer.begin(7, DefaultVertexFormats.POSITION_COLOR);
@@ -940,7 +1014,10 @@ public abstract class Render implements IEntityRenderer {
          }
 
          GlStateManager.enableTexture2D();
-         fontRenderer.drawString(str, -f2, (float)b, ClientManagers.moduleManager.nameTags.throughWalls.getValue() ? -1 : 553648127, false);
+         if (logoReserve > 0.0F) {
+            drawAugustusNameTagLogo(entity, -f2, (float)b - 0.5F, 8.5F, ClientManagers.moduleManager.nameTags.throughWalls.getValue() ? -1 : 0x55FFFFFF);
+         }
+         fontRenderer.drawString(str, -f2 + logoReserve, (float)b, ClientManagers.moduleManager.nameTags.throughWalls.getValue() ? -1 : 553648127, false);
          if (flag) {
             this.renderNameTagInfo(entity);
          }
@@ -960,7 +1037,10 @@ public abstract class Render implements IEntityRenderer {
          GlStateManager.popMatrix();
          GlStateManager.enableDepth();
          GlStateManager.depthMask(true);
-         fontRenderer.drawString(str, -f2, (float)b, -1, false);
+         if (logoReserve > 0.0F) {
+            drawAugustusNameTagLogo(entity, -f2, (float)b - 0.5F, 8.5F, -1);
+         }
+         fontRenderer.drawString(str, -f2 + logoReserve, (float)b, -1, false);
          if (flag) {
             this.renderNameTagInfo(entity);
          }

@@ -36,6 +36,7 @@ public class GuiTextField extends Gui {
    private Predicate validator = Predicates.alwaysTrue();
    private Consumer textChangeListener;
    private InterFontUtil customFont;
+   private boolean useMinecraftFont = false;
    private float wellHoverAnim = 0.0F;
    private float wellFocusAnim = 0.0F;
 
@@ -57,7 +58,14 @@ public class GuiTextField extends Gui {
       return this.customFont;
    }
 
+   public void setUseMinecraftFont(boolean useMinecraftFont) {
+      this.useMinecraftFont = useMinecraftFont;
+   }
+
    private InterFontUtil resolveFont() {
+      if (this.useMinecraftFont) {
+         return null;
+      }
       return this.customFont != null ? this.customFont : textFieldFont();
    }
 

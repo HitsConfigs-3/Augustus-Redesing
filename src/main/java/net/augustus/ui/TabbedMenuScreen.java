@@ -189,8 +189,8 @@ public class TabbedMenuScreen extends AugustusGuiScreen {
    }
 
    private void updateLayout() {
-      float w = this.width <= 0 ? 854.0F : (float)this.width;
-      float h = this.height <= 0 ? 480.0F : (float)this.height;
+      float w = this.width <= 0 ? 1366.0F : (float)this.width;
+      float h = this.height <= 0 ? 768.0F : (float)this.height;
 
       float pad = clamp(Math.round(h * 0.028F), 10.0F, 18.0F);
       float gap = clamp(Math.round(h * 0.018F), 8.0F, 12.0F);

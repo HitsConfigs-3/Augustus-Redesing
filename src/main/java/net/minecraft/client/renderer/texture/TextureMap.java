@@ -445,6 +445,7 @@ public class TextureMap extends AbstractTexture implements ITickableTextureObjec
       int n3 = 0;
 
       for (Entry entry : (Iterable<Entry>)(this.mapRegisteredSprites.entrySet())) {
+         net.augustus.ui.StartupSplashRenderer.pulse(0.32F, 0.53F);
          if (!this.skipFirst) {
             TextureAtlasSprite value = (TextureAtlasSprite)entry.getValue();
             ResourceLocation location = new ResourceLocation(value.getIconName());

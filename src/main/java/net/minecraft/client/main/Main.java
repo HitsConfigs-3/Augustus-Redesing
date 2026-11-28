@@ -168,8 +168,8 @@ public class Main {
       OptionSpec<String> optionSpec11 = optionParser.accepts("uuid").withRequiredArg();
       OptionSpec<String> optionSpec12 = optionParser.accepts("accessToken").withRequiredArg().required();
       OptionSpec<String> optionSpec13 = optionParser.accepts("version").withRequiredArg().required();
-      OptionSpec<Integer> optionSpec14 = optionParser.accepts("width").withRequiredArg().ofType(Integer.class).defaultsTo(854);
-      OptionSpec<Integer> optionSpec15 = optionParser.accepts("height").withRequiredArg().ofType(Integer.class).defaultsTo(480);
+      OptionSpec<Integer> optionSpec14 = optionParser.accepts("width").withRequiredArg().ofType(Integer.class).defaultsTo(1366);
+      OptionSpec<Integer> optionSpec15 = optionParser.accepts("height").withRequiredArg().ofType(Integer.class).defaultsTo(768);
       OptionSpec<String> optionSpec16 = optionParser.accepts("userProperties").withRequiredArg().defaultsTo("{}");
       OptionSpec<String> optionSpec17 = optionParser.accepts("profileProperties").withRequiredArg().defaultsTo("{}");
       OptionSpec<String> optionSpec18 = optionParser.accepts("assetIndex").withRequiredArg();
@@ -198,6 +198,11 @@ public class Main {
 
       int n = optionSet.valueOf(optionSpec14);
       int n2 = optionSet.valueOf(optionSpec15);
+      // Launchers commonly inject vanilla 854x480 minimum defaults; enforce 1366x768 startup window.
+      if (!optionSet.has(optionSpec14) || !optionSet.has(optionSpec15) || (n == 854 && n2 == 480) || n <= 0 || n2 <= 0) {
+         n = 1366;
+         n2 = 768;
+      }
       boolean flag = optionSet.has("fullscreen");
       boolean flag2 = optionSet.has("checkGlErrors");
       boolean flag3 = optionSet.has("demo");

@@ -30,6 +30,7 @@ public class ClientTabManager {
    public void initTabs() {
       this.tabs.add(new AccountManagerScreen());
       this.tabs.add(new ProxyManagerScreen());
+      this.tabs.add(new IrcMenuTab());
       this.tabs.add(new ConfigMigratorMenuTab());
       this.tabs.add(new BackgroundMenuTab());
       this.tabs.add(new ChangelogMenuTab());

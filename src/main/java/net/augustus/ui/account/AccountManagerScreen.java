@@ -316,14 +316,19 @@ public class AccountManagerScreen extends ClientMenuTab {
             .withIcon(LucideIcon.ALERT_TRIANGLE)
             .withToggleState(remInv);
 
-      GuiButtonClickHandler altshopClick = button9 -> {
+      this.addGlassButton(Math.round(innerX), Math.round(this.manageRow2Y), Math.round(columnW), Math.round(row),
+            "Link Premium IRC", button9 -> this.onLinkSelectedPremiumClick(button9))
+            .withIcon(LucideIcon.LINK)
+            .withVariant(GlassMenuButton.Variant.PRIMARY);
+
+      GuiButtonClickHandler altshopClick = button10 -> {
          try {
             Desktop.getDesktop().browse(new URI("https://alts.fernan.club/"));
          } catch (URISyntaxException | IOException e2) {
             e2.printStackTrace();
          }
       };
-      this.addGlassButton(Math.round(innerX), Math.round(this.manageRow2Y), Math.round(innerW), Math.round(row),
+      this.addGlassButton(Math.round(innerX + columnW + this.colGap), Math.round(this.manageRow2Y), Math.round(columnW), Math.round(row),
             "Fernan's Altshop", altshopClick).withIcon(LucideIcon.SHOPPING_CART);
 
       scrollBar.setBounds(
@@ -634,6 +639,17 @@ public class AccountManagerScreen extends ClientMenuTab {
          AccountAuthenticator.playSuccessSound();
       } else {
          AccountAuthenticator.playFailureSound();
+      }
+   }
+
+   private void onLinkSelectedPremiumClick(GuiButton button) {
+      if (this.selectedAccount != null && net.augustus.irc.IrcManager.isMicrosoftType(this.selectedAccount.getLoginType())) {
+         net.augustus.irc.IrcManager.getInstance().linkAccountEntry(this.selectedAccount);
+         this.setStatus("Vinculando " + this.selectedAccount.getUsername() + " al IRC...", Color.GREEN);
+         AccountAuthenticator.playSuccessSound();
+      } else {
+         net.augustus.irc.IrcManager.getInstance().startInteractiveMicrosoftLink();
+         this.setStatus("Abriendo login Microsoft para IRC...", Color.ORANGE);
       }
    }
 

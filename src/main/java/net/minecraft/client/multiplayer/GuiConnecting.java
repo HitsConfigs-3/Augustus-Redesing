@@ -136,6 +136,7 @@ public class GuiConnecting extends GuiScreen {
    }
 
    private void connect(String str, int n) {
+      net.augustus.irc.IrcManager.getInstance().ensureOriginalNickBeforeConnect();
       lastServerIp = str;
       lastServerPort = n;
       logger.info("Connecting to " + str + ", " + n);

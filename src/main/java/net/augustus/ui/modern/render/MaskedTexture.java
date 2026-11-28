@@ -235,6 +235,55 @@ public final class MaskedTexture {
       GlStateManager.color(1.0F, 1.0F, 1.0F, 1.0F);
    }
 
+   /**
+    * Draws the accent-recoloured logo inside 3D billboarded spaces (like player nametags) while
+    * preserving the caller's depth-test, depth-mask, and cull state for proper world occlusion.
+    */
+   public void drawQuadPreserveDepth(float x, float y, float width, float height, int accentArgb, int colorArgb) {
+      if (accentArgb != -1) {
+         this.prepare(accentArgb);
+      } else {
+         this.ensureLoaded();
+      }
+      if (this.textureId <= 0 || width <= 0.0F || height <= 0.0F || (colorArgb >>> 24) == 0) {
+         return;
+      }
+
+      boolean prevBlend = GL11.glIsEnabled(GL11.GL_BLEND);
+      boolean prevAlpha = GL11.glIsEnabled(GL11.GL_ALPHA_TEST);
+      int prevAlphaFunc = GlStateManager.getAlphaFunc();
+      float prevAlphaRef = GlStateManager.getAlphaRef();
+      int prevTex = GlStateManager.getBoundTexture();
+
+      GlStateManager.enableTexture2D();
+      GlStateManager.enableBlend();
+      GlStateManager.tryBlendFuncSeparate(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA, GL11.GL_ONE, GL11.GL_ONE_MINUS_SRC_ALPHA);
+      GlStateManager.disableAlpha();
+      GlStateManager.bindTexture(this.textureId);
+      GlStateManager.color(1.0F, 1.0F, 1.0F, 1.0F);
+
+      Tessellator tessellator = Tessellator.getInstance();
+      WorldRenderer worldRenderer = tessellator.getWorldRenderer();
+      worldRenderer.begin(GL11.GL_QUADS, DefaultVertexFormats.POSITION_TEX_COLOR);
+      putVertex(worldRenderer, x, y + height, 0.0F, 1.0F, colorArgb);
+      putVertex(worldRenderer, x + width, y + height, 1.0F, 1.0F, colorArgb);
+      putVertex(worldRenderer, x + width, y, 1.0F, 0.0F, colorArgb);
+      putVertex(worldRenderer, x, y, 0.0F, 0.0F, colorArgb);
+      tessellator.draw();
+
+      GlStateManager.bindTexture(prevTex);
+      GlStateManager.alphaFunc(prevAlphaFunc, prevAlphaRef);
+      if (prevAlpha) {
+         GlStateManager.enableAlpha();
+      } else {
+         GlStateManager.disableAlpha();
+      }
+      if (!prevBlend) {
+         GlStateManager.disableBlend();
+      }
+      GlStateManager.color(1.0F, 1.0F, 1.0F, 1.0F);
+   }
+
    private static void putVertex(WorldRenderer worldRenderer, float x, float y, float u, float v, int argb) {
       worldRenderer.pos((double)x, (double)y, 0.0)
          .tex((double)u, (double)v)

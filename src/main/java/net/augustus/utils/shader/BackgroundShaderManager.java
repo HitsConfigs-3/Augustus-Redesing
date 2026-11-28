@@ -543,6 +543,7 @@ public class BackgroundShaderManager {
       this.extractResourceFile("assets/augustus/reconnect.sh", str246, false);
 
       for (File file2 : new File(ClientPaths.CLIENT_DIR + "/shaders").listFiles()) {
+         net.augustus.ui.StartupSplashRenderer.pulse(0.80F, 0.92F);
          if (file2.getName().contains(".")) {
             String[] parts = file2.getName().split("\\.");
             if (parts.length > 1 && parts[1].equals("frag")) {

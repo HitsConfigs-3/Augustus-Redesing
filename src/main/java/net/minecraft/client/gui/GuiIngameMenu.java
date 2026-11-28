@@ -33,6 +33,11 @@ public class GuiIngameMenu extends GuiScreen implements ServerListHost {
    private int cardH;
    private int headerY;
    private int dividerY;
+   private int levelBoxX;
+   private int levelBoxY;
+   private int levelBoxW;
+   private int levelBoxH;
+   private boolean showLevelBlock;
 
    @Override
    public void drawScreen(int mouseX, int mouseY, float partialTicks) {
@@ -50,7 +55,79 @@ public class GuiIngameMenu extends GuiScreen implements ServerListHost {
          UiTheme.GLASS_DIVIDER
       );
 
+      if (this.showLevelBlock) {
+         this.drawLevelProgressCard(mouseX, mouseY);
+      }
+
       super.drawScreen(mouseX, mouseY, partialTicks);
+   }
+
+   private void drawLevelProgressCard(int mouseX, int mouseY) {
+      net.augustus.irc.IrcManager irc = net.augustus.irc.IrcManager.getInstance();
+      long playMs = irc.getPlayTimeMillis();
+      int currentLevel = net.augustus.irc.ClientLevelSystem.levelForPlayTime(playMs);
+      int nextLevel = currentLevel + 1;
+      float targetProgress = net.augustus.irc.ClientLevelSystem.progressWithinLevel(playMs);
+      float animProgress = UiAnimation.smoothState("ingame.level.progress", targetProgress, 10.0F);
+      long remainingMs = net.augustus.irc.ClientLevelSystem.millisToNextLevel(playMs);
+      int pct = Math.max(0, Math.min(100, Math.round(targetProgress * 100.0F)));
+
+      float x = (float)this.levelBoxX;
+      float y = (float)this.levelBoxY;
+      float w = (float)this.levelBoxW;
+      float h = (float)this.levelBoxH;
+      boolean hovered = mouseX >= this.levelBoxX && mouseX <= this.levelBoxX + this.levelBoxW
+         && mouseY >= this.levelBoxY && mouseY <= this.levelBoxY + this.levelBoxH;
+      float hoverT = UiTheme.smoothState("ingame.level.hover", hovered ? 1.0F : 0.0F);
+
+      int accent = UiTheme.accentColor();
+      MenuScreenSkin.drawGlassContainer(x, y, w, h, 8.0F);
+      if (hoverT > 0.01F) {
+         GlassRenderer.drawRoundedOutline(
+            x, y, w, h, 8.0F, UiTheme.BORDER_THICKNESS,
+            UiTheme.scaleAlpha(UiTheme.withAlpha(UiTheme.lerpArgb(accent, 0xFFFFFFFF, 0.25F), 185), hoverT)
+         );
+      }
+
+      float pad = 8.0F;
+      net.augustus.ui.modern.font.InterFontUtil titleFont = net.augustus.font.FontManager.uiSmall();
+      net.augustus.ui.modern.font.InterFontUtil captionFont = net.augustus.font.FontManager.uiCaption();
+
+      float contentX = x + pad;
+      float contentW = w - pad * 2.0F;
+      float topRowY = y + 5.5F;
+
+      String lvlText = "Nivel " + currentLevel;
+      String nextText = "Nv." + nextLevel;
+      String remText = pct + "%  •  Falta " + net.augustus.irc.ClientLevelSystem.formatDuration(remainingMs);
+
+      if (titleFont != null && captionFont != null) {
+         titleFont.drawStringWithShadow(lvlText, (double)contentX, (double)topRowY, 0xFFF8FAFC);
+         float afterLvl = contentX + titleFont.getStringWidth(lvlText) + 5.0F;
+         LucideIcon.ARROW_RIGHT.draw(afterLvl, topRowY + 1.5F, 7.5F, UiTheme.lerpArgb(accent, 0xFFFFFFFF, 0.35F), false);
+         captionFont.drawStringWithShadow(nextText, (double)(afterLvl + 10.0F), (double)(topRowY + 1.0F), UiTheme.lerpArgb(accent, 0xFFFFFFFF, 0.40F));
+
+         float remW = captionFont.getStringWidth(remText);
+         captionFont.drawStringWithShadow(remText, (double)(contentX + contentW - remW), (double)(topRowY + 1.0F), 0xFFB8C2D4);
+      } else {
+         String fallbackLeft = lvlText + " -> " + nextText;
+         this.fontRendererObj.drawStringWithShadow(fallbackLeft, contentX, topRowY, 0xFFF8FAFC);
+         this.fontRendererObj.drawStringWithShadow(remText, contentX + contentW - (float)this.fontRendererObj.getStringWidth(remText), topRowY, 0xFFB8C2D4);
+      }
+
+      float barY = y + h - 9.5F;
+      float barH = 4.5F;
+      GlassRenderer.drawRoundedRect(contentX, barY, contentW, barH, 2.5F, 0x9906080F);
+      GlassRenderer.drawRoundedOutline(contentX, barY, contentW, barH, 2.5F, 0.75F, UiTheme.withAlpha(accent, 75));
+      float fillW = animProgress > 0.005F ? Math.max(5.0F, contentW * animProgress) : 0.0F;
+      if (fillW > 0.0F) {
+         GlassRenderer.drawRoundedGradientBoxHorizontal(
+            contentX, barY, Math.min(contentW, fillW), barH, 2.5F,
+            UiTheme.withAlpha(accent, 235),
+            UiTheme.withAlpha(UiTheme.accentSoftGlow(), 250),
+            1.0F
+         );
+      }
    }
 
    @Override
@@ -113,9 +190,19 @@ public class GuiIngameMenu extends GuiScreen implements ServerListHost {
       boolean hasWdl = this.buttonList.size() > beforeWdl;
 
       int rows = 4 + (hideCustomMenu ? 0 : 1) + (hasWdl ? 1 : 0);
+      this.showLevelBlock = !hideCustomMenu;
       this.cardH = padTop + headerH + rows * btnH + (rows - 1) * rowGap + padBottom;
       this.cardX = (this.width - this.cardW) / 2;
-      this.cardY = Math.max(16, (this.height - this.cardH) / 2);
+      if (this.showLevelBlock) {
+         this.levelBoxW = this.cardW;
+         this.levelBoxH = 29;
+         this.levelBoxX = this.cardX;
+         this.levelBoxY = 12;
+         int centeredY = (this.height - this.cardH) / 2;
+         this.cardY = Math.max(this.levelBoxY + this.levelBoxH + 10, centeredY);
+      } else {
+         this.cardY = Math.max(16, (this.height - this.cardH) / 2);
+      }
       this.headerY = this.cardY + padTop;
       this.dividerY = this.headerY + 18;
 
@@ -170,6 +257,18 @@ public class GuiIngameMenu extends GuiScreen implements ServerListHost {
 
       quitBtn.xPosition = leftX;
       quitBtn.yPosition = y;
+   }
+
+   @Override
+   public void mouseClicked(int mouseX, int mouseY, int mouseButton) throws IOException {
+      if (mouseButton == 0 && this.showLevelBlock
+         && mouseX >= this.levelBoxX && mouseX <= this.levelBoxX + this.levelBoxW
+         && mouseY >= this.levelBoxY && mouseY <= this.levelBoxY + this.levelBoxH) {
+         int ircIdx = Augustus.getInstance().getClientTabManager().indexOf(net.augustus.ui.menu.IrcMenuTab.class);
+         this.mc.displayGuiScreen(new ClientTabContainerScreen(this, ircIdx));
+         return;
+      }
+      super.mouseClicked(mouseX, mouseY, mouseButton);
    }
 
    public OldServerPinger getOldServerPinger() {

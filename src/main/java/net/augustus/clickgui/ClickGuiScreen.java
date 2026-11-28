@@ -314,6 +314,7 @@ public class ClickGuiScreen extends GuiScreen {
       screenFade = 0.0F;
       GlassRenderer.setOverlayEnvelope(0.0F);
       GuiScreen.NO_TOGGLE_SCREENS.add(Minecraft.getMinecraft().currentScreen);
+      Keyboard.enableRepeatEvents(true);
    }
 
    @Override
@@ -583,6 +584,7 @@ public class ClickGuiScreen extends GuiScreen {
          activeScreen = null;
       }
 
+      Keyboard.enableRepeatEvents(false);
       super.onGuiClosed();
    }
 

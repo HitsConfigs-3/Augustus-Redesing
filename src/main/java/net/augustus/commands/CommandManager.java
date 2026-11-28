@@ -17,6 +17,7 @@ import net.augustus.commands.impl.GcCommand;
 import net.augustus.commands.impl.HClipCommand;
 import net.augustus.commands.impl.HelpCommand;
 import net.augustus.commands.impl.IgnCommand;
+import net.augustus.commands.impl.IrcCommand;
 import net.augustus.commands.impl.KillMessageCommand;
 import net.augustus.commands.impl.MotionModifierCommand;
 import net.augustus.commands.impl.PanicCommand;
@@ -62,6 +63,7 @@ public class CommandManager implements ChatListener {
       this.commands.add(this.alertCommand = new AlertCommand());
       this.commands.add(new PanicCommand());
       this.commands.add(new ResetBindsCommand());
+      this.commands.add(new IrcCommand());
    }
 
    public void setCommands(List list) {

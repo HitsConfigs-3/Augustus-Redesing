@@ -330,7 +330,13 @@ public abstract class RendererLivingEntity extends Render {
 
    public boolean canRenderName(EntityLivingBase entity) {
       EntityPlayerSP thePlayer = Minecraft.getMinecraft().thePlayer;
-      boolean flag = entity != thePlayer || ClientManagers.moduleManager.nameTags.isToggled() && ClientManagers.moduleManager.nameTags.myself.getValue();
+      boolean inGuiPreview = Minecraft.getMinecraft().currentScreen instanceof net.minecraft.client.gui.inventory.GuiContainer
+         || Minecraft.getMinecraft().currentScreen instanceof net.augustus.ui.menu.AbstractMainMenuScreen;
+      boolean thirdPersonOwnTag = !inGuiPreview
+         && Minecraft.getMinecraft().gameSettings.thirdPersonView != 0
+         && net.augustus.irc.IrcManager.getInstance().getConfig().isIrcEnabled()
+         && net.augustus.irc.IrcManager.getInstance().getConfig().isShowOwnNametagLogo();
+      boolean flag = entity != thePlayer || thirdPersonOwnTag || ClientManagers.moduleManager.nameTags.isToggled() && ClientManagers.moduleManager.nameTags.myself.getValue();
       if (entity instanceof EntityPlayer && flag) {
          if (ClientManagers.moduleManager.antiBot.isBot(entity)) {
             return false;
@@ -871,6 +877,17 @@ public abstract class RendererLivingEntity extends Render {
                if (ClientManagers.moduleManager.murdererFinder.isMurderer(name)) {
                   displayNameString = displayNameString + " §7[§4Murderer§7]§9";
                }
+
+               net.augustus.irc.IrcManager irc = net.augustus.irc.IrcManager.getInstance();
+               net.augustus.irc.IrcUserRecord ircUser = irc.resolveUserForPlayer((EntityPlayer)entity);
+               if (ircUser != null) {
+                  if (irc.getConfig().isShowOriginalNickOnNametags() && ircUser.usesDifferentServerNick()) {
+                     displayNameString = displayNameString + " §7(§d" + ircUser.getDisplayOriginalNick() + "§7)§r";
+                  }
+                  if (irc.getConfig().isShowLevelOnNametags()) {
+                     displayNameString = displayNameString + " " + net.augustus.irc.ClientLevelSystem.minecraftColorCode(ircUser.getLevel()) + "[Lv." + ircUser.getLevel() + "]§r";
+                  }
+               }
             }
 
             float f2 = 0.02666667F;
@@ -889,18 +906,23 @@ public abstract class RendererLivingEntity extends Render {
                GlStateManager.enableBlend();
                GlStateManager.disableTexture2D();
                GlStateManager.tryBlendFuncSeparate(770, 771, 1, 0);
-               int n = fontRenderer.getStringWidth(displayNameString) / 2;
+               float logoReserve = Render.getAugustusNameTagLogoWidth(entity, true, 8.5F);
+               float totalW = (float)fontRenderer.getStringWidth(displayNameString) + logoReserve;
+               float halfW = totalW / 2.0F;
                Tessellator instance = Tessellator.getInstance();
                WorldRenderer worldRenderer = instance.getWorldRenderer();
                worldRenderer.begin(7, DefaultVertexFormats.POSITION_COLOR);
-               worldRenderer.pos((double)(-n - 1), -1.0, 0.0).color(0.0F, 0.0F, 0.0F, 0.25F).endVertex();
-               worldRenderer.pos((double)(-n - 1), 8.0, 0.0).color(0.0F, 0.0F, 0.0F, 0.25F).endVertex();
-               worldRenderer.pos((double)(n + 1), 8.0, 0.0).color(0.0F, 0.0F, 0.0F, 0.25F).endVertex();
-               worldRenderer.pos((double)(n + 1), -1.0, 0.0).color(0.0F, 0.0F, 0.0F, 0.25F).endVertex();
+               worldRenderer.pos((double)(-halfW - 1.0F), -1.0, 0.0).color(0.0F, 0.0F, 0.0F, 0.25F).endVertex();
+               worldRenderer.pos((double)(-halfW - 1.0F), 8.0, 0.0).color(0.0F, 0.0F, 0.0F, 0.25F).endVertex();
+               worldRenderer.pos((double)(halfW + 1.0F), 8.0, 0.0).color(0.0F, 0.0F, 0.0F, 0.25F).endVertex();
+               worldRenderer.pos((double)(halfW + 1.0F), -1.0, 0.0).color(0.0F, 0.0F, 0.0F, 0.25F).endVertex();
                instance.draw();
                GlStateManager.enableTexture2D();
                GlStateManager.depthMask(true);
-               fontRenderer.drawString(displayNameString, -n, 0, 553648127);
+               if (logoReserve > 0.0F) {
+                  Render.drawAugustusNameTagLogo(entity, -halfW, -0.5F, 8.5F, 0x55FFFFFF);
+               }
+               fontRenderer.drawString(displayNameString, -halfW + logoReserve, 0.0F, 553648127, false);
                GlStateManager.enableLighting();
                GlStateManager.disableBlend();
                GlStateManager.color(1.0F, 1.0F, 1.0F, 1.0F);

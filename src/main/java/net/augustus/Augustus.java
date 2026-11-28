@@ -106,6 +106,7 @@ public class Augustus {
       this.mouseWheelTracker = new MouseWheelTracker();
       this.shuttingDown = false;
       SystemTrayNotifier.init();
+      net.augustus.ui.StartupSplashRenderer.advance(0.72F);
       FontManager.initFonts();
       this.protectorManager.init();
       this.rotationController = new RotationController(this.getVersion());
@@ -113,6 +114,7 @@ public class Augustus {
       this.moduleManager = new ModuleManager();
       this.configManager = new ConfigManager();
       this.moduleManager.initModules();
+      net.augustus.ui.StartupSplashRenderer.advance(0.82F);
       this.configManager.initVisualsConfig(this.moduleManager);
       this.settingDescriptionManager = new SettingDescriptionManager();
       this.settingNameManager = new SettingNameManager();
@@ -124,10 +126,16 @@ public class Augustus {
       this.backgroundShaderManager = new BackgroundShaderManager();
       ClientManagers.init();
       this.clickGui = new ClickGuiScreen();
+      net.augustus.ui.StartupSplashRenderer.advance(0.90F);
       this.settingDescriptionManager.initialize();
       this.settingNameManager.initialize();
       this.clientTabManager.initTabs();
       this.configManager.loadAll();
+      net.augustus.irc.IrcManager.getInstance().init();
+      if (this.moduleManager.irc != null) {
+         this.moduleManager.irc.syncFromConfig();
+      }
+      net.augustus.ui.StartupSplashRenderer.advance(0.96F);
       this.migrateRenderLoadFromConfigOnce();
       MinotarAvatarCache.preloadAccountAvatars();
 
@@ -196,6 +204,11 @@ public class Augustus {
          if (Minecraft.getMinecraft() != null && Minecraft.getMinecraft().getSession() != null) {
             Minecraft.getMinecraft().getSession().updatePlayTime(false);
          }
+      } catch (Throwable ignored) {
+      }
+
+      try {
+         net.augustus.irc.IrcManager.getInstance().shutdown();
       } catch (Throwable ignored) {
       }
 

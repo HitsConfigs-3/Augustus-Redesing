@@ -31,7 +31,7 @@ public class GuiKeyBindingList extends GuiListExtended {
 
    @Override
    public int getListWidth() {
-      return super.getListWidth() + 32;
+      return Math.max(252, this.maxListLabelWidth + 168);
    }
 
    public static GuiControls accessControlsScreen(GuiKeyBindingList guiKeyBindingList) {
@@ -40,7 +40,7 @@ public class GuiKeyBindingList extends GuiListExtended {
 
    @Override
    public int getScrollBarX() {
-      return super.getScrollBarX() + 15;
+      return this.left + this.width / 2 + this.getListWidth() / 2 + 4;
    }
 
    public static int accessMaxListLabelWidth(GuiKeyBindingList guiKeyBindingList) {
@@ -104,15 +104,15 @@ public class GuiKeyBindingList extends GuiListExtended {
          VanillaScreenText
             .drawString(
                this.keyDesc,
-               n2 + 90 - GuiKeyBindingList.accessMaxListLabelWidth(this.keyBindingList),
+               n2 + 4,
                n3 + n5 / 2 - GuiKeyBindingList.accessMc(this.keyBindingList).fontRendererObj.FONT_HEIGHT / 2,
                16777215
             );
-         this.btnReset.xPosition = n2 + 190;
+         this.btnReset.xPosition = n2 + n4 - 56;
          this.btnReset.yPosition = n3;
          this.btnReset.enabled = this.keybinding.getKeyCode() != this.keybinding.getKeyCodeDefault();
          this.btnReset.drawButton(GuiKeyBindingList.accessMc(this.keyBindingList), n6, n7);
-         this.btnChangeKeyBinding.xPosition = n2 + 105;
+         this.btnChangeKeyBinding.xPosition = this.btnReset.xPosition - 82;
          this.btnChangeKeyBinding.yPosition = n3;
          this.btnChangeKeyBinding.displayString = GameSettings.getKeyDisplayString(this.keybinding.getKeyCode());
          boolean flag3 = false;

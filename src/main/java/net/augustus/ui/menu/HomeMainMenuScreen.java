@@ -117,8 +117,8 @@ public final class HomeMainMenuScreen extends AbstractMainMenuScreen {
    /** Vertical pitch of the stacked action pills, measured between their top edges. */
    private static final float PITCH = 23.0F;
 
-   private static final float MARK_TOP = 226.0F;
-   private static final float MARK_H = 28.0F;
+   private static final float MARK_TOP = 223.0F;
+   private static final float MARK_H = 31.0F;
    private static final float WORD_TOP = 266.0F;
 
    private static final float ACTION_TOP = 305.0F;
@@ -526,7 +526,8 @@ public final class HomeMainMenuScreen extends AbstractMainMenuScreen {
 
    private void drawHero(float alpha) {
       float lift = (1.0F - alpha) * 12.0F;
-      float markW = MARK_H * 512.0F / 398.0F;
+      float aspect = BRAND_MARK.isReady() && BRAND_MARK.getAspect() > 0.0F ? BRAND_MARK.getAspect() : (510.0F / 560.0F);
+      float markW = MARK_H * aspect;
       float markAlpha = UiAnimation.clamp01(alpha * 1.1F);
       int markTint = UiTheme.scaleAlpha(0xFFFFFFFF, markAlpha);
       BRAND_MARK.draw(this.X((this.designW - markW) * 0.5F), this.Y(MARK_TOP + lift), this.S(markW),
@@ -926,10 +927,11 @@ public final class HomeMainMenuScreen extends AbstractMainMenuScreen {
          return;
       }
       float y = FOOTER_TOP;
-      float markH = 8.5F;
-      float markW = markH * 512.0F / 398.0F;
+      float markH = 9.0F;
+      float aspect = BRAND_MARK.isReady() && BRAND_MARK.getAspect() > 0.0F ? BRAND_MARK.getAspect() : (510.0F / 560.0F);
+      float markW = markH * aspect;
       int footerMarkTint = UiTheme.scaleAlpha(0xFFFFFFFF, opacity);
-      BRAND_MARK.draw(this.X(MARGIN - 1.0F), this.Y(y + 0.6F), this.S(markW), this.S(markH),
+      BRAND_MARK.draw(this.X(MARGIN - 1.0F), this.Y(y + 0.3F), this.S(markW), this.S(markH),
             UiTheme.accentColor(), footerMarkTint, footerMarkTint);
 
       float textX = MARGIN + markW + 4.0F;

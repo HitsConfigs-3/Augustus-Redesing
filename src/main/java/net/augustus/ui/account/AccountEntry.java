@@ -190,24 +190,23 @@ public class AccountEntry implements MC {
       float textX = headX + head + 9.0F;
       float availW = Math.max(40.0F, iconsStart - textX - 6.0F);
       boolean isCurrentSession = mc.getSession() != null && mc.getSession().getUsername().equals(this.username);
+      boolean isIrcLinked = net.augustus.irc.IrcManager.getInstance().isLinkedAccount(this);
 
       int nameColor = isCurrentSession ? 0xFF4ADE80 : (this.isMarked() ? 0xFFFBBF24 : ClientMenuTab.TEXT_BASE);
       float line1Y = (float)y + 6.5F;
       float line2Y = (float)y + 20.5F;
 
-      String safeName = ClientMenuTab.menuFit(titleFace, this.username, availW - (isCurrentSession ? 46.0F : 0.0F));
+      String safeName = ClientMenuTab.menuFit(titleFace, this.username, availW - (isCurrentSession ? 46.0F : 0.0F) - (isIrcLinked ? 34.0F : 0.0F));
       titleFace.drawStringWithShadow(safeName, (double)textX, (double)line1Y, nameColor);
 
-      if (isCurrentSession) {
-         float badgeX = textX + titleFace.getStringWidth(safeName) + 6.0F;
-         if (badgeX + 38.0F <= iconsStart) {
-            ClientMenuTab.menuBadge("ACTIVE", badgeX, line1Y - 1.0F, 0x334ADE80, 0xFF86EFAC);
-         }
-      } else if (this.isMarked()) {
-         float badgeX = textX + titleFace.getStringWidth(safeName) + 6.0F;
-         if (badgeX + 42.0F <= iconsStart) {
-            ClientMenuTab.menuBadge("MARKED", badgeX, line1Y - 1.0F, 0x33FBBF24, 0xFFFDE68A);
-         }
+      float badgeX = textX + titleFace.getStringWidth(safeName) + 6.0F;
+      if (isCurrentSession && badgeX + 38.0F <= iconsStart) {
+         badgeX += ClientMenuTab.menuBadge("ACTIVE", badgeX, line1Y - 1.0F, 0x334ADE80, 0xFF86EFAC) + 4.0F;
+      } else if (this.isMarked() && badgeX + 42.0F <= iconsStart) {
+         badgeX += ClientMenuTab.menuBadge("MARKED", badgeX, line1Y - 1.0F, 0x33FBBF24, 0xFFFDE68A) + 4.0F;
+      }
+      if (isIrcLinked && badgeX + 26.0F <= iconsStart) {
+         ClientMenuTab.menuBadge("IRC", badgeX, line1Y - 1.0F, UiTheme.withAlpha(accent, 72), UiTheme.lerpArgb(accent, 0xFFFFFFFF, 0.40F));
       }
 
       String stateLabel = this.working ? "§aFunctional" : "§cInvalid";

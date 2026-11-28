@@ -1,5 +1,5 @@
-import java.io.File;
 import java.util.Arrays;
+import java.io.File;
 import net.augustus.utils.OSUtil;
 import net.minecraft.client.main.Main;
 
@@ -63,7 +63,7 @@ public class Start {
    public static void main(String[] args) {
       String[] baseArgs = hasArgument(args, "--gameDir")
          ? new String[]{
-            "--version", "1.8.9", "--accessToken", "0", "--assetsDir", resolveAssetsDir(), "--assetIndex", "1.8", "--userProperties", "{}"
+            "--version", "1.8.9", "--accessToken", "0", "--assetsDir", resolveAssetsDir(), "--assetIndex", "1.8", "--userProperties", "{}", "--width", "1366", "--height", "768"
          }
          : new String[]{
             "--version",
@@ -77,7 +77,11 @@ public class Start {
             "--assetIndex",
             "1.8",
             "--userProperties",
-            "{}"
+            "{}",
+            "--width",
+            "1366",
+            "--height",
+            "768"
          };
       Main.main((String[])concat(baseArgs, args));
    }

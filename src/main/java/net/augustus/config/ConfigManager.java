@@ -23,6 +23,7 @@ public class ConfigManager {
    public final ProxyConfigStorage proxyConfig;
    public final ClientSettingsConfigFile clientSettingsConfig;
    public final ModuleConfigStorage moduleConfigStorage;
+   public final net.augustus.irc.IrcConfigFile ircConfig;
    public VisualsConfigFile visualsConfig;
 
    public ConfigManager() {
@@ -32,6 +33,7 @@ public class ConfigManager {
       this.proxyConfig = new ProxyConfigStorage();
       this.accountConfig = new AccountConfigStorage();
       this.clientSettingsConfig = new ClientSettingsConfigFile();
+      this.ircConfig = net.augustus.irc.IrcManager.getInstance().getConfig();
    }
 
    public void initVisualsConfig(ModuleManager moduleManager) {

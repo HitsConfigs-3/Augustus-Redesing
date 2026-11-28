@@ -156,7 +156,8 @@ public class ModuleSettingsPanel {
          return;
       }
 
-      if (this.currentModule.handleBehaviorCardClick(mouseX, mouseY, mouseButton)) {
+      boolean showBehavior = TAB_ALL.equals(this.activeSectionKey) || TAB_GENERAL.equals(this.activeSectionKey);
+      if (showBehavior && this.currentModule.handleBehaviorCardClick(mouseX, mouseY, mouseButton)) {
          return;
       }
 

@@ -604,6 +604,9 @@ if (this.currentScreen != null) {
 
    public synchronized void setSession(Session session2) {
       this.session = session2;
+      if (net.augustus.irc.IrcManager.getInstance() != null) {
+         net.augustus.irc.IrcManager.getInstance().onSessionApplied(session2);
+      }
    }
 
    public int getRightClickDelayTimer() {
@@ -2588,14 +2591,16 @@ if (eventKey > 0) {
       
       this.startTimerHackThread();
       mc = this;
-      if (this.gameSettings.overrideHeight > 0) {
-            mc = this;
-
-if (this.gameSettings.overrideWidth > 0) {
-               this.displayWidth = this.gameSettings.overrideWidth;
-               this.displayHeight = this.gameSettings.overrideHeight;
-            }
+      if (this.gameSettings.overrideHeight > 0 && this.gameSettings.overrideWidth > 0) {
+         int ovW = this.gameSettings.overrideWidth;
+         int ovH = this.gameSettings.overrideHeight;
+         if (!(ovW == 854 && ovH == 480)) {
+            this.displayWidth = ovW;
+            this.displayHeight = ovH;
+            this.tempDisplayWidth = ovW;
+            this.tempDisplayHeight = ovH;
          }
+      }
 
          LOGGER.info("LWJGL Version: " + Sys.getVersion());
          this.setWindowIcon(false);
@@ -2650,6 +2655,7 @@ if (this.gameSettings.overrideWidth > 0) {
       }
 
       OpenGlHelper.initializeTextures();
+      net.augustus.ui.StartupSplashRenderer.showInitial();
             this.framebufferMc = new ResizableFramebuffer(this.displayWidth, this.displayHeight, true);
             this.blurFramebuffer = new ResizableFramebuffer(this.displayWidth, this.displayHeight, true);
             this.framebufferMc.setFramebufferColor(0.0F, 0.0F, 0.0F, 0.0F);
@@ -2665,6 +2671,7 @@ if (this.gameSettings.overrideWidth > 0) {
             this.renderEngine = new TextureManager(this.mcResourceManager);
             this.mcResourceManager.registerReloadListener(this.renderEngine);
             this.drawSplashScreen(this.renderEngine);
+            net.augustus.ui.StartupSplashRenderer.advance(0.16F);
             this.skinManager = new SkinManager(this.renderEngine, new File(this.fileAssets, "skins"), this.sessionService);
             this.saveLoader = new AnvilSaveConverter(new File(this.mcDataDir, "saves"));
             this.mcSoundHandler = new SoundHandler(this.mcResourceManager, this.gameSettings);
@@ -2684,6 +2691,7 @@ if (this.gameSettings.language != null) {
             this.mcResourceManager.registerReloadListener(new GrassColorReloadListener());
             this.mcResourceManager.registerReloadListener(new FoliageColorReloadListener());
             AchievementList.openInventory.setStatStringFormatter(new Minecraft.DefaultStatStringFormat(this));
+            net.augustus.ui.StartupSplashRenderer.advance(0.28F);
             this.mouseHelper = new RawMouseHelper();
             this.checkGLError("Pre startup");
             GlStateManager.enableTexture2D();
@@ -2698,6 +2706,7 @@ if (this.gameSettings.language != null) {
             GlStateManager.loadIdentity();
             GlStateManager.matrixMode(5888);
             this.checkGLError("Startup");
+            net.augustus.ui.StartupSplashRenderer.advance(0.36F);
             this.textureMapBlocks = new TextureMap("textures");
             this.textureMapBlocks.setMipmapLevels(this.gameSettings.mipmapLevels);
             this.renderEngine.loadTickableTexture(TextureMap.locationBlocksTexture, this.textureMapBlocks);
@@ -2709,6 +2718,7 @@ if (this.gameSettings.language != null) {
       mipmapLevels = this.gameSettings.mipmapLevels > 0 ? 1 : 0;
 
       mc.textureMapBlocks.setBlurMipmapDirect(false, (mipmapLevels != 0));
+         net.augustus.ui.StartupSplashRenderer.advance(0.54F);
          this.modelManager = new ModelManager(this.textureMapBlocks);
          this.mcResourceManager.registerReloadListener(this.modelManager);
          this.renderItem = new RenderItem(this.renderEngine, this.modelManager);
@@ -2726,9 +2736,11 @@ if (this.gameSettings.language != null) {
          this.effectRenderer = new EffectRenderer(this.theWorld, this.renderEngine);
          this.checkGLError("Post startup");
          this.ingameGUI = new GuiIngameHook(this);
+         net.augustus.ui.StartupSplashRenderer.advance(0.66F);
          Augustus.getInstance().preStart();
          Augustus.getInstance().start();
          Runtime.getRuntime().addShutdownHook(new Thread(Augustus.getInstance()::stop, "OpenAugustus-ShutdownHook"));
+         net.augustus.ui.StartupSplashRenderer.advance(1.0F);
          mc = this;
 if (this.serverName != null) {
 this.displayGuiScreen(new GuiConnecting(new GuiMainMenu(), this, this.serverName, this.serverPort));
@@ -2738,8 +2750,11 @@ mc = this;
          mc.displayGuiScreen(new GuiMainMenu());
 }
 
-      this.renderEngine.deleteTexture(this.mojangLogo);
-      this.mojangLogo = null;
+      net.augustus.ui.StartupSplashRenderer.dispose();
+      if (this.mojangLogo != null) {
+         this.renderEngine.deleteTexture(this.mojangLogo);
+         this.mojangLogo = null;
+      }
       this.loadingScreen = new LoadingScreenRenderer(this);
       if (this.gameSettings.fullScreen && !this.fullscreen) {
          this.toggleFullscreen();
@@ -2790,6 +2805,7 @@ mc = this;
          this.timer.updateTimer();
          this.realTimer.updateTimer();
       }
+      net.augustus.irc.IrcManager.getInstance().onClientLoopTick();
 
       float f;
       f = this.timer.renderPartialTicks;
@@ -3323,15 +3339,16 @@ userInfo = gameConfiguration.userInfo;
       LOGGER.info("(Session ID is " + this.session.getSessionID() + ")");
       this.isDemo = gameConfiguration.gameInfo.isDemo;
       int width = gameConfiguration.displayInfo.width;
-      width = gameConfiguration.displayInfo.width > 0 ? gameConfiguration.displayInfo.width : 1;
+      int height = gameConfiguration.displayInfo.height;
+      if (width <= 0 || height <= 0 || (width == 854 && height == 480)) {
+         width = 1366;
+         height = 768;
+      }
 
       this.displayWidth = width;
-      int height = gameConfiguration.displayInfo.height;
-      height = gameConfiguration.displayInfo.height > 0 ? gameConfiguration.displayInfo.height : 1;
-
       this.displayHeight = height;
-      this.tempDisplayWidth = gameConfiguration.displayInfo.width;
-      this.tempDisplayHeight = gameConfiguration.displayInfo.height;
+      this.tempDisplayWidth = width;
+      this.tempDisplayHeight = height;
       this.fullscreen = gameConfiguration.displayInfo.fullscreen;
       this.java64bit = isJvm64bit();
       this.theIntegratedServer = new IntegratedServer(this);
@@ -4098,6 +4115,7 @@ isSingleplayer = this.theIntegratedServer.getPublic();
    }
 
    public void launchIntegratedServer(String str, String str2, WorldSettings worldSettings) {
+      net.augustus.irc.IrcManager.getInstance().ensureOriginalNickBeforeConnect();
       boolean flag;
       WorldInfo worldInfo;
       WorldSettings worldSettings2;
@@ -4258,56 +4276,7 @@ File file = new File(new File(OSUtil.detectOS().getMinecraftDirectory()), "crash
     * </p>
     */
    private void drawSplashScreen(TextureManager textureManager) throws LWJGLException {
-      ScaledResolution sr = new ScaledResolution(this);
-      int scaleFactor = sr.getScaleFactor();
-      Framebuffer framebuffer = new Framebuffer(sr.getScaledWidth() * scaleFactor, sr.getScaledHeight() * scaleFactor, true);
-      framebuffer.bindFramebuffer(false);
-      GlStateManager.matrixMode(5889);
-      GlStateManager.loadIdentity();
-      GlStateManager.ortho(0.0, (double)sr.getScaledWidth(), (double)sr.getScaledHeight(), 0.0, 1000.0, 3000.0);
-      GlStateManager.matrixMode(5888);
-      GlStateManager.loadIdentity();
-      GlStateManager.translate(0.0F, 0.0F, -2000.0F);
-      GlStateManager.disableLighting();
-      GlStateManager.disableFog();
-      GlStateManager.disableDepth();
-      GlStateManager.enableTexture2D();
-      BufferedImage image = null;
-      InputStream resourceAsStream = null;
-
-      try {
-         resourceAsStream = Minecraft.class.getClassLoader().getResourceAsStream("assets/augustus/pictures/splashRedesign.png");
-         if (resourceAsStream == null) {
-            // Safety net only (the art ships with the client): the previous splash art rather than a black box.
-            resourceAsStream = Minecraft.class.getClassLoader().getResourceAsStream("assets/augustus/pictures/startLogo.png");
-         }
-         if (resourceAsStream != null) {
-            image = ImageIO.read(resourceAsStream);
-         }
-      } catch (IOException e) {
-         LOGGER.error("Couldn't load the Augustus splash art", e);
-      } finally {
-         IOUtils.closeQuietly(resourceAsStream);
-      }
-
-      if (image != null) {
-         this.mojangLogo = textureManager.getDynamicTextureLocation("logo", new DynamicTexture(image));
-         textureManager.bindTexture(this.mojangLogo);
-         // Linear filtering: DynamicTexture defaults to nearest, which makes the splash text crawl when the
-         // window is not exactly 1920x1080. The art is the first thing a user sees, so it scales smoothly.
-         GlStateManager.glTexParameteri(3553, 10241, 9729);
-         GlStateManager.glTexParameteri(3553, 10240, 9729);
-         this.drawSplashArt(image.getWidth(), image.getHeight(), sr.getScaledWidth(), sr.getScaledHeight());
-      }
-
-      GlStateManager.color(1.0F, 1.0F, 1.0F, 1.0F);
-      GlStateManager.disableLighting();
-      GlStateManager.disableFog();
-      framebuffer.unbindFramebuffer();
-      framebuffer.framebufferRender(sr.getScaledWidth() * scaleFactor, sr.getScaledHeight() * scaleFactor);
-      GlStateManager.enableAlpha();
-      GlStateManager.alphaFunc(516, 0.1F);
-      this.updateDisplay();
+      net.augustus.ui.StartupSplashRenderer.advance(0.10F);
    }
 
    /**
